@@ -3,6 +3,8 @@ import clsx from "clsx";
 type IconProps = {
   name: string;
   className?: string;
+  monochrome?: boolean;
+  active?: boolean;
 };
 
 const accentFor = (name: string) => {
@@ -26,11 +28,13 @@ const accentFor = (name: string) => {
   return map[name] ?? "#C08A2B";
 };
 
-export function DoodleIcon({ name, className }: IconProps) {
-  const accent = accentFor(name);
+export function DoodleIcon({ name, className, monochrome = false, active = false }: IconProps) {
+  const accent = monochrome ? (active ? "#080808" : "#7a7a7a") : accentFor(name);
+  const stroke = monochrome ? (active ? "#080808" : "#7a7a7a") : "#080808";
+  const fillActive = active ? "#080808" : "none";
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true" className={clsx("h-11 w-11", className)}>
-      <g fill="none" stroke="#080808" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <g fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         {name === "piano" || name === "music" ? (
           <>
             <path d="M18 44V16l28-4v28" />
@@ -129,7 +133,25 @@ export function DoodleIcon({ name, className }: IconProps) {
             <path d="M24 32l6 6 12-14" stroke={accent} />
           </>
         ) : name === "heart" ? (
-          <path d="M32 50C20 42 12 35 12 24c0-7 5-12 12-12 4 0 7 2 8 5 1-3 4-5 8-5 7 0 12 5 12 12 0 11-8 18-20 26z" stroke={accent} />
+          <path d="M32 50C20 42 12 35 12 24c0-7 5-12 12-12 4 0 7 2 8 5 1-3 4-5 8-5 7 0 12 5 12 12 0 11-8 18-20 26z" fill={fillActive} stroke={accent} />
+        ) : name === "home" ? (
+          <>
+            <path d="M12 31L32 14l20 17" fill="none" />
+            <path d="M18 29v23h28V29" fill={fillActive} />
+            <path d="M28 52V39h8v13" stroke={active ? "#ffffff" : stroke} />
+          </>
+        ) : name === "map" ? (
+          <>
+            <path d="M14 16l12-5 12 5 12-5v37l-12 5-12-5-12 5z" fill={fillActive} />
+            <path d="M26 11v37M38 16v37" stroke={active ? "#ffffff" : stroke} />
+          </>
+        ) : name === "family" ? (
+          <>
+            <circle cx="24" cy="24" r="7" fill={active ? "#080808" : "none"} />
+            <circle cx="42" cy="26" r="6" fill={active ? "#080808" : "none"} />
+            <path d="M11 52c2-11 9-18 17-18 7 0 13 5 15 14" fill={fillActive} />
+            <path d="M34 52c1-8 6-13 12-13 5 0 9 4 10 13" fill={fillActive} />
+          </>
         ) : name === "bell" ? (
           <>
             <path d="M20 42h24l-3-5V27c0-7-4-12-9-12s-9 5-9 12v10z" />
