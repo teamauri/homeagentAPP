@@ -34,7 +34,7 @@ export function AppShell({ children, activeTab, onTabChange }: { children: React
               </span>
             </div>
           </div>
-          <div className="no-scrollbar flex-1 overflow-y-auto px-[31px] pb-28 pt-16">{children}</div>
+          <div className="no-scrollbar flex-1 overflow-y-auto px-[31px] pb-28 pt-14">{children}</div>
           <nav className="border-t border-line bg-white/95 px-5 pb-7 pt-3 backdrop-blur">
             <div className="grid grid-cols-5 gap-1">
               {tabs.map((tab) => {

@@ -12,35 +12,35 @@ export function CalendarView() {
   const timeline = [calendarEvents[0], calendarEvents[1], suggestedEvents[0], calendarEvents[2]];
 
   return (
-    <div className="space-y-8">
-      <PageHeader title="Calendar" subtitle="What's ahead for your family." action={<button className="mt-5 grid h-12 w-12 place-items-center rounded-full border border-line text-2xl">☼</button>} />
+    <div className="space-y-7">
+      <PageHeader title="Calendar" subtitle="What's ahead for your family." action={<button className="mt-4 grid h-11 w-11 place-items-center rounded-full border border-line text-xl">☼</button>} />
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex gap-2">
           {["All", "Sophie", "Leo", "Baby"].map((filter, index) => (
-            <button key={filter} className={index === 0 ? "rounded-full bg-ink px-5 py-2.5 text-[17px] text-white" : "rounded-full border border-line px-5 py-2.5 text-[17px] text-ink"}>{filter}</button>
+            <button key={filter} className={index === 0 ? "rounded-full bg-ink px-4 py-2 text-[15px] text-white" : "rounded-full border border-line px-4 py-2 text-[15px] text-ink"}>{filter}</button>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           {["Day", "Week"].map((filter, index) => (
-            <button key={filter} className={index === 0 ? "rounded-full bg-ink px-5 py-2.5 text-[17px] text-white" : "rounded-full border border-line px-5 py-2.5 text-[17px] text-ink"}>{filter}</button>
+            <button key={filter} className={index === 0 ? "rounded-full bg-ink px-4 py-2 text-[15px] text-white" : "rounded-full border border-line px-4 py-2 text-[15px] text-ink"}>{filter}</button>
           ))}
         </div>
       </div>
 
-      <div className="relative pl-10 before:absolute before:left-[9px] before:top-3 before:h-[calc(100%-2rem)] before:w-px before:bg-line">
+      <div className="relative pl-9 before:absolute before:left-[9px] before:top-3 before:h-[calc(100%-2rem)] before:w-px before:bg-line">
         {timeline.map((event) => (
-          <div key={event.id} className="relative border-b border-line py-6 last:border-b-0">
-            <span className="absolute -left-[40px] top-8 h-5 w-5 rounded-full border border-line bg-white" />
-            <div className="flex items-center gap-5">
+          <div key={event.id} className="relative border-b border-line py-5 last:border-b-0">
+            <span className="absolute -left-[37px] top-8 h-4 w-4 rounded-full border border-line bg-white" />
+            <div className="flex items-center gap-4">
               <IconBubble icon={event.icon} />
               <div className="min-w-0 flex-1">
-                <div className="text-[16px] text-muted">{event.person === "family" ? "Family" : "Sophie"}</div>
-                <h3 className="mt-1 text-[22px] font-medium leading-tight">{event.title}</h3>
-                <div className="mt-2 text-[20px] text-muted">{event.dateLabel} · {event.timeLabel}</div>
-                <p className="mt-3 text-[16px] leading-5 text-muted">{event.body}</p>
+                <div className="text-[14px] text-muted">{event.person === "family" ? "Family" : "Sophie"}</div>
+                <h3 className="mt-1 text-[18px] font-medium leading-tight">{event.title}</h3>
+                <div className="mt-1 text-[16px] text-muted">{event.dateLabel} · {event.timeLabel}</div>
+                <p className="mt-2 text-[14px] leading-5 text-muted">{event.body}</p>
               </div>
-              <div className="flex flex-col items-end gap-3">
+              <div className="flex shrink-0 items-center gap-2">
                 <StatusPill tone={statusTone(event.status)}>{event.statusLabel}</StatusPill>
                 <RowChevron />
               </div>
@@ -52,9 +52,9 @@ export function CalendarView() {
       <Card className="px-5 py-4">
         <div className="mb-2 flex items-center gap-4">
           <IconBubble icon="spark" small />
-          <h3 className="font-display text-[26px]">This week</h3>
+          <h3 className="font-display text-[24px]">This week</h3>
         </div>
-        <div className="divide-y divide-line pl-14 text-[17px] leading-6">
+        <div className="divide-y divide-line pl-14 text-[15px] leading-6">
           <p className="py-2">2 activities planned, 1 needs your review</p>
           <p className="py-2">Sophie has piano on Tue and preschool on Fri</p>
           <p className="py-2">1 family dinner suggestion is ready</p>

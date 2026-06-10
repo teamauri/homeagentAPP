@@ -20,12 +20,12 @@ function imageToneClass(tone = "green") {
 
 export function MomentsView() {
   return (
-    <div className="space-y-8">
-      <PageHeader title="Moments" subtitle="All your moments, in one timeline." action={<button className="mt-5 grid h-12 w-12 place-items-center rounded-full border border-line text-2xl">✧</button>} />
+    <div className="space-y-7">
+      <PageHeader title="Moments" subtitle="All your moments, in one timeline." action={<button className="mt-4 grid h-11 w-11 place-items-center rounded-full border border-line text-xl">✧</button>} />
 
-      <div className="grid grid-cols-4 rounded-[24px] border border-line p-1 text-[17px]">
+      <div className="grid grid-cols-4 rounded-[24px] border border-line p-1 text-[15px]">
         {["All", "Auri", "Phone", "Reading"].map((filter, index) => (
-          <button key={filter} className={index === 0 ? "rounded-[20px] bg-white px-2 py-3 text-ink shadow-[0_8px_22px_rgba(0,0,0,0.12)]" : "rounded-[20px] px-2 py-3 text-muted"}>{filter}</button>
+          <button key={filter} className={index === 0 ? "rounded-[20px] bg-white px-2 py-2.5 text-ink shadow-[0_8px_22px_rgba(0,0,0,0.12)]" : "rounded-[20px] px-2 py-2.5 text-muted"}>{filter}</button>
         ))}
       </div>
 
@@ -33,22 +33,22 @@ export function MomentsView() {
         {moments.map((moment) => (
           <div key={moment.id} className="relative pb-7">
             <span className="absolute -left-[20px] top-1 h-3 w-3 rounded-full bg-line" />
-            <div className="mb-5 flex items-center gap-4 text-[18px] text-muted">
+            <div className="mb-4 flex items-center gap-4 text-[16px] text-muted">
               <span>{moment.timeLabel}</span>
               <span className="h-px flex-1 bg-line" />
             </div>
-            <Card className="flex min-h-[142px] items-center gap-4 px-4 py-4">
-              <IconBubble icon={moment.icon} />
+            <Card className="flex min-h-[126px] items-center gap-3 px-4 py-4">
+              <IconBubble icon={moment.icon} small />
               <div className="min-w-0 flex-1 py-1">
                 <StatusPill tone={sourceTone(moment.sourceLabel)}>{moment.sourceLabel}</StatusPill>
-                <h3 className="mt-3 text-[21px] font-medium leading-tight">{moment.title}</h3>
-                <p className="mt-2 text-[16px] leading-5 text-muted">{moment.sourceLabel === "Auri Robot" ? "Auri Robot clip · Leo" : moment.body}</p>
-                <div className="mt-3 flex items-center gap-2 text-[17px]">
+                <h3 className="mt-2 text-[18px] font-medium leading-tight">{moment.title}</h3>
+                <p className="mt-1 text-[14px] leading-5 text-muted">{moment.sourceLabel === "Auri Robot" ? "Auri Robot clip · Leo" : moment.body}</p>
+                <div className="mt-2 flex items-center gap-2 text-[14px]">
                   <span className={moment.status === "draft" ? "h-2 w-2 rounded-full bg-orange-400" : "h-2 w-2 rounded-full bg-green-500"} />
                   <span className="text-muted">{moment.statusLabel}</span>
                 </div>
               </div>
-              <div className={`relative h-[86px] w-[108px] shrink-0 overflow-hidden rounded-[15px] bg-gradient-to-br ${imageToneClass(moment.imageTone)}`}>
+              <div className={`relative h-[82px] w-[96px] shrink-0 overflow-hidden rounded-[15px] bg-gradient-to-br ${imageToneClass(moment.imageTone)}`}>
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_34%,rgba(255,255,255,0.75)_0_9%,transparent_10%),radial-gradient(circle_at_62%_42%,rgba(255,255,255,0.65)_0_11%,transparent_12%),linear-gradient(135deg,transparent_0_54%,rgba(0,0,0,0.16)_55%)]" />
                 {moment.id === "sunday-story" ? <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-0.5 p-0.5">{[0, 1, 2, 3].map((tile) => <span key={tile} className={`rounded-[6px] bg-gradient-to-br ${imageToneClass(["green", "orange", "purple", "pink"][tile])}`} />)}</div> : null}
               </div>
@@ -59,7 +59,7 @@ export function MomentsView() {
 
       <Card className="flex items-center gap-4 border-[#f1dfbd] px-4 py-4">
         <IconBubble icon="spark" small />
-        <p className="flex-1 text-[20px] leading-7">Sophie's Sunday was full of giggles, cozy moments, and little surprises.</p>
+        <p className="flex-1 text-[17px] leading-6">Sophie's Sunday was full of giggles, cozy moments, and little surprises.</p>
         <RowChevron />
       </Card>
     </div>
