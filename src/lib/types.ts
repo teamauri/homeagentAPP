@@ -1,4 +1,4 @@
-export type TabKey = "today" | "calendar" | "journeys" | "moments" | "family";
+export type TabKey = "today" | "chat" | "memory";
 export type Helper = "Milo" | "Bibi" | "Mira" | "Nora" | "You";
 export type PersonId = "sophie" | "leo" | "baby" | "mom" | "dad" | "grandma" | "family";
 export type SourceType = "auri" | "phone" | "reading" | "calendar" | "photos" | "external";

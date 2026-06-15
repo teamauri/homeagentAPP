@@ -1,7 +1,11 @@
 node_modules
 .next
+.next.broken-*
 out
 .env*.local
 .DS_Store
 .vercel
 .env*
+*.tsbuildinfo
+.claude/
+*.dataless-backup

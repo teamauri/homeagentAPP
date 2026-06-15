@@ -1,5 +1,5 @@
 import { moments } from "@/lib/mock-data";
-import { Card, IconBubble, PageHeader, RowChevron, StatusPill } from "./Primitives";
+import { Card, IconBubble, RowChevron, StatusPill } from "./Primitives";
 
 function sourceTone(source: string) {
   if (source === "Auri Robot") return "green" as const;
@@ -21,8 +21,6 @@ function imageToneClass(tone = "green") {
 export function MomentsView() {
   return (
     <div className="space-y-7">
-      <PageHeader title="Moments" subtitle="All your moments, in one timeline." action={<button className="mt-4 grid h-11 w-11 place-items-center rounded-full border border-line text-xl">✧</button>} />
-
       <div className="grid grid-cols-4 rounded-[24px] border border-line p-1 text-[15px]">
         {["All", "Auri", "Phone", "Reading"].map((filter, index) => (
           <button key={filter} className={index === 0 ? "rounded-[20px] bg-white px-2 py-2.5 text-ink shadow-[0_8px_22px_rgba(0,0,0,0.12)]" : "rounded-[20px] px-2 py-2.5 text-muted"}>{filter}</button>
