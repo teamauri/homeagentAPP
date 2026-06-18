@@ -7,7 +7,7 @@ export type { TabKey };
 
 const tabs: { key: TabKey; label: string; icon: string }[] = [
   { key: "chat", label: "Chat", icon: "family" },
-  { key: "today", label: "Today", icon: "home" },
+  { key: "today", label: "Inbox", icon: "bell" },
   { key: "memory", label: "Memory", icon: "photos" },
 ];
 
