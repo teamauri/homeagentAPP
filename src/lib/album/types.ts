@@ -71,6 +71,8 @@ export interface DayGroup {
   ageShort?: string; // "3y 4m"
   caption: string;
   isFirstDay: boolean;
+  /** demo-store memory id when this day is a real Story → links to /memory/[id]. */
+  memoryId?: string;
   media: OrganizedMedia[];
 }
 

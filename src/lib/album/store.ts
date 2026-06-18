@@ -60,6 +60,7 @@ function demoStoryDays(): DayGroup[] {
       ageShort: ageAt(child?.birthday, dateISO)?.short,
       caption: it.body || it.title,
       isFirstDay: false,
+      memoryId: it.id,
       media: organized,
     };
   });

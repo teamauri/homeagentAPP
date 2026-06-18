@@ -184,7 +184,7 @@ function Feed({ days }: { days: DayGroup[] }) {
           ) : null}
           <div className="grid grid-cols-3 gap-1.5">
             {day.media.map((m) => (
-              <Tile key={m.id} media={m} />
+              <Tile key={m.id} media={m} href={day.memoryId ? `/memory/${day.memoryId}` : m.url} sameTab={Boolean(day.memoryId)} />
             ))}
           </div>
         </section>
@@ -193,7 +193,7 @@ function Feed({ days }: { days: DayGroup[] }) {
   );
 }
 
-function Tile({ media }: { media: OrganizedMedia }) {
+function Tile({ media, href, sameTab }: { media: OrganizedMedia; href?: string; sameTab?: boolean }) {
   const inner = (
     <>
       {media.thumbDataUrl ? (
@@ -218,14 +218,15 @@ function Tile({ media }: { media: OrganizedMedia }) {
   );
 
   const className = "relative aspect-square overflow-hidden rounded-[11px]";
-  // Real ingested media is openable/playable in a new tab; placeholders are not.
-  return media.url ? (
-    <a href={media.url} target="_blank" rel="noreferrer" className={className}>
-      {inner}
-    </a>
-  ) : (
-    <div className={className}>{inner}</div>
-  );
+  // A real Story links to its detail page; a bare media URL opens in a new tab.
+  if (href) {
+    return (
+      <a href={href} target={sameTab ? undefined : "_blank"} rel={sameTab ? undefined : "noreferrer"} className={className}>
+        {inner}
+      </a>
+    );
+  }
+  return <div className={className}>{inner}</div>;
 }
 
 function FirstsWall({ firsts }: { firsts: FirstItem[] }) {
