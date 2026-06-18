@@ -9,3 +9,5 @@ out
 *.tsbuildinfo
 .claude/
 *.dataless-backup
+public/demo-media/*
+!public/demo-media/.gitkeep

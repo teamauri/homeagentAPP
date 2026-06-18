@@ -1,49 +1,45 @@
 export const demoFamilyContext = {
   family: {
-    name: "Sophie’s Family",
+    name: "Jane’s Family",
     members: [
-      { id: "mom", name: "Mom", role: "parent" },
-      { id: "dad", name: "Dad", role: "parent" },
-      { id: "sophie", name: "Sophie", role: "child" },
+      { id: "mom", name: "Jane", role: "parent" },
+      { id: "dad", name: "Marcus", role: "parent" },
+      { id: "mia", name: "Mia", role: "child" },
       { id: "leo", name: "Leo", role: "child" },
-      { id: "baby", name: "Baby", role: "baby" },
-      { id: "grandma", name: "Grandma", role: "extended_family" },
     ],
   },
   teamMembers: [
     {
-      id: "nora",
-      name: "Nora the Home Coordinator",
-      handles: ["calendar", "school emails", "reminders", "sports", "family logistics"],
+      id: "iris",
+      name: "Iris the eye",
+      handles: ["films firsts", "robot clips", "family album", "photo highlights", "video receipts"],
     },
     {
-      id: "nina",
-      name: "Nina the Baby Care Advisor",
-      handles: ["feeds", "sleep", "diapers", "growth", "baby care logs", "caregiver handoffs"],
-    },
-    {
-      id: "milo",
-      name: "Milo the Piano Coach",
-      handles: ["piano lessons", "teacher notes", "practice plans", "lesson recordings"],
-    },
-    {
-      id: "bibi",
-      name: "Bibi the Book Buddy",
+      id: "lumi",
+      name: "Lumi the companion",
       handles: ["reading", "books", "questions", "reading moments"],
     },
     {
-      id: "mira",
-      name: "Mira the Memory Keeper",
-      handles: ["photos", "videos", "Auri Robot clips", "stories", "Grandma updates"],
+      id: "vita",
+      name: "Vita the keeper",
+      handles: ["calendar", "reminders", "school emails", "logs", "meds", "naps", "appointments", "family logistics"],
+    },
+    {
+      id: "nova",
+      name: "Nova the coach",
+      handles: ["home workout", "quick sets", "form", "reps"],
+    },
+    {
+      id: "sera",
+      name: "Sera the calm",
+      handles: ["breathing", "a hard day", "pointing you to a real person"],
     },
   ],
   availableLocalActions: [
-    "create_calendar_draft",
     "create_reminder_draft",
-    "create_baby_log",
+    "create_calendar_draft",
     "create_memory_draft",
     "create_story_draft",
-    "create_lesson_recap",
     "reply_only",
   ],
 } as const;

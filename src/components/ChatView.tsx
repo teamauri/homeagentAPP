@@ -9,7 +9,7 @@ import { TeamAgentId } from "@/lib/team";
 
 type ChatTurn = {
   id: string;
-  sender: "Mom" | "Dad" | "Nora" | "Milo" | "Mira";
+  sender: "Mom" | "Dad" | "Vita" | "Iris" | "Lumi";
   time: string;
   avatar: "mom" | "dad" | TeamAgentId;
   text: string;
@@ -27,14 +27,13 @@ export type LiveChatTurn = {
 };
 
 const chatThreadIds = [
-  "mom-basketball",
-  "nora-basketball",
-  "dad-pickup",
-  "nora-pickup",
-  "mom-piano",
-  "milo-piano",
-  "mom-grandma",
-  "mira-grandma",
+  "mom-meds",
+  "vita-meds",
+  "dad-film",
+  "iris-film",
+  "mom-react",
+  "vita-checkup",
+  "lumi-reading",
 ];
 
 const turns: ChatTurn[] = chatFixtureMessages
