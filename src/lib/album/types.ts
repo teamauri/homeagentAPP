@@ -52,8 +52,11 @@ export interface OrganizedMedia {
   id: string;
   kind: "photo" | "video";
   source: "phone" | "auri";
-  /** Inline data URL for uploaded photos; undefined for seed/gradient items. */
+  /** Thumbnail to render: inline data URL (phone organize) or a real CDN/local
+   * URL (robot Stories ingested via DockKit). Undefined → gradient tone tile. */
   thumbDataUrl?: string;
+  /** Full media URL to open/play (real ingested media). */
+  url?: string;
   /** Gradient class for seed/placeholder tiles. */
   tone?: string;
   durationLabel?: string;

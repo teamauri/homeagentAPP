@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { DayGroup, FirstItem, GrowthData, MilestoneSession, OrganizedMedia } from "@/lib/album/types";
 
 // Fixed gradient classes for seed/placeholder tones (kept literal so Tailwind
-// includes them). Uploaded photos render their real thumbnail instead.
+// includes them). Real photos (phone organize) and ingested robot Stories
+// (DockKit) render their actual thumbnail instead.
 const TONE: Record<string, string> = {
   g1: "bg-gradient-to-br from-[#a8d8ad] via-[#d9c89b] to-[#5e8f54]",
   g2: "bg-gradient-to-br from-[#f7d8ad] via-[#c0794a] to-[#f0e6d4]",
@@ -43,11 +44,14 @@ export function MomentsView() {
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  async function refresh() {
+    const res = await fetch("/api/memory/growth", { cache: "no-store" });
+    const data = await res.json();
+    if (data.growth) setGrowth(data.growth);
+  }
+
   useEffect(() => {
-    fetch("/api/memory/growth")
-      .then((r) => r.json())
-      .then((d) => setGrowth(d.growth))
-      .catch(() => {});
+    refresh().catch(() => {});
   }, []);
 
   async function onFiles(files: FileList | null) {
@@ -163,7 +167,7 @@ function Feed({ days }: { days: DayGroup[] }) {
   return (
     <div className="mt-4">
       {days.map((day) => (
-        <section key={day.dateISO} className="mb-6">
+        <section key={day.dateISO + day.dateLabel} className="mb-6">
           <h3 className="font-display text-[16px] tracking-[-0.02em] text-ink">
             {day.dateLabel}
             {day.ageShort ? <span className="ml-1.5 text-[11px] font-semibold text-[#b3ada3]">· {day.ageShort}</span> : null}
@@ -190,9 +194,10 @@ function Feed({ days }: { days: DayGroup[] }) {
 }
 
 function Tile({ media }: { media: OrganizedMedia }) {
-  return (
-    <div className="relative aspect-square overflow-hidden rounded-[11px]">
+  const inner = (
+    <>
       {media.thumbDataUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img src={media.thumbDataUrl} alt="" className="h-full w-full object-cover" />
       ) : (
         <div className={"h-full w-full " + toneClass(media.tone)} />
@@ -209,7 +214,17 @@ function Tile({ media }: { media: OrganizedMedia }) {
           ) : null}
         </>
       ) : null}
-    </div>
+    </>
+  );
+
+  const className = "relative aspect-square overflow-hidden rounded-[11px]";
+  // Real ingested media is openable/playable in a new tab; placeholders are not.
+  return media.url ? (
+    <a href={media.url} target="_blank" rel="noreferrer" className={className}>
+      {inner}
+    </a>
+  ) : (
+    <div className={className}>{inner}</div>
   );
 }
 
@@ -221,6 +236,7 @@ function FirstsWall({ firsts }: { firsts: FirstItem[] }) {
         <article key={first.id} className="mb-3 overflow-hidden rounded-[16px] border border-line">
           <div className="relative h-[150px]">
             {first.thumbDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={first.thumbDataUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <div className={"h-full w-full " + toneClass(first.tone)} />
