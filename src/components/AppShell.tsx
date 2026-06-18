@@ -6,8 +6,8 @@ import { DoodleIcon } from "./Icons";
 export type { TabKey };
 
 const tabs: { key: TabKey; label: string; icon: string }[] = [
-  { key: "today", label: "Today", icon: "home" },
   { key: "chat", label: "Chat", icon: "family" },
+  { key: "today", label: "Today", icon: "home" },
   { key: "memory", label: "Memory", icon: "photos" },
 ];
 
@@ -73,25 +73,24 @@ function ShellHeader({ activeTab }: { activeTab: TabKey }) {
   return (
     <div className="shrink-0 bg-paper">
       <StatusBar />
-      <header className="flex items-start justify-between gap-3 px-[26px] pb-3 pt-4">
+      <header className="flex items-start justify-between gap-3 px-[26px] pb-3 pt-3">
         <div className="min-w-0">
-          <h1 className="font-display text-[33px] leading-[0.94] tracking-[-0.02em] text-ink">
+          <h1 className="font-display text-[34px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
             {titles[activeTab].split("\n").map((line) => (
               <span key={line} className="block">
                 {line}
               </span>
             ))}
           </h1>
-          <p className="mt-1.5 text-[14px] leading-5 text-muted">{subtitles[activeTab]}</p>
+          <p className="mt-2 text-[14px] leading-5 text-muted">{subtitles[activeTab]}</p>
         </div>
-        <button
-          aria-label="Settings"
-          className="mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-full border border-line bg-white text-ink shadow-[0_4px_14px_rgba(8,8,8,0.04)]"
-        >
-          <DoodleIcon name={activeTab === "memory" ? "spark" : "calendar"} className="h-5 w-5" monochrome active />
+        <button aria-label="Settings" className="mt-1.5 shrink-0 text-ink/55">
+          <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+          </svg>
         </button>
       </header>
-      <div className="mx-[26px] h-px bg-line" />
     </div>
   );
 }
