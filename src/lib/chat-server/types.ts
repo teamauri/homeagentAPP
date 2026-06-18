@@ -1,4 +1,8 @@
-export type TeamMemberId = "nora" | "nina" | "milo" | "bibi" | "mira" | "auri";
+import type { TeamAgentId } from "@/lib/team";
+
+// Canonical id for the AI teammate that handled a turn. Kept in lockstep with
+// the teammate roster defined in src/lib/team.ts.
+export type TeamMemberId = TeamAgentId;
 
 export type ChatIntent =
   | "calendar_event"

@@ -1,4 +1,10 @@
-export type TeamAgentId = "nina" | "milo" | "bibi" | "mira" | "nora" | "auri";
+// AI teammates — aligned with the AURI product site.
+// Iris (the eye), Lumi (the companion), Vita (the keeper) live in the family group.
+// Nova (the coach) and Sera (the calm) work with you privately, outside the group.
+// Auri is the device itself / the router that brings in the right teammate.
+export type TeamAgentId = "iris" | "lumi" | "vita" | "nova" | "sera" | "auri";
+
+export type TeamAgentScope = "group" | "private" | "device";
 
 export type TeamAgent = {
   id: TeamAgentId;
@@ -8,62 +14,69 @@ export type TeamAgent = {
   icon: string;
   tone: string;
   accent: string;
+  scope: TeamAgentScope;
 };
 
 export const teamAgents: TeamAgent[] = [
   {
-    id: "nina",
-    name: "Nina",
-    role: "Baby Care Advisor",
-    shortRole: "Baby Care",
-    icon: "bottle",
-    tone: "bg-[#fff0c9]",
-    accent: "text-[#e49b20]",
+    id: "iris",
+    name: "Iris",
+    role: "The eye — films the firsts",
+    shortRole: "The eye",
+    icon: "camera-note",
+    tone: "bg-[#FFE6DD]",
+    accent: "text-[#C0492C]",
+    scope: "group",
   },
   {
-    id: "milo",
-    name: "Milo",
-    role: "Piano Coach",
-    shortRole: "Piano Coach",
-    icon: "piano",
-    tone: "bg-[#eee6ff]",
-    accent: "text-[#7657c7]",
-  },
-  {
-    id: "bibi",
-    name: "Bibi",
-    role: "Book Buddy",
-    shortRole: "Book Buddy",
+    id: "lumi",
+    name: "Lumi",
+    role: "The companion — reads with your kids",
+    shortRole: "Reads along",
     icon: "book",
-    tone: "bg-[#dcf4df]",
-    accent: "text-[#2f9d5b]",
+    tone: "bg-[#EEE6FE]",
+    accent: "text-[#6B43B5]",
+    scope: "group",
   },
   {
-    id: "mira",
-    name: "Mira",
-    role: "Memory Keeper",
-    shortRole: "Memory Keeper",
-    icon: "mail-heart",
-    tone: "bg-[#ffe2d3]",
-    accent: "text-[#ee5d23]",
-  },
-  {
-    id: "nora",
-    name: "Nora",
-    role: "Home Coordinator",
-    shortRole: "Home Coordinator",
+    id: "vita",
+    name: "Vita",
+    role: "The keeper — logs, calendar, reminders, receipts",
+    shortRole: "Keeps things",
     icon: "calendar",
-    tone: "bg-[#dceaff]",
-    accent: "text-[#2e6fbd]",
+    tone: "bg-[#EAF6EF]",
+    accent: "text-[#1F5C42]",
+    scope: "group",
+  },
+  {
+    id: "nova",
+    name: "Nova",
+    role: "The coach — your home workout",
+    shortRole: "Your coach",
+    icon: "spark",
+    tone: "bg-[#F0EADE]",
+    accent: "text-[#6F6A60]",
+    scope: "private",
+  },
+  {
+    id: "sera",
+    name: "Sera",
+    role: "The calm — a breath on a hard day",
+    shortRole: "The calm",
+    icon: "heart",
+    tone: "bg-[#F0EADE]",
+    accent: "text-[#6F6A60]",
+    scope: "private",
   },
   {
     id: "auri",
     name: "Auri",
-    role: "Robot",
+    role: "The home robot that sees",
     shortRole: "Robot",
     icon: "robot",
-    tone: "bg-[#e6f8f6]",
-    accent: "text-[#128c86]",
+    tone: "bg-[#D8EEE2]",
+    accent: "text-[#2E7B5B]",
+    scope: "device",
   },
 ];
 
