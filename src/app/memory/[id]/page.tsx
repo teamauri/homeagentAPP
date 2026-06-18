@@ -46,8 +46,10 @@ export default function MemoryDetailPage() {
         const r = await fetch(`/api/memory/${encodeURIComponent(id)}`, { cache: "no-store" });
         if (r.ok) {
           const j = await r.json();
-          if (j?.item) {
-            if (!cancelled) setData({ item: j.item, media: j.media ?? [] });
+          // Data-layer owner returns { memory, media }; accept { item } too.
+          const memory = j?.memory ?? j?.item;
+          if (memory) {
+            if (!cancelled) setData({ item: memory, media: j.media ?? [] });
             return;
           }
         }
