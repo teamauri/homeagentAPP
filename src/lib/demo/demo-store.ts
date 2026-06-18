@@ -191,8 +191,9 @@ export function createDemoMemoryFromMedia(
   const hasAuri = mediaItems.some((item) => item.source === "auri");
   const hasPhone = mediaItems.some((item) => item.source === "phone");
   const sourceType: SourceType = hasAuri && hasPhone ? "photos" : first.sourceType;
+  const memoryId = nextId("memory", "__auriDemoMemoryCounter");
   const memory: DemoMemoryItem = {
-    id: nextId("memory", "__auriDemoMemoryCounter"),
+    id: memoryId,
     title: options?.title || first.title,
     body: options?.body || first.body,
     sourceLabel: hasAuri && hasPhone ? "Phone + Auri" : sourceLabel(first.source),
@@ -203,7 +204,8 @@ export function createDemoMemoryFromMedia(
     statusLabel: options?.statusLabel || "Ready",
     mediaIds: mediaItems.map((item) => item.id),
     createdAt: new Date().toISOString(),
-    targetRoute: `/memory/${first.id}`,
+    // [id] in /memory/[id] is the memory id; the detail page joins mediaIds.
+    targetRoute: `/memory/${memoryId}`,
     metadata: {
       mediaCount: mediaItems.length,
       sources: [...new Set(mediaItems.map((item) => item.source))],
