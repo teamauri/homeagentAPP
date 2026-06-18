@@ -1,16 +1,13 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&family=Caveat:wght@500;600;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Aligned with the AURI product site design tokens. */
-  --bg: #fbf8f2;
-  --ink: #1d1b17;
-  --muted: #6f6a60;
-  --line: #e9e2d6;
-  --soft: #f0eade;
+  --bg: #ffffff;
+  --ink: #080808;
+  --muted: #656565;
+  --line: #e6e1da;
+  --soft: #fbfaf8;
 }
 
 * {
@@ -20,13 +17,13 @@
 html,
 body {
   min-height: 100%;
-  background: #f0eade;
+  background: #f5f1eb;
   color: var(--ink);
 }
 
 body {
   margin: 0;
-  font-family: "Nunito Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: Avenir, "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 button {

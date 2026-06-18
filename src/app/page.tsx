@@ -21,7 +21,7 @@ function displayHelperName(name: string) {
 }
 
 export default function Home() {
-  const [tab, setTab] = useState<TabKey>("today");
+  const [tab, setTab] = useState<TabKey>("chat");
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
 
   const sendComposerMessage = async (message: string) => {
