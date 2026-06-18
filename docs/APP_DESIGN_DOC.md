@@ -174,7 +174,10 @@ AURI 是一台**会看的家庭机器人**——官网主张 **"It sees — so i
 | Chat 标题 | *Jane's Family* |
 | Memory 标题 | *Jane's Memory* |
 | Today 分区 | *Needs You* · *Upcoming* · *Your team* · *Recent in Memory* |
-| Memory 筛选 | *All · Auri · Phone · Reading* |
+| Memory 筛选 | *All · ★ Firsts · Auri · Phone* |
+| Memory 顶端 session | *Where Mia is now · 3y 4m* / *Little things that might help next* / *never a score, never a comparison* |
+| 成长流 | *By day · kept by Iris · N skipped* · *★ First* · *＋ Organize photos* |
+| Firsts 墙 | *N milestones, kept forever* |
 | 私聊入口 | *For you — Nova · Sera* |
 | 卡片 CTA | *Review · Confirm · Edit · Open draft · Watch · View* |
 | Robot 状态 | *Auri Robot · Living Room · Ready · not recording* |
@@ -185,9 +188,23 @@ AURI 是一台**会看的家庭机器人**——官网主张 **"It sees — so i
 
 | Day | 内容 | 状态 |
 |---|---|---|
-| **Day 1** | 地基：设计 tokens + 队友 Iris/Lumi/Vita/Nova/Sera + 清理孤儿 + 家庭 profile 数据模型 + 还原家庭群剧本 | ✅ 已完成并入库 (`3483560`) |
-| **Day 2** | ② 真整理相册（Gemini vision → Memory，产出观察）+ ③ reminder→视频回执闭环对接 | ⏳ 下一步 |
-| **Day 3** | ① Home agent 洞察卡 + Today 确认队列成型 + 官网三场景脚本化 + 视觉打磨 + 截图 | ⏳ |
+| **Day 1** | 地基：设计 tokens + 队友 Iris/Lumi/Vita/Nova/Sera + 清理孤儿 + 家庭 profile 数据模型 + 还原家庭群剧本 + UI 对齐 assets（底部 tab bar、Chat 默认首页、Inbox 改名、Inter 正文） | ✅ 已完成入库 |
+| **Day 2** | ② 真整理相册（Gemini vision，按天聚合的成长流 + 顶端 milestone/support session = Task ① + ★Firsts 纪念墙 + 回写 observations） | ✅ 已完成入库 |
+| **Day 3** | ③ reminder→视频回执（待机器人端 repo）+ Inbox 确认队列 + 官网三场景脚本化 + 打磨 | ⏳ |
+
+### 跑真 AI（相册整理 / 群聊路由）
+根目录建 `.env.local`：
+```
+GEMINI_API_KEY=...      # 相册 vision + 群聊兜底，必填才有真 AI
+DEEPSEEK_API_KEY=...    # 群聊文本路由（可选）
+GEMINI_MODEL=gemini-2.5-flash   # 可选，默认即此
+```
+没填 key：相册走确定性兜底、群聊走关键词兜底，**UI 流程完全一致**，能跑能 demo。
+
+### 相册整理实现位置
+- `src/lib/album/*`：`gemini-vision.ts`（真 Gemini 多图调用）、`fallback.ts`、`organize.ts`、`seed.ts`、`store.ts`、`types.ts`、`schema.ts`
+- `POST /api/album/organize`（整理）、`GET /api/memory/growth`（读取，force-dynamic）
+- `src/components/MomentsView.tsx`：Memory 视图（session + 筛选 + 按天成长流 + Firsts 墙 + 上传整理）
 
 ---
 
