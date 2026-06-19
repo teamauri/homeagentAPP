@@ -1,6 +1,7 @@
 import { Observation } from "@/lib/family/profile";
 import { ageAt, seedFamilyMembers } from "@/lib/family/profile";
 import { listDemoMedia, listDemoMemory } from "@/lib/demo/demo-store";
+import { persistStore, registerStore } from "@/lib/demo/persistence";
 import { seedGrowthData } from "./seed";
 import { DayGroup, FirstItem, GrowthData, MilestoneSession, OrganizedMedia } from "./types";
 import { OrganizeResult } from "./organize";
@@ -16,6 +17,29 @@ const g = globalThis as typeof globalThis & {
   __auriGrowthSkipped?: number;
   __auriGrowthObs?: Observation[];
 };
+
+registerStore({
+  key: "growth",
+  snapshot: () => ({
+    days: g.__auriGrowthDays,
+    firsts: g.__auriGrowthFirsts,
+    session: g.__auriGrowthSession,
+    skipped: g.__auriGrowthSkipped,
+    obs: g.__auriGrowthObs,
+  }),
+  restore: (data) => {
+    if (Array.isArray(data.days)) g.__auriGrowthDays = data.days as DayGroup[];
+    if (Array.isArray(data.firsts)) g.__auriGrowthFirsts = data.firsts as FirstItem[];
+    if (data.session) g.__auriGrowthSession = data.session as MilestoneSession;
+    if (typeof data.skipped === "number") g.__auriGrowthSkipped = data.skipped;
+    if (Array.isArray(data.obs)) g.__auriGrowthObs = data.obs as Observation[];
+  },
+});
+
+/** Persist the organized-album growth structure after a mutation. */
+export function persistGrowthStore() {
+  return persistStore("growth");
+}
 
 function sortByDateDesc<T extends { dateISO: string }>(items: T[]) {
   return [...items].sort((a, b) => (a.dateISO < b.dateISO ? 1 : -1));

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { addDemoMedia, createDemoMemoryFromMedia, DemoMediaInput } from "@/lib/demo/demo-store";
+import { addDemoMedia, createDemoMemoryFromMedia, DemoMediaInput, persistDemoStore } from "@/lib/demo/demo-store";
 import { isFile, storeUploadedFile } from "@/lib/demo/media-storage";
+import { ensureHydrated } from "@/lib/demo/persistence";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,7 @@ async function inputsFromFormData(formData: FormData): Promise<DemoMediaInput[]>
 }
 
 export async function POST(request: Request) {
+  await ensureHydrated();
   const contentType = request.headers.get("content-type") || "";
 
   let inputs: DemoMediaInput[];
@@ -117,6 +119,8 @@ export async function POST(request: Request) {
     status: "ready",
     statusLabel: "Ready",
   });
+
+  await persistDemoStore();
 
   const storage = media.find((item) => typeof item.metadata?.storage === "string")?.metadata?.storage;
 

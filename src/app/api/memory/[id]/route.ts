@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listDemoMedia, listDemoMemory } from "@/lib/demo/demo-store";
+import { ensureHydrated } from "@/lib/demo/persistence";
 
 export const runtime = "nodejs";
 
@@ -7,6 +8,7 @@ export const runtime = "nodejs";
 // its media resolved by mediaIds (in mediaIds order), each with a real url /
 // thumbnailUrl for inline playback. Contract: [id] is the memory id.
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  await ensureHydrated();
   const memory = listDemoMemory().find((item) => item.id === params.id);
   if (!memory) {
     return NextResponse.json({ error: "Memory not found" }, { status: 404 });
