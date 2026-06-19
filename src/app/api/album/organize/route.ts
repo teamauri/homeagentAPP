@@ -37,16 +37,19 @@ export async function POST(request: Request) {
   const childId = typeof body?.childId === "string" ? body.childId : "mia";
 
   try {
-    // Pull the latest organized album from Blob FIRST so appending this batch
-    // (and the following persist) builds on other instances' writes instead of
-    // overwriting them with a stale in-memory snapshot.
-    await reloadStore("growth");
+    // Pull the latest organized album (growth) AND ingested Stories/uploads
+    // (demo) from Blob FIRST, so appending this batch — and the growth we
+    // return — builds on other instances' writes instead of dropping them.
+    await Promise.all([reloadStore("growth"), reloadStore("demo")]);
     const result = await organizeAlbum(photos, childId);
     addOrganized(result);
     await persistGrowthStore();
+    // Count kept PHOTOS (not day-groups) so "organized N" matches what the
+    // parent actually uploaded.
+    const keptCount = result.growth.days.reduce((n, d) => n + d.media.length, 0);
     return NextResponse.json({
       growth: getGrowth(),
-      metadata: { provider: result.provider, model: result.model, skipped: result.skippedCount, organized: result.growth.days.length },
+      metadata: { provider: result.provider, model: result.model, skipped: result.skippedCount, organized: keptCount },
     });
   } catch (error) {
     console.error("[api/album/organize] failed", error);
