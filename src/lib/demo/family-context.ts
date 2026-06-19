@@ -1,4 +1,5 @@
-import { seedFamilyMembers, seedObservations } from "@/lib/family/profile";
+import { seedObservations } from "@/lib/family/profile";
+import { getChildren } from "@/lib/family/store";
 
 // Rich context for the chat model: the static family/team + each child's
 // interests, routines, health notes, and recent observations. This is what lets
@@ -7,8 +8,7 @@ import { seedFamilyMembers, seedObservations } from "@/lib/family/profile";
 export function buildFamilyContext() {
   return {
     ...demoFamilyContext,
-    children: seedFamilyMembers
-      .filter((m) => m.role === "child")
+    children: getChildren()
       .map((m) => ({
         id: m.id,
         name: m.name,

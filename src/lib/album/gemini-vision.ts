@@ -1,4 +1,4 @@
-import { seedFamilyMembers } from "@/lib/family/profile";
+import { getChildren, getMember } from "@/lib/family/store";
 import { albumAnalysisSchema } from "./schema";
 import { AlbumAnalysis, AlbumPhotoInput } from "./types";
 
@@ -6,8 +6,8 @@ import { AlbumAnalysis, AlbumPhotoInput } from "./types";
 // known interests, and the per-photo index + capture date so the model can
 // group days and reason about ages.
 function buildContext(photos: AlbumPhotoInput[], childId: string) {
-  const child = seedFamilyMembers.find((m) => m.id === childId);
-  const kids = seedFamilyMembers.filter((m) => m.role === "child");
+  const child = getMember(childId);
+  const kids = getChildren();
   return [
     "You are Iris, the AURI family robot's eye. You organize a parent's camera roll into a warm baby growth timeline.",
     "TASK:",

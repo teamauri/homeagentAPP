@@ -1,5 +1,5 @@
 import { ChatAIResponse, ChatHelperSegment, ChatRequestBody } from "@/lib/chat-server/types";
-import { seedFamilyMembers } from "@/lib/family/profile";
+import { getMember } from "@/lib/family/store";
 
 function lowerInput(request: ChatRequestBody) {
   const attachmentText = request.attachments?.map((a) => `${a.type ?? ""} ${a.name ?? ""}`).join(" ") ?? "";
@@ -29,7 +29,7 @@ const ADVICE_HINTS = [
 
 export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResponse {
   const input = lowerInput(request);
-  const mia = seedFamilyMembers.find((m) => m.id === "mia");
+  const mia = getMember("mia");
   const med = mia?.health[0]; // "Finishing a 10-day course of medicine"
 
   // 1) Advice / emotional — Auri alone, grounded in what we know. No task.

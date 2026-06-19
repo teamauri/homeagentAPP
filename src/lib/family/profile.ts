@@ -16,7 +16,9 @@ export type FamilyMemberProfile = {
   ageLabel?: string;
   /** ISO date (YYYY-MM-DD). Drives the age shown on growth moments/firsts. */
   birthday?: string;
-  avatar: string; // DoodleIcon name: mom | dad | girl | boy | baby | grandma
+  avatar: string; // DoodleIcon fallback: mom | dad | girl | boy | baby | grandma
+  /** Real uploaded photo (data URL or CDN url). Shown instead of the doodle. */
+  avatarUrl?: string;
   /** Stable, slow-moving facts the family told us or we learned early. */
   interests: string[];
   /** Recurring rhythms — bedtime, meds, practice, naps. */

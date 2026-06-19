@@ -1,4 +1,4 @@
-import { seedFamilyMembers } from "@/lib/family/profile";
+import { getMember } from "@/lib/family/store";
 import { AlbumAnalysis, AlbumPhotoInput, DropReason } from "./types";
 
 // Deterministic stand-in for the Gemini vision pass, used when GEMINI_API_KEY
@@ -29,7 +29,7 @@ function hash(text: string) {
 }
 
 export function fallbackAlbumAnalysis(photos: AlbumPhotoInput[], childId: string): AlbumAnalysis {
-  const child = seedFamilyMembers.find((m) => m.id === childId);
+  const child = getMember(childId);
   const interest = child?.interests[0] ?? "the world";
 
   const firstLabelPool = [

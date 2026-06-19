@@ -1,5 +1,6 @@
 import { Observation } from "@/lib/family/profile";
-import { ageAt, seedFamilyMembers } from "@/lib/family/profile";
+import { ageAt } from "@/lib/family/profile";
+import { getMember } from "@/lib/family/store";
 import { listDemoMedia, listDemoMemory } from "@/lib/demo/demo-store";
 import { persistStore, registerStore } from "@/lib/demo/persistence";
 import { seedGrowthData } from "./seed";
@@ -60,7 +61,7 @@ function durationLabel(seconds?: number) {
 // Convert real Stories sitting in the shared demo-store (robot ingest / phone
 // upload) into growth DayGroups so they render in the same timeline.
 function demoStoryDays(): DayGroup[] {
-  const child = seedFamilyMembers.find((m) => m.id === "mia");
+  const child = getMember("mia");
   const media = listDemoMedia();
   const byId = new Map(media.map((m) => [m.id, m]));
   const items = listDemoMemory().filter((it) => it.metadata?.fixture !== true && it.mediaIds.length > 0);

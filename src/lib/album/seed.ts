@@ -1,9 +1,9 @@
-import { ageAt, seedFamilyMembers } from "@/lib/family/profile";
+import { ageAt } from "@/lib/family/profile";
+import { getMember } from "@/lib/family/store";
 import { DayGroup, FirstItem, GrowthData, MilestoneSession, OrganizedMedia } from "./types";
 
 // A pre-organized growth album so Memory looks alive before the parent runs
 // "Organize photos". Tones map to fixed gradient classes in the view.
-const mia = seedFamilyMembers.find((m) => m.id === "mia")!;
 
 function dateLabel(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
@@ -71,6 +71,7 @@ const seedDays: SeedDay[] = [
 ];
 
 export function seedGrowthData(): GrowthData {
+  const mia = getMember("mia") ?? getMember("leo")!;
   const days: DayGroup[] = [];
   const firsts: FirstItem[] = [];
 

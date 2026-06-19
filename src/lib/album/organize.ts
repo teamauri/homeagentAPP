@@ -1,4 +1,5 @@
-import { ageAt, seedFamilyMembers } from "@/lib/family/profile";
+import { ageAt } from "@/lib/family/profile";
+import { getChildren, getMember } from "@/lib/family/store";
 import { Observation } from "@/lib/family/profile";
 import { callGeminiAlbum } from "./gemini-vision";
 import { fallbackAlbumAnalysis } from "./fallback";
@@ -21,7 +22,7 @@ export interface OrganizeResult {
 }
 
 export async function organizeAlbum(photos: AlbumPhotoInput[], childId: string): Promise<OrganizeResult> {
-  const child = seedFamilyMembers.find((m) => m.id === childId) ?? seedFamilyMembers.find((m) => m.role === "child")!;
+  const child = (getMember(childId) ?? getChildren()[0])!;
 
   let provider: "gemini" | "fallback" = "fallback";
   let model: string | undefined;
