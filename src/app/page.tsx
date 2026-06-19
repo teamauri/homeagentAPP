@@ -121,9 +121,21 @@ export default function Home() {
   return (
     <FamilyProvider>
       <AppShell activeTab={tab} onTabChange={setTab} onComposerSubmit={sendComposerMessage}>
-        {tab === "today" && <TodayView />}
-        {tab === "chat" && <ChatView liveTurns={liveTurns} />}
-        {tab === "memory" && <MomentsView />}
+        {/*
+          Keep every tab mounted and just toggle visibility. Conditional rendering
+          (`tab === x && <View/>`) unmounts the inactive views, which made Memory
+          re-fetch /api/memory/growth on every visit and discarded scroll state.
+          Hiding with `hidden` preserves each view's state between tab switches.
+        */}
+        <div className={tab === "today" ? "" : "hidden"}>
+          <TodayView />
+        </div>
+        <div className={tab === "chat" ? "" : "hidden"}>
+          <ChatView liveTurns={liveTurns} />
+        </div>
+        <div className={tab === "memory" ? "" : "hidden"}>
+          <MomentsView />
+        </div>
       </AppShell>
     </FamilyProvider>
   );
