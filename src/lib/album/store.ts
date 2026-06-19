@@ -73,7 +73,9 @@ function demoStoryDays(): DayGroup[] {
       id: m.id,
       kind: m.mediaType === "photo" ? "photo" : "video",
       source: m.source === "auri" ? "auri" : "phone",
-      thumbDataUrl: m.thumbnailUrl || m.url,
+      // Photos use their image; a video only shows a poster if one exists,
+      // otherwise the tile falls back to a gradient + ▶ (poster frames are ③).
+      thumbDataUrl: m.mediaType === "photo" ? m.thumbnailUrl || m.url : m.thumbnailUrl,
       url: m.url,
       durationLabel: durationLabel(m.durationSeconds),
       capturedAtISO: m.capturedAt,
