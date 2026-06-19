@@ -56,6 +56,8 @@ export async function organizeAlbum(photos: AlbumPhotoInput[], childId: string):
       id,
       kind: a.mediaKind,
       source: "phone",
+      // Gemini attributes each photo to a child when one is clearly present.
+      childId: a.childId ?? undefined,
       thumbDataUrl: `data:${photo.mimeType};base64,${photo.dataBase64}`,
       capturedAtISO: photo.capturedAtISO,
       isFirst: Boolean(a.isFirst && a.firstLabel),
