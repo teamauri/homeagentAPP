@@ -19,16 +19,49 @@ const toneClass = (tone?: string) => (tone && TONE[tone]) || TONE.g1;
 type Filter = "All" | "Firsts" | "Auri" | "Phone";
 const FILTERS: Filter[] = ["All", "Firsts", "Auri", "Phone"];
 
+// Decode a photo to {width,height,draw}. Tries the fast createImageBitmap path,
+// then falls back to an <img> element — crucial on iPhone Safari, where photos
+// are usually HEIC and createImageBitmap throws, but <img> renders HEIC natively.
+async function decodeImage(file: File): Promise<{ width: number; height: number; draw: (c: CanvasRenderingContext2D, w: number, h: number) => void }> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    return { width: bitmap.width, height: bitmap.height, draw: (c, w, h) => c.drawImage(bitmap, 0, 0, w, h) };
+  } catch {
+    // Fallback: load via object URL into an <img> (Safari decodes HEIC here).
+    return await new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          draw: (c, w, h) => c.drawImage(img, 0, 0, w, h),
+        });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error(`Could not decode ${file.name || "image"}`));
+      };
+      img.src = url;
+    });
+  }
+}
+
 async function fileToPayload(file: File) {
-  const bitmap = await createImageBitmap(file);
+  const { width, height, draw } = await decodeImage(file);
   const max = 768;
-  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
+  const scale = Math.min(1, max / Math.max(width, height));
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, w, h);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not available");
+  draw(ctx, w, h);
+  // Always re-encode to JPEG so HEIC/PNG all arrive as a compact base64 the
+  // server (and Gemini) can read, and stay well under Vercel's body limit.
   const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
   return {
     name: file.name,
@@ -42,6 +75,7 @@ export function MomentsView() {
   const [growth, setGrowth] = useState<GrowthData | null>(null);
   const [filter, setFilter] = useState<Filter>("All");
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -57,32 +91,65 @@ export function MomentsView() {
   async function onFiles(files: FileList | null) {
     if (!files || !files.length) return;
     const all = [...files];
-    const images = all.filter((f) => f.type.startsWith("image/"));
-    const videos = all.filter((f) => f.type.startsWith("video/"));
-    if (!images.length && !videos.length) return;
+    // iPhone Safari sometimes reports an empty MIME type; fall back to the
+    // file extension so HEIC/MOV/etc. still get routed correctly.
+    const isVideo = (f: File) => f.type.startsWith("video/") || /\.(mov|mp4|m4v|avi|webm)$/i.test(f.name);
+    const isImage = (f: File) => f.type.startsWith("image/") || /\.(heic|heif|jpe?g|png|gif|webp)$/i.test(f.name);
+    const videos = all.filter(isVideo);
+    const images = all.filter((f) => !isVideo(f) && isImage(f));
+    if (!images.length && !videos.length) {
+      setError("Those files aren't photos or videos.");
+      return;
+    }
     const childId = growth?.child.id ?? "mia";
+    setError(null);
     setOrganizing({ count: images.length + videos.length });
     try {
       // Photos → Gemini vision organize. Videos → stored (real URL) and shown.
       if (images.length) {
-        const photos = await Promise.all(images.map(fileToPayload));
-        await fetch("/api/album/organize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ childId, photos }),
-        });
+        // Decode each photo independently so one undecodable file doesn't sink
+        // the whole batch; collect any that fail to report back.
+        type Payload = Awaited<ReturnType<typeof fileToPayload>>;
+        const encoded = await Promise.all(
+          images.map((f) =>
+            fileToPayload(f).then(
+              (p): { p: Payload } | null => ({ p }),
+              () => null
+            )
+          )
+        );
+        const photos = encoded.filter((e): e is { p: Payload } => e !== null).map((e) => e.p);
+        const failed = encoded.length - photos.length;
+        if (photos.length) {
+          const res = await fetch("/api/album/organize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ childId, photos }),
+          });
+          if (!res.ok) {
+            throw new Error(
+              res.status === 413
+                ? "Those photos are too large to upload at once — try fewer."
+                : `Organize failed (${res.status})`
+            );
+          }
+        }
+        if (failed && !photos.length) throw new Error("Couldn't read those photos on this device.");
+        else if (failed) setError(`${failed} photo${failed > 1 ? "s" : ""} couldn't be read and were skipped.`);
       }
       if (videos.length) {
         const form = new FormData();
         videos.forEach((v) => form.append("files", v));
         form.append("person", childId);
-        await fetch("/api/media/upload", { method: "POST", body: form });
+        const res = await fetch("/api/media/upload", { method: "POST", body: form });
+        if (!res.ok) throw new Error(`Video upload failed (${res.status})`);
       }
       await refresh();
-    } catch {
-      /* keep current view on failure */
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed — please try again.");
     } finally {
       setOrganizing(null);
+      if (inputRef.current) inputRef.current.value = ""; // allow re-selecting the same file
     }
   }
 
@@ -131,6 +198,16 @@ export function MomentsView() {
       </div>
 
       {organizing ? <OrganizingPanel count={organizing.count} /> : null}
+
+      {error ? (
+        <div className="mt-3 flex items-start gap-2 rounded-[12px] border border-[#f0d4cc] bg-[#fdf3f0] px-3 py-2.5 text-[12.5px] text-[#9a4a36]">
+          <span>⚠️</span>
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError(null)} className="text-[#c08070]">
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       {filter === "Firsts" ? <FirstsWall firsts={growth.firsts} /> : <Feed days={days} />}
     </div>
