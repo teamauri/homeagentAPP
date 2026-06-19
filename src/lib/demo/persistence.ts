@@ -37,7 +37,13 @@ async function loadSnapshot(key: string): Promise<Snapshot | null> {
     const { blobs } = await list({ prefix: blobPathname(key) });
     const hit = blobs.find((blob) => blob.pathname === blobPathname(key));
     if (!hit) return null;
-    const response = await fetch(hit.url, { cache: "no-store" });
+    // Vercel Blob serves public URLs through a CDN that keeps caching the old
+    // bytes even after we overwrite the same pathname — so a plain fetch can
+    // return a STALE snapshot, and the next persist would then clobber newer
+    // data. Bust the edge cache with a unique query param so we always read the
+    // freshly-persisted snapshot. (cache: "no-store" only affects our runtime,
+    // not the CDN.)
+    const response = await fetch(`${hit.url}?ts=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) return null;
     return (await response.json()) as Snapshot;
   }
@@ -61,6 +67,9 @@ async function saveSnapshot(key: string, data: Snapshot): Promise<void> {
       contentType: "application/json",
       addRandomSuffix: false,
       allowOverwrite: true,
+      // Don't let the CDN hold this snapshot — it's mutable demo state that other
+      // serverless instances must read fresh right after a write.
+      cacheControlMaxAge: 0,
     });
     return;
   }

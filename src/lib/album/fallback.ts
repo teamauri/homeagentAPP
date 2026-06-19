@@ -5,7 +5,10 @@ import { AlbumAnalysis, AlbumPhotoInput, DropReason } from "./types";
 // is missing. It keeps the exact same shape as the real analysis so the rest
 // of the pipeline (and the UI) is identical — only the "intelligence" is faked.
 
-const SCREENSHOT_HINTS = ["screenshot", "screen shot", "screen_shot", "scrnli", "capture", "receipt", "scan", "img_e"];
+// Only obvious non-photos by filename. Deliberately conservative: a manually
+// chosen upload should be kept, so we don't guess from "img_e"/"capture"/"scan"
+// (those are normal iPhone edited/burst photos) or from PNG alone.
+const SCREENSHOT_HINTS = ["screenshot", "screen shot", "screen_shot", "scrnli", "receipt"];
 const DAY_CAPTIONS = [
   "A slow, happy afternoon together.",
   "Lots of giggles today.",
@@ -14,11 +17,9 @@ const DAY_CAPTIONS = [
   "Backyard play until the light went gold.",
 ];
 
-function isLikelyScreenshot(name: string, mime: string): DropReason | undefined {
+function isLikelyScreenshot(name: string, _mime: string): DropReason | undefined {
   const lower = name.toLowerCase();
   if (SCREENSHOT_HINTS.some((h) => lower.includes(h))) return "screenshot";
-  // PNGs from a camera roll are usually screenshots; JPEGs are usually photos.
-  if (mime === "image/png" && !lower.includes("photo")) return "screenshot";
   return undefined;
 }
 
