@@ -101,6 +101,28 @@ export function ensureHydrated(): Promise<void> {
   return Promise.all(tasks).then(() => undefined);
 }
 
+/**
+ * Force-reload a single store from its snapshot, bypassing the cold-start cache.
+ * Call this before READING or MUTATING a store that other serverless instances
+ * may have written, so a stale warm instance can't show — or worse, clobber on
+ * the next persist — data another instance just wrote. (ensureHydrated only runs
+ * once per instance, which is enough for cold starts but not for read-modify-
+ * write across warm instances.)
+ */
+export async function reloadStore(key: string): Promise<void> {
+  const registration = registry.get(key);
+  if (!registration) return;
+  const data = await loadSnapshot(key).catch(() => null);
+  if (data) {
+    try {
+      registration.restore(data);
+    } catch {
+      /* ignore malformed snapshot */
+    }
+  }
+  hydratedKeys.add(key);
+}
+
 /** Write one store's current snapshot. Best-effort: failures are swallowed. */
 export async function persistStore(key: string): Promise<void> {
   const registration = registry.get(key);

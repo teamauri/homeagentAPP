@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createDemoObjects, persistDemoStore } from "@/lib/demo/demo-store";
-import { ensureHydrated } from "@/lib/demo/persistence";
+import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
@@ -40,6 +40,11 @@ function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: C
 }
 
 async function withCreatedObjects(response: ChatAIResponse, metadata: ChatApiResponse["metadata"]): Promise<ChatApiResponse> {
+  // If this turn creates objects, build on the latest demo store so we don't
+  // overwrite uploads/Stories another warm instance just wrote.
+  if (response.objectsToCreate?.length || response.helper?.objectsToCreate?.length) {
+    await reloadStore("demo");
+  }
   const top = attachRoutes(response.cards, response.objectsToCreate);
 
   // The helper (second voice) carries the actual task → create its objects too.
