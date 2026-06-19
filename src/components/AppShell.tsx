@@ -27,19 +27,19 @@ declare global {
 const tabs: { key: TabKey; label: string; icon: string }[] = [
   { key: "chat", label: "Chat", icon: "family" },
   { key: "today", label: "Inbox", icon: "bell" },
-  { key: "memory", label: "Memory", icon: "photos" },
+  { key: "memory", label: "Journey", icon: "photos" },
 ];
 
 const titles: Record<TabKey, string> = {
-  today: "Good afternoon,\nJane.",
+  today: "Inbox",
   chat: "Jane’s Family",
-  memory: "Jane’s Memory",
+  memory: "Journey",
 };
 
 const subtitles: Record<TabKey, string> = {
   today: "Here’s what needs you today.",
   chat: "Mom, Dad · Iris, Lumi, Vita",
-  memory: "All your moments, in one timeline.",
+  memory: "Watch your family grow, together.",
 };
 
 export function AppShell({
@@ -68,7 +68,7 @@ export function AppShell({
 
 function ShellHeader({ activeTab }: { activeTab: TabKey }) {
   return (
-    <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]">
+    <div className="shrink-0 border-b border-line bg-paper pt-[env(safe-area-inset-top)]">
       <header className="flex items-start justify-between gap-3 px-[26px] pb-3 pt-3">
         <div className="min-w-0">
           <h1 className="font-display text-[34px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
@@ -134,9 +134,13 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   const [submitting, setSubmitting] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  // Snapshot of the text box from before recording started, so Cancel can
+  // restore it (dropping only what this dictation session added).
+  const baseTextRef = useRef("");
 
   // Stop recognition AND detach its handlers, so a final onresult fired by
   // stop() can't write the transcript back into the box after we've cleared it.
@@ -152,8 +156,22 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     setListening(false);
   };
 
+  // Abandon the in-progress dictation and roll the text box back.
+  const cancelVoice = () => {
+    stopRecognition();
+    setValue(baseTextRef.current.trimEnd());
+  };
+
   // Clean up an in-flight recognition session if the composer unmounts.
   useEffect(() => () => stopRecognition(), []);
+
+  // Run a 1s timer while listening; reset to 0 each time recording starts.
+  useEffect(() => {
+    if (!listening) return;
+    setElapsed(0);
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [listening]);
 
   const submit = async () => {
     const message = value.trim();
@@ -198,6 +216,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     recognition.interimResults = true;
     recognition.continuous = false;
     const base = value.trim() ? `${value.trim()} ` : "";
+    baseTextRef.current = base;
     recognition.onresult = (event) => {
       let transcript = "";
       for (let i = 0; i < event.results.length; i += 1) {
@@ -232,48 +251,114 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
           <span className="text-[13px] text-muted">Photo attached</span>
         </div>
       ) : null}
-      <div className="flex h-[54px] items-center gap-2.5 rounded-full border border-ink/15 bg-white px-2.5 shadow-[0_10px_30px_rgba(8,8,8,0.1)]">
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} className="hidden" />
+      {listening ? (
+        <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={stopRecognition} />
+      ) : (
+        <div className="flex h-[54px] items-center gap-2.5 rounded-full border border-ink/15 bg-white px-2.5 shadow-[0_10px_30px_rgba(8,8,8,0.1)]">
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} className="hidden" />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-[26px] font-light leading-none text-ink"
+            aria-label="Add photo"
+          >
+            +
+          </button>
+          <input
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submit();
+            }}
+            className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted/70"
+            placeholder="Ask Auri anything…"
+          />
+          <button
+            type="button"
+            onClick={toggleVoice}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-ink"
+            aria-label="Use microphone"
+          >
+            <svg viewBox="0 0 28 28" className="h-6 w-6" aria-hidden="true">
+              <path d="M14 4a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V8a4 4 0 0 0-4-4Z" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path d="M6 13v1a8 8 0 0 0 16 0v-1M14 22v3M10 25h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting || (!value.trim() && !image)}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-[22px] leading-none text-white disabled:opacity-35"
+            aria-label="Send message"
+          >
+            ↑
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatElapsed(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// A calm "listening" panel that rises in place of the composer while dictation
+// is active: a mic with soft breathing halos, a timer, the full live transcript
+// (wraps freely — never truncated), and two clear actions (Cancel / Done).
+function RecordingPanel({
+  transcript,
+  elapsed,
+  onCancel,
+  onStop,
+}: {
+  transcript: string;
+  elapsed: number;
+  onCancel: () => void;
+  onStop: () => void;
+}) {
+  const text = transcript.trim();
+  return (
+    <div className="rounded-[22px] border border-line bg-white px-[18px] pb-4 pt-6 shadow-[0_14px_36px_rgba(8,8,8,0.10)]">
+      <div className="flex flex-col items-center gap-3.5">
+        <span className="relative grid h-16 w-16 place-items-center" aria-hidden="true">
+          <span className="auri-halo-ring absolute h-16 w-16 rounded-full bg-mint" />
+          <span className="auri-halo-ring absolute h-16 w-16 rounded-full bg-mint" style={{ animationDelay: "1.2s" }} />
+          <span className="relative grid h-14 w-14 place-items-center rounded-full bg-mint text-white">
+            <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
+              <path d="M14 4a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V8a4 4 0 0 0-4-4Z" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path d="M6 13v1a8 8 0 0 0 16 0v-1M14 22v3M10 25h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+            </svg>
+          </span>
+        </span>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[15px] font-medium text-mint">Listening</span>
+          <span className="tabular-nums text-[13px] text-muted">{formatElapsed(elapsed)}</span>
+        </div>
+
+        <p className="no-scrollbar max-h-[34vh] w-full overflow-y-auto whitespace-pre-wrap break-words text-center text-[16px] leading-relaxed text-ink">
+          {text || <span className="text-muted/70">Start speaking…</span>}
+        </p>
+      </div>
+
+      <div className="mt-4 flex gap-2.5">
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-[26px] font-light leading-none text-ink"
-          aria-label="Add photo"
+          onClick={onCancel}
+          className="h-11 flex-1 rounded-full border border-line bg-soft text-[15px] font-medium text-muted"
         >
-          +
+          Cancel
         </button>
-        <input
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") submit();
-          }}
-          className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted/70"
-          placeholder={listening ? "Listening…" : "Ask Auri anything…"}
-        />
         <button
           type="button"
-          onClick={toggleVoice}
-          className={clsx(
-            "grid h-9 w-9 shrink-0 place-items-center rounded-full border",
-            listening ? "animate-pulse border-red-400 bg-red-50 text-red-500" : "border-line bg-white text-ink"
-          )}
-          aria-label={listening ? "Stop recording" : "Use microphone"}
-          aria-pressed={listening}
+          onClick={onStop}
+          className="h-11 flex-1 rounded-full bg-mint text-[15px] font-medium text-white"
+          aria-label="Stop recording and keep text"
         >
-          <svg viewBox="0 0 28 28" className="h-6 w-6" aria-hidden="true">
-            <path d="M14 4a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V8a4 4 0 0 0-4-4Z" fill="none" stroke="currentColor" strokeWidth="2" />
-            <path d="M6 13v1a8 8 0 0 0 16 0v-1M14 22v3M10 25h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={submitting || (!value.trim() && !image)}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-[22px] leading-none text-white disabled:opacity-35"
-          aria-label="Send message"
-        >
-          ↑
+          Done
         </button>
       </div>
     </div>
