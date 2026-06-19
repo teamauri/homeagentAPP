@@ -185,12 +185,10 @@ export function MomentsView() {
     return <div className="pt-10 text-center text-[14px] text-muted">Loading memories…</div>;
   }
 
-  // All · one tab per child (oldest first) · source filters.
+  // All · one tab per child (oldest first).
   const tabs: Tab[] = [
     { key: "all", label: "All" },
     ...children.map((c) => ({ key: `child:${c.id}`, label: c.name })),
-    { key: "src:auri", label: "Auri" },
-    { key: "src:phone", label: "Phone" },
   ];
   const days = filterDays(growth.days, filter);
 
@@ -363,13 +361,9 @@ function Tile({ media, href, sameTab }: { media: OrganizedMedia; href?: string; 
 }
 
 function filterDays(days: DayGroup[], filter: string): DayGroup[] {
-  if (filter === "all") return days;
-  const match: (m: OrganizedMedia) => boolean = filter.startsWith("child:")
-    ? (m) => m.childId === filter.slice("child:".length)
-    : filter.startsWith("src:")
-      ? (m) => m.source === filter.slice("src:".length)
-      : () => true;
+  if (!filter.startsWith("child:")) return days; // "all"
+  const childId = filter.slice("child:".length);
   return days
-    .map((day) => ({ ...day, media: day.media.filter(match) }))
+    .map((day) => ({ ...day, media: day.media.filter((m) => m.childId === childId) }))
     .filter((day) => day.media.length > 0);
 }
