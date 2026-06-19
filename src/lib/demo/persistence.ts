@@ -29,23 +29,22 @@ export function registerStore(registration: StoreRegistration) {
 }
 
 const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-// Each persist writes a NEW unique blob under this folder and readers pick the
-// newest. We never overwrite a fixed pathname, so a reader can never be served a
-// CDN-cached stale copy of an overwritten URL — the root cause of vanishing
-// photos. (Vercel Blob is really for immutable assets; for heavier concurrency
-// swap this adapter for Vercel KV without touching the store API.)
-const blobFolder = (key: string) => `demo-store/${key}/`;
+// The Blob store is PRIVATE, so snapshots are written with private access and
+// read back with get({ useCache: false }) — which fetches straight from origin
+// storage, bypassing the CDN. That avoids both the "public access on a private
+// store" error and the stale-CDN reads that were making organized photos vanish.
+const blobPathname = (key: string) => `demo-store/${key}.json`;
 
 async function loadSnapshot(key: string): Promise<Snapshot | null> {
   if (useBlob) {
-    const { list } = await import("@vercel/blob");
-    const { blobs } = await list({ prefix: blobFolder(key) });
-    if (!blobs.length) return null;
-    // Newest write wins. Each blob has a unique URL, so this fetch is fresh.
-    const newest = blobs.reduce((a, b) => (new Date(a.uploadedAt) >= new Date(b.uploadedAt) ? a : b));
-    const response = await fetch(newest.url, { cache: "no-store" });
-    if (!response.ok) return null;
-    return (await response.json()) as Snapshot;
+    const { get } = await import("@vercel/blob");
+    const res = await get(blobPathname(key), { access: "private", useCache: false }).catch(() => null);
+    if (!res || !res.stream) return null;
+    try {
+      return (await new Response(res.stream as ReadableStream).json()) as Snapshot;
+    } catch {
+      return null;
+    }
   }
 
   const { readFile } = await import("node:fs/promises");
@@ -61,19 +60,13 @@ async function loadSnapshot(key: string): Promise<Snapshot | null> {
 async function saveSnapshot(key: string, data: Snapshot): Promise<void> {
   const json = JSON.stringify(data);
   if (useBlob) {
-    const { put, list, del } = await import("@vercel/blob");
-    const folder = blobFolder(key);
-    // Write a NEW unique blob (unique URL → never a stale CDN hit on read).
-    const pathname = `${folder}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
-    await put(pathname, json, { access: "public", contentType: "application/json", addRandomSuffix: false });
-    // Best-effort prune of superseded snapshots so the folder doesn't grow.
-    try {
-      const { blobs } = await list({ prefix: folder });
-      const stale = blobs.filter((b) => b.pathname !== pathname).map((b) => b.url);
-      if (stale.length) await del(stale);
-    } catch {
-      /* pruning is best-effort */
-    }
+    const { put } = await import("@vercel/blob");
+    await put(blobPathname(key), json, {
+      access: "private",
+      contentType: "application/json",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    });
     return;
   }
 
