@@ -78,11 +78,10 @@ export default function MemoryDetailPage() {
   }, [id]);
 
   return (
-    <main className="min-h-screen bg-[#f5f1eb] px-3 py-4 md:grid md:place-items-center md:px-10">
-      <div className="phone-shell mx-auto w-full max-w-[430px] overflow-hidden bg-paper">
-        <div className="relative flex h-[min(900px,calc(100dvh-2rem))] min-h-[760px] flex-col overflow-hidden bg-paper">
-          <div className="relative px-[26px] pt-[18px]">
-            <div className="pointer-events-none absolute left-1/2 top-[12px] h-[30px] w-[112px] -translate-x-1/2 rounded-full bg-black" />
+    <main className="min-h-[100dvh] bg-paper md:grid md:min-h-screen md:place-items-center md:bg-[#f5f1eb] md:px-10 md:py-8">
+      <div className="mx-auto w-full overflow-hidden bg-paper md:max-w-[430px]">
+        <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-paper md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
+          <div className="relative px-[26px] pt-[max(18px,env(safe-area-inset-top))]">
             <a href="/" className="inline-flex items-center gap-1 pt-2 text-[13px] text-muted">
               ‹ Memory
             </a>

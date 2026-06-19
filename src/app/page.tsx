@@ -24,10 +24,11 @@ export default function Home() {
   const [tab, setTab] = useState<TabKey>("chat");
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
 
-  const sendComposerMessage = async (message: string) => {
+  const sendComposerMessage = async (message: string, imageUrl?: string) => {
     setTab("chat");
     const sentAt = Date.now();
     const pendingId = `helper-pending-${sentAt}`;
+    const outgoing = message || (imageUrl ? "📷 Photo" : "");
 
     setLiveTurns((current) => [
       ...current,
@@ -36,7 +37,8 @@ export default function Home() {
         sender: "Mom",
         time: nowLabel(),
         avatar: "mom",
-        text: message,
+        text: outgoing,
+        imageUrl,
       },
       {
         id: pendingId,
@@ -55,7 +57,7 @@ export default function Home() {
         body: JSON.stringify({
           familyId: "family_demo",
           userId: "mom_demo",
-          message,
+          message: outgoing,
           currentPage: tab,
         }),
       });
