@@ -125,9 +125,15 @@ export function getGrowth(): GrowthData {
   demoStoryDays().forEach((d) => add(d, true)); // robot/phone real media first
   (g.__auriGrowthDays ?? []).forEach((d) => add(d, true)); // organized phone photos first
 
+  // Per-child milestone cards: seed for every child, overridden by the freshly
+  // organized session for whichever child was last organized.
+  const sessions = { ...(seed.sessions ?? {}) };
+  if (g.__auriGrowthSession) sessions[g.__auriGrowthSession.childId] = g.__auriGrowthSession;
+
   return {
     child: seed.child,
     session: g.__auriGrowthSession ?? seed.session,
+    sessions,
     days: sortByDateDesc([...dayMap.values()]),
     firsts: sortByDateDesc([...(g.__auriGrowthFirsts ?? []), ...seed.firsts]),
     skippedCount: g.__auriGrowthSkipped ?? 0,
