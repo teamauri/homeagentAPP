@@ -104,6 +104,11 @@ export function MomentsView() {
     const childId = growth?.child.id ?? "mia";
     setError(null);
     setOrganizing({ count: images.length + videos.length });
+    // Trust the growth returned by the organize POST itself — it's computed on
+    // the same instance that just did the work. A separate GET can land on a
+    // different (stale) serverless instance and show "nothing".
+    let nextGrowth: GrowthData | null = null;
+    let notice: string | null = null;
     try {
       // Photos → Gemini vision organize. Videos → stored (real URL) and shown.
       if (images.length) {
@@ -133,9 +138,18 @@ export function MomentsView() {
                 : `Organize failed (${res.status})`
             );
           }
+          const data = await res.json();
+          if (data.growth) nextGrowth = data.growth as GrowthData;
+          // Gemini may triage a shot out (screenshot / not a clear moment) — say
+          // so instead of leaving the user staring at an unchanged screen.
+          const organized = data?.metadata?.organized ?? 0;
+          const skipped = data?.metadata?.skipped ?? 0;
+          if (organized === 0 && skipped > 0) {
+            notice = `Iris kept ${skipped} photo${skipped > 1 ? "s" : ""} out — ${skipped > 1 ? "they" : "it"} looked like a screenshot or not a clear moment.`;
+          }
         }
         if (failed && !photos.length) throw new Error("Couldn't read those photos on this device.");
-        else if (failed) setError(`${failed} photo${failed > 1 ? "s" : ""} couldn't be read and were skipped.`);
+        else if (failed) notice = `${failed} photo${failed > 1 ? "s" : ""} couldn't be read and were skipped.`;
       }
       if (videos.length) {
         const form = new FormData();
@@ -143,8 +157,12 @@ export function MomentsView() {
         form.append("person", childId);
         const res = await fetch("/api/media/upload", { method: "POST", body: form });
         if (!res.ok) throw new Error(`Video upload failed (${res.status})`);
+        // The upload route doesn't return growth, so re-fetch to pull the video in.
+        nextGrowth = null;
       }
-      await refresh();
+      if (nextGrowth) setGrowth(nextGrowth);
+      else await refresh();
+      if (notice) setError(notice);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed — please try again.");
     } finally {
