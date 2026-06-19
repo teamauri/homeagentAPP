@@ -75,10 +75,10 @@ function ChatTurnRow({ turn }: { turn: ChatTurn }) {
       <Avatar avatar={turn.avatar} />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[18px] font-semibold leading-6 text-ink">{turn.sender}</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{turn.sender}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
-        <p className="max-w-[98%] text-[17px] leading-6 text-ink">{turn.text}</p>
+        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[15px] leading-[21px] text-ink">{turn.text}</p>
         {turn.cards ? (
           <div className="mt-2">
             <ChatCardList cards={turn.cards} />
@@ -119,7 +119,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
       <LiveAvatar avatar={turn.avatar} sender={turn.sender} />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[18px] font-semibold leading-6 text-ink">{turn.sender}</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{turn.sender}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
         {turn.imageUrl ? (
@@ -129,7 +129,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
           </div>
         ) : null}
         {turn.text ? (
-          <p className={clsx("max-w-[98%] text-[17px] leading-6", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[15px] leading-[21px]", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
         ) : null}
         {turn.cards?.length ? (
           <div className="mt-2 space-y-2">
@@ -190,8 +190,8 @@ function ApiResponseCard({ card }: { card: ApiChatCard }) {
         <DoodleIcon name={iconForApiCard(card.type)} className="h-8 w-8" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] leading-5 text-muted">{labelForApiCard(card.type)}</div>
-        <div className="text-[17px] font-semibold leading-6 text-ink">{card.title}</div>
+        <div className="text-[13px] leading-4 text-muted">{labelForApiCard(card.type)}</div>
+        <div className="text-[15px] font-semibold leading-5 text-ink">{card.title}</div>
         {card.subtitle ? <div className="mt-0.5 text-[13px] leading-5 text-muted">{card.subtitle}</div> : null}
       </div>
       {card.cta ? <span className="shrink-0 rounded-full border border-line px-3 py-1.5 text-[13px] font-medium text-ink">{card.cta}</span> : null}
