@@ -138,13 +138,27 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
+  // Stop recognition AND detach its handlers, so a final onresult fired by
+  // stop() can't write the transcript back into the box after we've cleared it.
+  const stopRecognition = () => {
+    const rec = recognitionRef.current;
+    if (rec) {
+      rec.onresult = () => {};
+      rec.onend = () => {};
+      rec.onerror = () => {};
+      rec.stop();
+    }
+    recognitionRef.current = null;
+    setListening(false);
+  };
+
   // Clean up an in-flight recognition session if the composer unmounts.
-  useEffect(() => () => recognitionRef.current?.stop(), []);
+  useEffect(() => () => stopRecognition(), []);
 
   const submit = async () => {
     const message = value.trim();
     if ((!message && !image) || submitting) return;
-    recognitionRef.current?.stop();
+    stopRecognition();
     const attachment = image ?? undefined;
     setSubmitting(true);
     setValue("");
@@ -167,7 +181,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
 
   const toggleVoice = () => {
     if (listening) {
-      recognitionRef.current?.stop();
+      stopRecognition();
       return;
     }
     const SpeechRecognition =
