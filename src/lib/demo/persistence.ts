@@ -29,21 +29,21 @@ export function registerStore(registration: StoreRegistration) {
 }
 
 const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-const blobPathname = (key: string) => `demo-store/${key}.json`;
+// Each persist writes a NEW unique blob under this folder and readers pick the
+// newest. We never overwrite a fixed pathname, so a reader can never be served a
+// CDN-cached stale copy of an overwritten URL — the root cause of vanishing
+// photos. (Vercel Blob is really for immutable assets; for heavier concurrency
+// swap this adapter for Vercel KV without touching the store API.)
+const blobFolder = (key: string) => `demo-store/${key}/`;
 
 async function loadSnapshot(key: string): Promise<Snapshot | null> {
   if (useBlob) {
     const { list } = await import("@vercel/blob");
-    const { blobs } = await list({ prefix: blobPathname(key) });
-    const hit = blobs.find((blob) => blob.pathname === blobPathname(key));
-    if (!hit) return null;
-    // Vercel Blob serves public URLs through a CDN that keeps caching the old
-    // bytes even after we overwrite the same pathname — so a plain fetch can
-    // return a STALE snapshot, and the next persist would then clobber newer
-    // data. Bust the edge cache with a unique query param so we always read the
-    // freshly-persisted snapshot. (cache: "no-store" only affects our runtime,
-    // not the CDN.)
-    const response = await fetch(`${hit.url}?ts=${Date.now()}`, { cache: "no-store" });
+    const { blobs } = await list({ prefix: blobFolder(key) });
+    if (!blobs.length) return null;
+    // Newest write wins. Each blob has a unique URL, so this fetch is fresh.
+    const newest = blobs.reduce((a, b) => (new Date(a.uploadedAt) >= new Date(b.uploadedAt) ? a : b));
+    const response = await fetch(newest.url, { cache: "no-store" });
     if (!response.ok) return null;
     return (await response.json()) as Snapshot;
   }
@@ -61,16 +61,19 @@ async function loadSnapshot(key: string): Promise<Snapshot | null> {
 async function saveSnapshot(key: string, data: Snapshot): Promise<void> {
   const json = JSON.stringify(data);
   if (useBlob) {
-    const { put } = await import("@vercel/blob");
-    await put(blobPathname(key), json, {
-      access: "public",
-      contentType: "application/json",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      // Don't let the CDN hold this snapshot — it's mutable demo state that other
-      // serverless instances must read fresh right after a write.
-      cacheControlMaxAge: 0,
-    });
+    const { put, list, del } = await import("@vercel/blob");
+    const folder = blobFolder(key);
+    // Write a NEW unique blob (unique URL → never a stale CDN hit on read).
+    const pathname = `${folder}${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`;
+    await put(pathname, json, { access: "public", contentType: "application/json", addRandomSuffix: false });
+    // Best-effort prune of superseded snapshots so the folder doesn't grow.
+    try {
+      const { blobs } = await list({ prefix: folder });
+      const stale = blobs.filter((b) => b.pathname !== pathname).map((b) => b.url);
+      if (stale.length) await del(stale);
+    } catch {
+      /* pruning is best-effort */
+    }
     return;
   }
 
