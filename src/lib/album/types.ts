@@ -104,7 +104,11 @@ export interface MilestoneSession {
 
 export interface GrowthData {
   child: { id: string; name: string };
+  /** Primary/focus child's milestone session (kept for compatibility). */
   session: MilestoneSession;
+  /** One milestone session per child, keyed by childId — shown on that child's
+   * Memory tab. */
+  sessions?: Record<string, MilestoneSession>;
   days: DayGroup[];
   firsts: FirstItem[];
   skippedCount: number;

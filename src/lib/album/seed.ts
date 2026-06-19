@@ -1,5 +1,5 @@
 import { ageAt } from "@/lib/family/profile";
-import { getMember } from "@/lib/family/store";
+import { getChildren, getMember } from "@/lib/family/store";
 import { DayGroup, FirstItem, GrowthData, MilestoneSession, OrganizedMedia } from "./types";
 
 // A pre-organized growth album so Memory looks alive before the parent runs
@@ -134,7 +134,7 @@ export function seedGrowthData(): GrowthData {
   });
 
   const todayAge = ageAt(mia.birthday, new Date().toISOString());
-  const session: MilestoneSession = {
+  const miaSession: MilestoneSession = {
     childId: mia.id,
     childName: mia.name,
     ageShort: todayAge?.short,
@@ -147,5 +147,31 @@ export function seedGrowthData(): GrowthData {
     reassurance: "Ideas from Mia’s last few weeks — never a score, never a comparison.",
   };
 
-  return { child: { id: mia.id, name: mia.name }, session, days, firsts, skippedCount: 0 };
+  // A milestone card for every child (shown on their tab). Mia gets the rich
+  // hand-written one; others are generated warmly from their profile.
+  const sessions: Record<string, MilestoneSession> = {};
+  for (const child of getChildren()) {
+    sessions[child.id] = child.id === mia.id ? miaSession : sessionForChild(child);
+  }
+
+  return { child: { id: mia.id, name: mia.name }, session: miaSession, sessions, days, firsts, skippedCount: 0 };
+}
+
+function sessionForChild(child: { id: string; name: string; birthday?: string; interests?: string[] }): MilestoneSession {
+  const age = ageAt(child.birthday, new Date().toISOString());
+  const interests = child.interests ?? [];
+  return {
+    childId: child.id,
+    childName: child.name,
+    ageShort: age?.short,
+    nowSummary: interests.length
+      ? `Lately ${child.name} is into ${interests.slice(0, 2).join(" and ")}, and getting more independent every week.`
+      : `${child.name} is growing and curious — new words and new tricks every week.`,
+    suggestions: [
+      { icon: "📖", text: "Read together before bed" },
+      { icon: "🧩", text: "A simple puzzle to try" },
+      { icon: "🔢", text: "Count things out loud" },
+    ],
+    reassurance: `Ideas from ${child.name}’s last few weeks — never a score, never a comparison.`,
+  };
 }

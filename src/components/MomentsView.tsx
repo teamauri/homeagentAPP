@@ -191,12 +191,14 @@ export function MomentsView() {
     ...children.map((c) => ({ key: `child:${c.id}`, label: c.name })),
   ];
   const days = filterDays(growth.days, filter);
+  // The milestone card belongs to a child, so show it only inside that child's
+  // tab — not on "All".
+  const activeChildId = filter.startsWith("child:") ? filter.slice("child:".length) : undefined;
+  const activeSession = activeChildId ? growth.sessions?.[activeChildId] : undefined;
 
   return (
     <div className="pb-4">
-      <SessionCard session={growth.session} />
-
-      <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto">
+      <div className="no-scrollbar mt-1 flex gap-2 overflow-x-auto">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -210,6 +212,8 @@ export function MomentsView() {
           </button>
         ))}
       </div>
+
+      {activeSession ? <SessionCard session={activeSession} /> : null}
 
       <div className="mt-3 flex items-center justify-between">
         <span className="text-[12px] text-muted">
@@ -254,7 +258,7 @@ export function MomentsView() {
 function SessionCard({ session }: { session: MilestoneSession }) {
   const child = useFamilyMember(session.childId);
   return (
-    <section className="mt-1 rounded-[18px] border border-[#ecdebf] bg-gradient-to-br from-[#fbf3e3] to-white p-4">
+    <section className="mt-3 rounded-[18px] border border-[#ecdebf] bg-gradient-to-br from-[#fbf3e3] to-white p-4">
       <div className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#b9772a]">
         {child?.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
