@@ -51,3 +51,27 @@ button {
   scrollbar-width: none;
 }
 
+/* Voice-recording "listening" halo — soft rings breathe outward from the mic. */
+@keyframes auri-halo {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.3;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+.auri-halo-ring {
+  animation: auri-halo 2.4s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auri-halo-ring {
+    animation: none;
+    opacity: 0;
+  }
+}
+
