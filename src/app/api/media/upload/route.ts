@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { addDemoMedia, createDemoMemoryFromMedia, DemoMediaInput } from "@/lib/demo/demo-store";
+import { addDemoMedia, createDemoMemoryFromMedia, DemoMediaInput, persistDemoStore } from "@/lib/demo/demo-store";
+import { isFile, storeUploadedFile } from "@/lib/demo/media-storage";
+import { ensureHydrated } from "@/lib/demo/persistence";
 import { PersonId } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -20,9 +22,7 @@ function toPersonId(value: FormDataEntryValue | null): PersonId {
 
 async function inputsFromFormData(request: Request): Promise<DemoMediaInput[]> {
   const formData = await request.formData();
-  const files = formData
-    .getAll("files")
-    .filter((value): value is File => typeof value === "object" && value !== null && "name" in value && "size" in value);
+  const files = formData.getAll("files").filter(isFile);
   const fallbackTitle = String(formData.get("title") || "Phone media upload");
   const person = toPersonId(formData.get("person"));
 
@@ -37,20 +37,32 @@ async function inputsFromFormData(request: Request): Promise<DemoMediaInput[]> {
     ];
   }
 
-  return files.map((file) => ({
-    title: file.name || fallbackTitle,
-    person,
-    mediaType: file.type.startsWith("video/") ? "video" : "photo",
-    metadata: {
-      fileName: file.name,
-      mimeType: file.type,
-      size: file.size,
-      uploadMode: "multipart",
-    },
-  }));
+  // Actually persist each file (Blob on Vercel / local) so it has a real,
+  // servable URL — phone photos display and phone videos play.
+  return Promise.all(
+    files.map(async (file) => {
+      const stored = await storeUploadedFile(file);
+      const isVideo = file.type.startsWith("video/");
+      return {
+        title: file.name || fallbackTitle,
+        person,
+        mediaType: isVideo ? "video" : "photo",
+        url: stored.url,
+        thumbnailUrl: isVideo ? undefined : stored.url,
+        metadata: {
+          fileName: file.name,
+          mimeType: stored.mimeType,
+          size: stored.size,
+          storage: stored.storage,
+          uploadMode: "multipart",
+        },
+      } satisfies DemoMediaInput;
+    })
+  );
 }
 
 export async function POST(request: Request) {
+  await ensureHydrated();
   let inputs: DemoMediaInput[];
 
   try {
@@ -74,6 +86,8 @@ export async function POST(request: Request) {
     status: "saved",
     statusLabel: "Saved",
   });
+
+  await persistDemoStore();
 
   return NextResponse.json({
     media,

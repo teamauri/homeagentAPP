@@ -6,7 +6,7 @@ import { TeamBadge } from "./TeamBadge";
 export function TodayView() {
   return (
     <div className="pb-4">
-      <button className="mb-4 flex min-h-[70px] w-full items-center gap-3 rounded-[20px] border border-line bg-white px-4 text-left shadow-[0_8px_24px_rgba(8,8,8,0.03)]">
+      <button className="mb-6 mt-1 flex min-h-[70px] w-full items-center gap-3 rounded-[18px] border border-line bg-white px-4 text-left shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
         <div className="grid h-[46px] w-[46px] shrink-0 place-items-center">
           <DoodleIcon name="robot" className="h-11 w-11" />
         </div>
@@ -23,9 +23,9 @@ export function TodayView() {
         <span className="text-[34px] font-light leading-none text-ink/45">›</span>
       </button>
 
-      <section className="mb-5">
-        <h2 className="font-display text-[31px] leading-none tracking-[-0.04em] text-ink">Needs You</h2>
-        <div className="mt-3 space-y-2">
+      <section className="mb-6">
+        <h2 className="font-display text-[24px] font-normal leading-none tracking-[-0.02em] text-ink">Needs You</h2>
+        <div className="mt-3 space-y-2.5">
           {needs.map((item) => (
             <NeedRow key={item.id} item={item} />
           ))}
@@ -50,7 +50,7 @@ export function TodayView() {
 
       <section className="pb-2">
         <div className="mb-2 flex items-center justify-between gap-4">
-          <h2 className="font-display text-[26px] leading-none tracking-[-0.04em] text-ink">Recent in Memory</h2>
+          <h2 className="font-display text-[20px] font-normal leading-none tracking-[-0.02em] text-ink">Recent in Memory</h2>
         </div>
         <div>
           {suggestions.map((item) => (
@@ -70,7 +70,7 @@ export function TodayView() {
 function NeedRow({ item }: { item: (typeof needs)[number] }) {
   const helper = teamAgentByName[item.helper];
   return (
-    <article className="flex min-h-[76px] items-center gap-3 rounded-[19px] border border-line bg-white px-3 py-2 shadow-[0_8px_24px_rgba(8,8,8,0.025)]">
+    <article className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-line/85 bg-white px-3.5 py-2.5 shadow-[0_1px_4px_rgba(8,8,8,0.03)]">
       <div className="grid h-[42px] w-[42px] shrink-0 place-items-center">
         <DoodleIcon name={helper?.icon ?? item.icon} className="h-9 w-9" />
       </div>

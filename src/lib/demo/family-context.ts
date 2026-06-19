@@ -1,3 +1,31 @@
+import { seedObservations } from "@/lib/family/profile";
+import { getChildren } from "@/lib/family/store";
+
+// Rich context for the chat model: the static family/team + each child's
+// interests, routines, health notes, and recent observations. This is what lets
+// Auri answer "why is my child upset?" with something only a family agent could
+// know — never generic advice.
+export function buildFamilyContext() {
+  return {
+    ...demoFamilyContext,
+    children: getChildren()
+      .map((m) => ({
+        id: m.id,
+        name: m.name,
+        ageLabel: m.ageLabel,
+        interests: m.interests,
+        routines: m.routines,
+        health: m.health,
+      })),
+    recentObservations: seedObservations.map((o) => ({
+      child: o.memberId,
+      note: o.note,
+      source: o.source,
+      observedAt: o.observedAt,
+    })),
+  };
+}
+
 export const demoFamilyContext = {
   family: {
     name: "Jane’s Family",

@@ -1,6 +1,7 @@
 import { CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
 import { moments } from "@/lib/mock-data";
 import { PersonId, SourceType, Status } from "@/lib/types";
+import { persistStore, registerStore } from "./persistence";
 
 type StoredObject = CreatedLocalObject & { payload: Record<string, unknown>; createdAt: string };
 type DemoObjectAction = "add" | "save" | "send" | "log" | "complete";
@@ -74,6 +75,35 @@ function store() {
   globalStore.__auriDemoMediaCounter ??= 0;
   globalStore.__auriDemoMemoryCounter ??= 0;
   return globalStore;
+}
+
+registerStore({
+  key: "demo",
+  snapshot: () => {
+    const current = store();
+    return {
+      objects: current.__auriDemoObjects,
+      media: current.__auriDemoMedia,
+      memory: current.__auriDemoMemory,
+      counter: current.__auriDemoCounter,
+      mediaCounter: current.__auriDemoMediaCounter,
+      memoryCounter: current.__auriDemoMemoryCounter,
+    };
+  },
+  restore: (data) => {
+    const current = store();
+    if (Array.isArray(data.objects)) current.__auriDemoObjects = data.objects as StoredObject[];
+    if (Array.isArray(data.media)) current.__auriDemoMedia = data.media as DemoMediaItem[];
+    if (Array.isArray(data.memory)) current.__auriDemoMemory = data.memory as DemoMemoryItem[];
+    if (typeof data.counter === "number") current.__auriDemoCounter = data.counter;
+    if (typeof data.mediaCounter === "number") current.__auriDemoMediaCounter = data.mediaCounter;
+    if (typeof data.memoryCounter === "number") current.__auriDemoMemoryCounter = data.memoryCounter;
+  },
+});
+
+/** Persist the demo store (media/memory/objects/counters) after a mutation. */
+export function persistDemoStore() {
+  return persistStore("demo");
 }
 
 function statusFor(type: ObjectToCreate["type"]): CreatedLocalObject["status"] {
@@ -191,8 +221,9 @@ export function createDemoMemoryFromMedia(
   const hasAuri = mediaItems.some((item) => item.source === "auri");
   const hasPhone = mediaItems.some((item) => item.source === "phone");
   const sourceType: SourceType = hasAuri && hasPhone ? "photos" : first.sourceType;
+  const memoryId = nextId("memory", "__auriDemoMemoryCounter");
   const memory: DemoMemoryItem = {
-    id: nextId("memory", "__auriDemoMemoryCounter"),
+    id: memoryId,
     title: options?.title || first.title,
     body: options?.body || first.body,
     sourceLabel: hasAuri && hasPhone ? "Phone + Auri" : sourceLabel(first.source),
@@ -203,7 +234,8 @@ export function createDemoMemoryFromMedia(
     statusLabel: options?.statusLabel || "Ready",
     mediaIds: mediaItems.map((item) => item.id),
     createdAt: new Date().toISOString(),
-    targetRoute: `/memory/${first.id}`,
+    // [id] in /memory/[id] is the memory id; the detail page joins mediaIds.
+    targetRoute: `/memory/${memoryId}`,
     metadata: {
       mediaCount: mediaItems.length,
       sources: [...new Set(mediaItems.map((item) => item.source))],

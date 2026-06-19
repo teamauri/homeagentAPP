@@ -14,7 +14,11 @@ export type FamilyMemberProfile = {
   name: string;
   role: FamilyRole;
   ageLabel?: string;
-  avatar: string; // DoodleIcon name: mom | dad | girl | boy | baby | grandma
+  /** ISO date (YYYY-MM-DD). Drives the age shown on growth moments/firsts. */
+  birthday?: string;
+  avatar: string; // DoodleIcon fallback: mom | dad | girl | boy | baby | grandma
+  /** Real uploaded photo (data URL or CDN url). Shown instead of the doodle. */
+  avatarUrl?: string;
   /** Stable, slow-moving facts the family told us or we learned early. */
   interests: string[];
   /** Recurring rhythms — bedtime, meds, practice, naps. */
@@ -22,6 +26,22 @@ export type FamilyMemberProfile = {
   /** Health / care notes worth remembering. */
   health: string[];
 };
+
+/** Age of someone with `birthday` at moment `atISO`, as a compact "3y 4m". */
+export function ageAt(birthday: string | undefined, atISO: string): { years: number; months: number; short: string; long: string } | undefined {
+  if (!birthday) return undefined;
+  const birth = new Date(birthday);
+  const at = new Date(atISO);
+  if (Number.isNaN(birth.getTime()) || Number.isNaN(at.getTime())) return undefined;
+  let months = (at.getFullYear() - birth.getFullYear()) * 12 + (at.getMonth() - birth.getMonth());
+  if (at.getDate() < birth.getDate()) months -= 1;
+  if (months < 0) months = 0;
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  const short = `${years}y ${rem}m`;
+  const long = `${years} ${years === 1 ? "year" : "years"} ${rem} ${rem === 1 ? "month" : "months"}`;
+  return { years, months, short, long };
+}
 
 export type ObservationSource =
   | "album_organize" // Task ② — Iris organizing phone photos
@@ -69,7 +89,8 @@ export const seedFamilyMembers: FamilyMemberProfile[] = [
     id: "mia",
     name: "Mia",
     role: "child",
-    ageLabel: "4",
+    ageLabel: "3",
+    birthday: "2023-02-10",
     avatar: "girl",
     interests: ["dinosaurs", "picture books"],
     routines: ["Bedtime story around 8pm", "2pm medicine"],
@@ -80,6 +101,7 @@ export const seedFamilyMembers: FamilyMemberProfile[] = [
     name: "Leo",
     role: "child",
     ageLabel: "7",
+    birthday: "2019-03-15",
     avatar: "boy",
     interests: ["basketball", "drawing"],
     routines: ["Basketball Fridays at 5:30"],
