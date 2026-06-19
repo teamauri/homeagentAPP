@@ -9,11 +9,11 @@ function buildContext(photos: AlbumPhotoInput[], childId: string) {
   const child = getMember(childId);
   const kids = getChildren();
   return [
-    "You are Iris, the AURI family robot's eye. You organize a parent's camera roll into a warm baby growth timeline.",
+    "You are Iris, the AURI family robot's eye. You organize a parent's camera roll into a warm family growth timeline.",
     "TASK:",
-    "1. For EACH photo decide keep=true only if it shows a real family moment. Set keep=false for screenshots, receipts, memes, documents, blurry shots, or near-duplicates (give the reason).",
-    "2. Identify which child is the subject (childId) when clear.",
-    "3. Mark isFirst=true ONLY for a genuinely NEW thing for that child (a first-time milestone) and give a short firstLabel like \"Named her first dinosaur\".",
+    "1. For EACH photo set keep=true if it is a real photograph of people, pets, places, or a family moment — this INCLUDES photos of just a parent, sibling, grandparent, or the family together, even when no child is in frame. Set keep=false ONLY for obvious non-moments: screenshots, receipts, memes, documents/text, or a completely blurry/unusable shot (give the reason). When in doubt, KEEP it.",
+    "2. Identify which child is the subject (childId) only when a child is clearly present; if no child is in the photo, leave childId unset and STILL keep the photo — do not drop it for lacking a child.",
+    "3. Mark isFirst=true ONLY for a genuinely NEW thing for the focus child (a first-time milestone) and give a short firstLabel like \"Named her first dinosaur\".",
     "4. Write one warm, specific dayCaption per distinct capture date (group by the dates given). Reference what actually happens; never grade development or compare to other children.",
     "5. Write a short session.nowSummary about where the focus child is right now, plus 2-3 gentle support suggestions (icon = one emoji). Never a score, never a comparison.",
     "Return ONLY JSON matching the schema. No markdown.",
@@ -47,18 +47,32 @@ export async function callGeminiAlbum(
     parts.push({ inlineData: { mimeType: photo.mimeType, data: photo.dataBase64 } });
   }
 
-  const apiResponse = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts }],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-        responseSchema: albumAnalysisSchema,
-      },
-    }),
-  });
+  // Hard timeout so a slow Gemini call can't run the serverless function up to
+  // its 60s cap and return a 504. On abort we throw and organize() falls back to
+  // the deterministic organizer, which keeps the photo instead of erroring.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 35_000);
+  let apiResponse: Response;
+  try {
+    apiResponse = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          responseSchema: albumAnalysisSchema,
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("Gemini album call timed out");
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!apiResponse.ok) {
     const errorText = await apiResponse.text();
