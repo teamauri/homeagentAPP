@@ -65,3 +65,15 @@ export async function storeUploadedFile(file: File): Promise<StoredFile> {
 export function isFile(value: FormDataEntryValue | null): value is File {
   return typeof value === "object" && value !== null && "arrayBuffer" in value && "size" in value;
 }
+
+/** Delete every stored uploaded media file (Blob on Vercel / local folder). */
+export async function deleteAllUploadedMedia(): Promise<void> {
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const { list, del } = await import("@vercel/blob");
+    const { blobs } = await list({ prefix: "demo-media/" });
+    if (blobs.length) await del(blobs.map((b) => b.url));
+    return;
+  }
+  const { rm } = await import("node:fs/promises");
+  await rm(MEDIA_DIR, { recursive: true, force: true }).catch(() => {});
+}

@@ -106,6 +106,17 @@ export function persistDemoStore() {
   return persistStore("demo");
 }
 
+/** Wipe all demo content (uploaded/ingested media, Stories, created objects). */
+export function resetDemoStore() {
+  const current = store();
+  current.__auriDemoObjects = [];
+  current.__auriDemoMedia = [];
+  current.__auriDemoMemory = [];
+  current.__auriDemoCounter = 0;
+  current.__auriDemoMediaCounter = 0;
+  current.__auriDemoMemoryCounter = 0;
+}
+
 function statusFor(type: ObjectToCreate["type"]): CreatedLocalObject["status"] {
   if (type === "baby_log") return "logged";
   if (type === "memory_item") return "saved";
