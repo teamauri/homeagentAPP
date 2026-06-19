@@ -30,3 +30,11 @@ export function useFamilyMember(id?: string): FamilyMemberProfile | undefined {
   const byId = useContext(FamilyContext);
   return id ? byId[id] : undefined;
 }
+
+/** Children, oldest first (by birthday). Drives the per-child tabs in Memory. */
+export function useChildren(): FamilyMemberProfile[] {
+  const byId = useContext(FamilyContext);
+  return Object.values(byId)
+    .filter((m) => m.role === "child" || m.role === "baby")
+    .sort((a, b) => (a.birthday ?? "9999") < (b.birthday ?? "9999") ? -1 : 1);
+}

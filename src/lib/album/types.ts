@@ -52,6 +52,9 @@ export interface OrganizedMedia {
   id: string;
   kind: "photo" | "video";
   source: "phone" | "auri";
+  /** Which family child this media belongs to (mia/leo/…), when known — drives
+   * the per-child tabs in Memory. Undefined → only shows under "All". */
+  childId?: string;
   /** Thumbnail to render: inline data URL (phone organize) or a real CDN/local
    * URL (robot Stories ingested via DockKit). Undefined → gradient tone tile. */
   thumbDataUrl?: string;

@@ -14,6 +14,7 @@ function media(id: string, tone: string, opts: Partial<OrganizedMedia> = {}): Or
     id,
     kind: opts.kind ?? "photo",
     source: opts.source ?? "phone",
+    childId: opts.childId,
     tone,
     capturedAtISO: opts.capturedAtISO ?? "2026-06-14T10:00:00.000Z",
     isFirst: opts.isFirst ?? false,
@@ -26,6 +27,8 @@ interface SeedDay {
   date: string;
   caption: string;
   firstLabel?: string;
+  /** Which child this day's media belongs to (drives the per-child tabs). */
+  childId?: string;
   tones: { tone: string; kind?: "photo" | "video"; source?: "phone" | "auri"; durationLabel?: string }[];
 }
 
@@ -61,11 +64,13 @@ const seedDays: SeedDay[] = [
   {
     date: "2026-06-06",
     caption: "Pancakes with Dad. Flour everywhere — worth it.",
+    childId: "leo",
     tones: [{ tone: "g4" }, { tone: "g2" }, { tone: "g5" }],
   },
   {
     date: "2026-06-03",
     caption: "A slow park afternoon — braver on the slide.",
+    childId: "leo",
     tones: [{ tone: "g1" }, { tone: "g5" }, { tone: "g3" }],
   },
 ];
@@ -81,6 +86,7 @@ export function seedGrowthData(): GrowthData {
       media(`seed_${di}_${i}`, t.tone, {
         kind: t.kind,
         source: t.source,
+        childId: day.childId ?? "mia",
         durationLabel: t.durationLabel,
         capturedAtISO,
         isFirst: i === 0 && Boolean(day.firstLabel),

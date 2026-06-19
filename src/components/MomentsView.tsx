@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DayGroup, FirstItem, GrowthData, MilestoneSession, OrganizedMedia } from "@/lib/album/types";
-import { useFamilyMember } from "./FamilyContext";
+import { DayGroup, GrowthData, MilestoneSession, OrganizedMedia } from "@/lib/album/types";
+import { useChildren, useFamilyMember } from "./FamilyContext";
 
 // Fixed gradient classes for seed/placeholder tones (kept literal so Tailwind
 // includes them). Real photos (phone organize) and ingested robot Stories
@@ -17,8 +17,8 @@ const TONE: Record<string, string> = {
 };
 const toneClass = (tone?: string) => (tone && TONE[tone]) || TONE.g1;
 
-type Filter = "All" | "Firsts" | "Auri" | "Phone";
-const FILTERS: Filter[] = ["All", "Firsts", "Auri", "Phone"];
+// A Memory tab is "All", a source ("auri"/"phone"), or a specific child id.
+type Tab = { key: string; label: string };
 
 // Decode a photo to {width,height,draw}. Tries the fast createImageBitmap path,
 // then falls back to an <img> element — crucial on iPhone Safari, where photos
@@ -73,8 +73,9 @@ async function fileToPayload(file: File) {
 }
 
 export function MomentsView() {
+  const children = useChildren();
   const [growth, setGrowth] = useState<GrowthData | null>(null);
-  const [filter, setFilter] = useState<Filter>("All");
+  const [filter, setFilter] = useState<string>("all");
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -184,6 +185,13 @@ export function MomentsView() {
     return <div className="pt-10 text-center text-[14px] text-muted">Loading memories…</div>;
   }
 
+  // All · one tab per child (oldest first) · source filters.
+  const tabs: Tab[] = [
+    { key: "all", label: "All" },
+    ...children.map((c) => ({ key: `child:${c.id}`, label: c.name })),
+    { key: "src:auri", label: "Auri" },
+    { key: "src:phone", label: "Phone" },
+  ];
   const days = filterDays(growth.days, filter);
 
   return (
@@ -191,22 +199,16 @@ export function MomentsView() {
       <SessionCard session={growth.session} />
 
       <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto">
-        {FILTERS.map((f) => (
+        {tabs.map((t) => (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
+            key={t.key}
+            onClick={() => setFilter(t.key)}
             className={
               "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] " +
-              (filter === f
-                ? f === "Firsts"
-                  ? "border-[#b9772a] bg-[#b9772a] font-semibold text-white"
-                  : "border-ink bg-ink font-semibold text-white"
-                : f === "Firsts"
-                  ? "border-[#eccfa0] text-[#b9772a]"
-                  : "border-line text-muted")
+              (filter === t.key ? "border-ink bg-ink font-semibold text-white" : "border-line text-muted")
             }
           >
-            {f === "Firsts" ? "★ Firsts" : f}
+            {t.label}
           </button>
         ))}
       </div>
@@ -246,7 +248,7 @@ export function MomentsView() {
         </div>
       ) : null}
 
-      {filter === "Firsts" ? <FirstsWall firsts={growth.firsts} /> : <Feed days={days} />}
+      <Feed days={days} />
     </div>
   );
 }
@@ -360,43 +362,14 @@ function Tile({ media, href, sameTab }: { media: OrganizedMedia; href?: string; 
   return <div className={className}>{inner}</div>;
 }
 
-function FirstsWall({ firsts }: { firsts: FirstItem[] }) {
-  return (
-    <div className="mt-4">
-      <p className="mb-3 text-[12.5px] text-muted">{firsts.length} milestones, kept forever</p>
-      {firsts.map((first) => (
-        <article key={first.id} className="mb-3 overflow-hidden rounded-[16px] border border-line">
-          <div className="relative h-[150px]">
-            {first.thumbDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={first.thumbDataUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className={"h-full w-full " + toneClass(first.tone)} />
-            )}
-            {first.kind === "video" ? (
-              <span className="absolute inset-0 grid place-items-center">
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-white/85 pl-0.5 text-ink">▶</span>
-              </span>
-            ) : null}
-          </div>
-          <div className="p-3">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#fbeede] px-2 py-0.5 text-[10px] font-bold text-[#b9772a]">★ First</span>
-            <h4 className="mt-1.5 text-[15px] font-semibold text-ink">{first.label}</h4>
-            <p className="mt-0.5 text-[11.5px] text-muted">
-              {first.dateLabel}
-              {first.ageLong ? ` · ${first.ageLong}` : ""}
-            </p>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function filterDays(days: DayGroup[], filter: Filter): DayGroup[] {
-  if (filter === "All" || filter === "Firsts") return days;
-  const source = filter === "Auri" ? "auri" : "phone";
+function filterDays(days: DayGroup[], filter: string): DayGroup[] {
+  if (filter === "all") return days;
+  const match: (m: OrganizedMedia) => boolean = filter.startsWith("child:")
+    ? (m) => m.childId === filter.slice("child:".length)
+    : filter.startsWith("src:")
+      ? (m) => m.source === filter.slice("src:".length)
+      : () => true;
   return days
-    .map((day) => ({ ...day, media: day.media.filter((m) => m.source === source) }))
+    .map((day) => ({ ...day, media: day.media.filter(match) }))
     .filter((day) => day.media.length > 0);
 }

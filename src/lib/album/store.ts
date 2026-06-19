@@ -73,6 +73,8 @@ function demoStoryDays(): DayGroup[] {
       id: m.id,
       kind: m.mediaType === "photo" ? "photo" : "video",
       source: m.source === "auri" ? "auri" : "phone",
+      // Attribute to a child when the ingest tagged a known one (mia/leo).
+      childId: m.person === "mia" || m.person === "leo" ? m.person : undefined,
       // Photos use their image; a video only shows a poster if one exists,
       // otherwise the tile falls back to a gradient + ▶ (poster frames are ③).
       thumbDataUrl: m.mediaType === "photo" ? m.thumbnailUrl || m.url : m.thumbnailUrl,
