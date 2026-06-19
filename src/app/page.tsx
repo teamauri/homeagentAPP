@@ -45,7 +45,7 @@ export default function Home() {
         sender: "Auri",
         time: nowLabel(),
         avatar: "auri",
-        text: "Thinking through the best helper...",
+        text: "Auri is thinking…",
         pending: true,
       },
     ]);
