@@ -27,19 +27,19 @@ declare global {
 const tabs: { key: TabKey; label: string; icon: string }[] = [
   { key: "chat", label: "Chat", icon: "family" },
   { key: "today", label: "Inbox", icon: "bell" },
-  { key: "memory", label: "Memory", icon: "photos" },
+  { key: "memory", label: "Journey", icon: "photos" },
 ];
 
 const titles: Record<TabKey, string> = {
-  today: "Good afternoon,\nJane.",
+  today: "Inbox",
   chat: "Jane’s Family",
-  memory: "Jane’s Memory",
+  memory: "Journey",
 };
 
 const subtitles: Record<TabKey, string> = {
   today: "Here’s what needs you today.",
   chat: "Mom, Dad · Iris, Lumi, Vita",
-  memory: "All your moments, in one timeline.",
+  memory: "Watch your family grow, together.",
 };
 
 export function AppShell({
@@ -68,7 +68,7 @@ export function AppShell({
 
 function ShellHeader({ activeTab }: { activeTab: TabKey }) {
   return (
-    <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]">
+    <div className="shrink-0 border-b border-line bg-paper pt-[env(safe-area-inset-top)]">
       <header className="flex items-start justify-between gap-3 px-[26px] pb-3 pt-3">
         <div className="min-w-0">
           <h1 className="font-display text-[34px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
@@ -134,6 +134,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   const [submitting, setSubmitting] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -163,6 +164,14 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
 
   // Clean up an in-flight recognition session if the composer unmounts.
   useEffect(() => () => stopRecognition(), []);
+
+  // Run a 1s timer while listening; reset to 0 each time recording starts.
+  useEffect(() => {
+    if (!listening) return;
+    setElapsed(0);
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [listening]);
 
   const submit = async () => {
     const message = value.trim();
@@ -243,7 +252,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
         </div>
       ) : null}
       {listening ? (
-        <RecordingBar transcript={value} onCancel={cancelVoice} onStop={stopRecognition} />
+        <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={stopRecognition} />
       ) : (
         <div className="flex h-[54px] items-center gap-2.5 rounded-full border border-ink/15 bg-white px-2.5 shadow-[0_10px_30px_rgba(8,8,8,0.1)]">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} className="hidden" />
@@ -290,56 +299,68 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   );
 }
 
-// Replaces the normal composer while dictation is active. Makes "recording" and
-// "how to finish" unmistakable: red frame, pulsing dot, animated waveform, the
-// live transcript, an explicit Stop (✓) button, and a Cancel (✕).
-function RecordingBar({
+function formatElapsed(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// A calm "listening" panel that rises in place of the composer while dictation
+// is active: a mic with soft breathing halos, a timer, the full live transcript
+// (wraps freely — never truncated), and two clear actions (Cancel / Done).
+function RecordingPanel({
   transcript,
+  elapsed,
   onCancel,
   onStop,
 }: {
   transcript: string;
+  elapsed: number;
   onCancel: () => void;
   onStop: () => void;
 }) {
+  const text = transcript.trim();
   return (
-    <div className="flex h-[54px] items-center gap-2 rounded-full border-2 border-red-400 bg-red-50 px-2 shadow-[0_10px_30px_rgba(220,38,38,0.18)]">
-      <button
-        type="button"
-        onClick={onCancel}
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-red-200 bg-white text-[20px] leading-none text-red-500"
-        aria-label="Cancel voice input"
-      >
-        ×
-      </button>
+    <div className="rounded-[22px] border border-line bg-white px-[18px] pb-4 pt-6 shadow-[0_14px_36px_rgba(8,8,8,0.10)]">
+      <div className="flex flex-col items-center gap-3.5">
+        <span className="relative grid h-16 w-16 place-items-center" aria-hidden="true">
+          <span className="auri-halo-ring absolute h-16 w-16 rounded-full bg-mint" />
+          <span className="auri-halo-ring absolute h-16 w-16 rounded-full bg-mint" style={{ animationDelay: "1.2s" }} />
+          <span className="relative grid h-14 w-14 place-items-center rounded-full bg-mint text-white">
+            <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
+              <path d="M14 4a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V8a4 4 0 0 0-4-4Z" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path d="M6 13v1a8 8 0 0 0 16 0v-1M14 22v3M10 25h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+            </svg>
+          </span>
+        </span>
 
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 pl-1">
-        <span className="relative flex h-2.5 w-2.5 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-        </span>
-        <div className="flex h-5 shrink-0 items-center gap-[3px]" aria-hidden="true">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <span
-              key={i}
-              className="auri-eq-bar h-full w-[3px] rounded-full bg-red-400"
-              style={{ animationDelay: `${i * 0.12}s` }}
-            />
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="text-[15px] font-medium text-mint">Listening</span>
+          <span className="tabular-nums text-[13px] text-muted">{formatElapsed(elapsed)}</span>
         </div>
-        <span className={clsx("min-w-0 flex-1 truncate text-[15px]", transcript.trim() ? "text-ink" : "text-red-500")}>
-          {transcript.trim() || "Listening…"}
-        </span>
+
+        <p className="no-scrollbar max-h-[34vh] w-full overflow-y-auto whitespace-pre-wrap break-words text-center text-[16px] leading-relaxed text-ink">
+          {text || <span className="text-muted/70">Start speaking…</span>}
+        </p>
       </div>
 
-      <button
-        type="button"
-        onClick={onStop}
-        className="grid h-9 shrink-0 place-items-center gap-1.5 rounded-full bg-red-500 px-4 text-[14px] font-semibold text-white shadow-sm"
-        aria-label="Stop recording and keep text"
-      >
-        Done
-      </button>
+      <div className="mt-4 flex gap-2.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="h-11 flex-1 rounded-full border border-line bg-soft text-[15px] font-medium text-muted"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onStop}
+          className="h-11 flex-1 rounded-full bg-mint text-[15px] font-medium text-white"
+          aria-label="Stop recording and keep text"
+        >
+          Done
+        </button>
+      </div>
     </div>
   );
 }

@@ -51,24 +51,27 @@ button {
   scrollbar-width: none;
 }
 
-/* Voice-recording equalizer bars — animated height to signal live capture. */
-@keyframes auri-eq {
-  0%,
-  100% {
-    transform: scaleY(0.3);
+/* Voice-recording "listening" halo — soft rings breathe outward from the mic. */
+@keyframes auri-halo {
+  0% {
+    transform: scale(0.72);
+    opacity: 0.3;
   }
-  50% {
-    transform: scaleY(1);
+  80% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
   }
 }
-.auri-eq-bar {
-  transform-origin: center;
-  animation: auri-eq 0.9s ease-in-out infinite;
+.auri-halo-ring {
+  animation: auri-halo 2.4s ease-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .auri-eq-bar {
+  .auri-halo-ring {
     animation: none;
-    transform: scaleY(0.7);
+    opacity: 0;
   }
 }
 
