@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { addDemoMedia, createDemoMemoryFromMedia, DemoMediaInput, persistDemoStore } from "@/lib/demo/demo-store";
 import { isFile, storeUploadedFile } from "@/lib/demo/media-storage";
-import { ensureHydrated } from "@/lib/demo/persistence";
+import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 import { PersonId } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -79,6 +79,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Provide at least one media item or file" }, { status: 400 });
   }
 
+  // Build on the latest demo store so a warm instance doesn't drop earlier
+  // uploads/Stories when it persists.
+  await reloadStore("demo");
   const media = addDemoMedia(inputs, "phone");
   const memory = createDemoMemoryFromMedia(media, {
     title: media.length === 1 ? media[0].title : `${media.length} phone items uploaded`,

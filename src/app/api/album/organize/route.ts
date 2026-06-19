@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { organizeAlbum } from "@/lib/album/organize";
 import { addOrganized, getGrowth, persistGrowthStore } from "@/lib/album/store";
 import { AlbumPhotoInput } from "@/lib/album/types";
-import { ensureHydrated } from "@/lib/demo/persistence";
+import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +37,10 @@ export async function POST(request: Request) {
   const childId = typeof body?.childId === "string" ? body.childId : "mia";
 
   try {
+    // Pull the latest organized album from Blob FIRST so appending this batch
+    // (and the following persist) builds on other instances' writes instead of
+    // overwriting them with a stale in-memory snapshot.
+    await reloadStore("growth");
     const result = await organizeAlbum(photos, childId);
     addOrganized(result);
     await persistGrowthStore();
