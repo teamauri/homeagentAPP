@@ -22,6 +22,8 @@ export default function FamilySettingsPage() {
   const [members, setMembers] = useState<FamilyMemberProfile[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
 
   useEffect(() => {
     fetch("/api/family")
@@ -66,6 +68,18 @@ export default function FamilySettingsPage() {
     }
   }
 
+  async function resetDemo() {
+    if (!window.confirm("Clear all test photos, videos and Stories created while testing? Your family settings are kept. This can’t be undone.")) return;
+    setResetting(true);
+    setResetDone(false);
+    try {
+      const res = await fetch("/api/demo/reset", { method: "POST" });
+      if (res.ok) setResetDone(true);
+    } finally {
+      setResetting(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#f5f1eb] px-3 py-4 md:grid md:place-items-center md:px-10">
       <div className="phone-shell mx-auto w-full max-w-[430px] overflow-hidden bg-paper">
@@ -90,6 +104,20 @@ export default function FamilySettingsPage() {
                 <button onClick={addChild} className="w-full rounded-[16px] border border-dashed border-line py-3 text-[14px] font-semibold text-muted">
                   ＋ Add a child
                 </button>
+
+                <div className="mt-6 border-t border-line pt-5">
+                  <p className="text-[13px] font-semibold text-ink">Demo data</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                    Clear photos, videos and Stories added while testing, returning Memory to its starting state. Your family settings are kept.
+                  </p>
+                  <button
+                    onClick={resetDemo}
+                    disabled={resetting}
+                    className="mt-3 w-full rounded-full border border-[#e3b7ab] py-3 text-[14px] font-semibold text-[#b5503a] disabled:opacity-40"
+                  >
+                    {resetting ? "Clearing…" : resetDone ? "Cleared ✓ — reopen Memory" : "Reset demo data"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

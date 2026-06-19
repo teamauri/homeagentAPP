@@ -42,6 +42,16 @@ export function persistGrowthStore() {
   return persistStore("growth");
 }
 
+/** Wipe all organized-album content back to the seed (clears organized photos,
+ *  firsts, the overridden session, and observations). */
+export function resetGrowthStore() {
+  g.__auriGrowthDays = [];
+  g.__auriGrowthFirsts = [];
+  g.__auriGrowthSession = undefined;
+  g.__auriGrowthSkipped = 0;
+  g.__auriGrowthObs = [];
+}
+
 function sortByDateDesc<T extends { dateISO: string }>(items: T[]) {
   return [...items].sort((a, b) => (a.dateISO < b.dateISO ? 1 : -1));
 }
