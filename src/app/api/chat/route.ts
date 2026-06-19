@@ -6,6 +6,9 @@ import { callGeminiChat } from "@/lib/chat-server/gemini";
 import { ChatAIResponse, ChatApiResponse, ChatRequestBody } from "@/lib/chat-server/types";
 
 export const runtime = "nodejs";
+// Real model calls (DeepSeek/Gemini) can exceed the 10s default; raise it
+// (Vercel Hobby caps at 60s, Pro at 300s).
+export const maxDuration = 60;
 
 function normalizeRequestBody(body: unknown): ChatRequestBody {
   const request = body && typeof body === "object" ? (body as ChatRequestBody) : {};
