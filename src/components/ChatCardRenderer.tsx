@@ -7,7 +7,7 @@ export function ChatCardRenderer({ card, compact = false }: { card: ChatCard; co
     return (
       <button className="flex min-h-[58px] w-[305px] max-w-full items-center gap-5 rounded-[15px] border border-line bg-white px-5 text-left shadow-[0_7px_16px_rgba(8,8,8,0.035)]">
         <DoodleIcon name={card.icon} className="h-9 w-9" />
-        <span className="min-w-0 flex-1 text-[17px] leading-5 text-ink">{card.title}</span>
+        <span className="min-w-0 flex-1 text-[15px] leading-5 text-ink">{card.title}</span>
       </button>
     );
   }

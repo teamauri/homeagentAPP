@@ -1,4 +1,4 @@
-import { Moment, NeedItem, Suggestion } from "./types";
+import { CalendarEvent, Moment, NeedItem, Suggestion } from "./types";
 
 // Seed content for the calm "Today" inbox and the "Memory" timeline.
 // Aligned with the AURI teammates: Iris (films/album), Lumi (reads), Vita (keeper).
@@ -38,6 +38,78 @@ export const suggestions: Suggestion[] = [
   { id: "make-album", helper: "Iris", icon: "spark", text: "Make a family album from this week’s photos" },
   { id: "dino-insight", helper: "Lumi", icon: "book", text: "Mia keeps choosing dinosaur books — suggest one more" },
   { id: "family-conflicts", helper: "Vita", icon: "calendar", text: "Check if this week has any family conflicts" },
+];
+
+// Next few family events, surfaced as a compact agenda in the Inbox since there
+// is no standalone Calendar tab. Ordered soonest-first.
+export const upcoming: CalendarEvent[] = [
+  {
+    id: "piano-lesson",
+    title: "Piano lesson",
+    person: "mia",
+    dateLabel: "Tomorrow",
+    timeLabel: "3:15 PM",
+    body: "Mia has 3 tiny practice steps ready.",
+    icon: "piano",
+    status: "prepared",
+    statusLabel: "Prepared",
+  },
+  {
+    id: "preschool-dropoff",
+    title: "Preschool drop-off",
+    person: "leo",
+    dateLabel: "Friday",
+    timeLabel: "8:30 AM",
+    body: "School chaos still needs a family photo.",
+    icon: "backpack",
+    status: "needs-review",
+    statusLabel: "Needs review",
+  },
+  {
+    id: "family-dinner",
+    title: "Dinner at home",
+    person: "family",
+    dateLabel: "Friday",
+    timeLabel: "6:30 PM",
+    body: "Nova can build a meal plan from your week.",
+    icon: "meal",
+    status: "suggested",
+    statusLabel: "Suggested",
+    suggested: true,
+  },
+  {
+    id: "library-storytime",
+    title: "Library story time",
+    person: "mia",
+    dateLabel: "Saturday",
+    timeLabel: "10:00 AM",
+    body: "Lumi lined up two dinosaur picks for after.",
+    icon: "book",
+    status: "prepared",
+    statusLabel: "Prepared",
+  },
+  {
+    id: "swim-class",
+    title: "Swim class",
+    person: "leo",
+    dateLabel: "Saturday",
+    timeLabel: "4:00 PM",
+    body: "Pack towels — last week's bag is still damp.",
+    icon: "soccer",
+    status: "needs-review",
+    statusLabel: "Needs review",
+  },
+  {
+    id: "grandma-call",
+    title: "Grandma call",
+    person: "family",
+    dateLabel: "Sunday",
+    timeLabel: "7:30 PM",
+    body: "Iris has 2 clips from this week ready to share.",
+    icon: "video-heart",
+    status: "ready",
+    statusLabel: "Ready",
+  },
 ];
 
 export const moments: Moment[] = [

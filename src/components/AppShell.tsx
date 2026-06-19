@@ -58,7 +58,7 @@ export function AppShell({
       <div className="mx-auto w-full overflow-hidden bg-paper md:max-w-[430px]">
         <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-paper md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
           <ShellHeader activeTab={activeTab} />
-          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[26px] pb-6 pt-2">{children}</div>
+          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[26px] pb-3 pt-2">{children}</div>
           <ShellBottom activeTab={activeTab} onTabChange={onTabChange} onComposerSubmit={onComposerSubmit} />
         </div>
       </div>
@@ -68,17 +68,17 @@ export function AppShell({
 
 function ShellHeader({ activeTab }: { activeTab: TabKey }) {
   return (
-    <div className="shrink-0 border-b border-line bg-paper pt-[env(safe-area-inset-top)]">
-      <header className="flex items-start justify-between gap-3 px-[26px] pb-3 pt-3">
+    <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]">
+      <header className="flex items-start justify-between gap-3 px-[26px] pb-2 pt-2">
         <div className="min-w-0">
-          <h1 className="font-display text-[34px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
+          <h1 className="font-display text-[30px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
             {titles[activeTab].split("\n").map((line) => (
               <span key={line} className="block">
                 {line}
               </span>
             ))}
           </h1>
-          <p className="mt-2 text-[14px] leading-5 text-muted">{subtitles[activeTab]}</p>
+          <p className="mt-1.5 text-[14px] leading-5 text-muted">{subtitles[activeTab]}</p>
         </div>
         <a href="/family" aria-label="Family settings" className="mt-1.5 shrink-0 text-ink/55">
           <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -110,7 +110,7 @@ function ShellBottom({
 
 function BottomTabBar({ activeTab, onTabChange }: { activeTab: TabKey; onTabChange: (tab: TabKey) => void }) {
   return (
-    <nav className="grid grid-cols-3 border-t border-line bg-paper px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2.5">
+    <nav className="grid grid-cols-3 border-t border-line bg-paper px-3 pb-[max(0.55rem,env(safe-area-inset-bottom))] pt-1.5">
       {tabs.map((tab) => {
         const active = activeTab === tab.key;
         return (
@@ -118,9 +118,9 @@ function BottomTabBar({ activeTab, onTabChange }: { activeTab: TabKey; onTabChan
             key={tab.key}
             onClick={() => onTabChange(tab.key)}
             aria-current={active ? "page" : undefined}
-            className="flex flex-col items-center gap-1 py-1"
+            className="flex flex-col items-center gap-1 py-0.5"
           >
-            <DoodleIcon name={tab.icon} className="h-[26px] w-[26px]" monochrome active={active} />
+            <DoodleIcon name={tab.icon} className="h-[24px] w-[24px]" monochrome active={active} />
             <span className={clsx("text-[11px] font-medium tracking-wide", active ? "text-ink" : "text-muted/70")}>{tab.label}</span>
           </button>
         );
@@ -233,7 +233,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   };
 
   return (
-    <div className="px-[26px] pb-3 pt-2">
+    <div className="px-[26px] pb-2 pt-1.5">
       {image ? (
         <div className="mb-2 flex items-center gap-2">
           <div className="relative">

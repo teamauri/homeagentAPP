@@ -1,0 +1,220 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { upcoming } from "@/lib/mock-data";
+import type { CalendarEvent, PersonId } from "@/lib/types";
+
+// A Google-Calendar-style day view. This screen stands in for the user's real
+// Google Calendar, so it deliberately mimics GCal: a week date strip, an hourly
+// time grid, and solid colored event blocks in Google's event palette.
+
+// The 7-day forward strip starting "today" (2026-06-19 is a Friday).
+const WEEK: { key: string; dow: string; date: number; today?: boolean }[] = [
+  { key: "fri", dow: "FRI", date: 19, today: true },
+  { key: "sat", dow: "SAT", date: 20 },
+  { key: "sun", dow: "SUN", date: 21 },
+  { key: "mon", dow: "MON", date: 22 },
+  { key: "tue", dow: "TUE", date: 23 },
+  { key: "wed", dow: "WED", date: 24 },
+  { key: "thu", dow: "THU", date: 25 },
+];
+
+// Which day each upcoming event lands on (dateLabel → strip key).
+const DAY_OF: Record<string, string> = {
+  Friday: "fri",
+  Tomorrow: "sat",
+  Saturday: "sat",
+  Sunday: "sun",
+};
+
+// Google event colors, keyed by whose calendar the event belongs to.
+const PERSON_COLOR: Record<PersonId, string> = {
+  mia: "#d50000", // Tomato
+  leo: "#039be5", // Peacock
+  family: "#0b8043", // Basil
+  baby: "#8e24aa", // Grape
+  mom: "#3f51b5", // Blueberry
+  dad: "#f09300", // Banana
+  grandma: "#e67c73", // Flamingo
+};
+
+const PERSON_LABEL: Record<PersonId, string> = {
+  mia: "Mia",
+  leo: "Leo",
+  family: "Family",
+  baby: "Baby",
+  mom: "Mom",
+  dad: "Dad",
+  grandma: "Grandma",
+};
+
+// Visible grid window: 7 AM → 9 PM.
+const START_HOUR = 7;
+const END_HOUR = 21;
+const ROW_H = 56; // px per hour
+
+function parseHour(timeLabel: string): number {
+  const m = timeLabel.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return START_HOUR;
+  let h = parseInt(m[1], 10) % 12;
+  if (/pm/i.test(m[3])) h += 12;
+  return h + parseInt(m[2], 10) / 60;
+}
+
+function hourLabel(h: number): string {
+  const ampm = h < 12 || h === 24 ? "AM" : "PM";
+  const display = h % 12 === 0 ? 12 : h % 12;
+  return `${display} ${ampm}`;
+}
+
+export default function CalendarPage() {
+  const [selected, setSelected] = useState("fri");
+
+  const byDay = useMemo(() => {
+    const map: Record<string, CalendarEvent[]> = {};
+    for (const e of upcoming) {
+      const day = DAY_OF[e.dateLabel];
+      if (!day) continue;
+      (map[day] ??= []).push(e);
+    }
+    return map;
+  }, []);
+
+  // Lay out the day's events, splitting overlapping ones into side-by-side
+  // columns the way Google Calendar does.
+  const laidOut = useMemo(() => {
+    const items = (byDay[selected] ?? [])
+      .map((e) => {
+        const start = parseHour(e.timeLabel);
+        return { e, start, end: start + 1 };
+      })
+      .sort((a, b) => a.start - b.start);
+
+    const placed: (typeof items[number] & { col: number; cols: number })[] = [];
+    let cluster: typeof items = [];
+    let clusterEnd = -1;
+
+    const flush = () => {
+      // Greedy column assignment within a cluster of mutually-overlapping events.
+      const colEnds: number[] = [];
+      const withCol = cluster.map((it) => {
+        let col = colEnds.findIndex((end) => it.start >= end);
+        if (col === -1) {
+          col = colEnds.length;
+          colEnds.push(it.end);
+        } else {
+          colEnds[col] = it.end;
+        }
+        return { ...it, col };
+      });
+      withCol.forEach((it) => placed.push({ ...it, cols: colEnds.length }));
+      cluster = [];
+      clusterEnd = -1;
+    };
+
+    for (const it of items) {
+      if (cluster.length && it.start >= clusterEnd) flush();
+      cluster.push(it);
+      clusterEnd = Math.max(clusterEnd, it.end);
+    }
+    flush();
+    return placed;
+  }, [byDay, selected]);
+
+  const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
+  // Static "now" line (mock) — only drawn on today.
+  const nowTop = (13.4 - START_HOUR) * ROW_H;
+
+  return (
+    <main className="min-h-screen bg-[#e9ecef] px-3 py-4 font-body md:grid md:place-items-center md:px-10">
+      <div className="phone-shell mx-auto w-full max-w-[430px] overflow-hidden bg-white">
+        <div className="relative flex h-[min(900px,calc(100dvh-2rem))] min-h-[760px] flex-col overflow-hidden bg-white">
+          {/* Google top bar */}
+          <div className="relative shrink-0 px-4 pt-[18px]">
+            <div className="pointer-events-none absolute left-1/2 top-[12px] h-[30px] w-[112px] -translate-x-1/2 rounded-full bg-black" />
+            <div className="flex items-center gap-3 pt-7">
+              <a href="/" aria-label="Back" className="-ml-1 grid h-9 w-9 place-items-center rounded-full text-[#5f6368] hover:bg-black/5">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4-4.6-4.6z" /></svg>
+              </a>
+              <h1 className="flex-1 text-[20px] font-medium text-[#3c4043]">June 2026</h1>
+              <div className="grid h-8 w-8 place-items-center rounded-full bg-[#1a73e8] text-[13px] font-medium text-white">J</div>
+            </div>
+
+            {/* Week date strip */}
+            <div className="mt-2 grid grid-cols-7">
+              {WEEK.map((d) => {
+                const active = selected === d.key;
+                const hasEvents = (byDay[d.key]?.length ?? 0) > 0;
+                return (
+                  <button key={d.key} onClick={() => setSelected(d.key)} className="flex flex-col items-center gap-1 py-1.5">
+                    <span className={`text-[11px] font-medium tracking-wide ${active ? "text-[#1a73e8]" : "text-[#70757a]"}`}>{d.dow}</span>
+                    <span
+                      className={`grid h-8 w-8 place-items-center rounded-full text-[15px] ${
+                        active && d.today
+                          ? "bg-[#1a73e8] font-medium text-white"
+                          : active
+                            ? "bg-[#e8f0fe] font-medium text-[#1a73e8]"
+                            : d.today
+                              ? "font-medium text-[#1a73e8]"
+                              : "text-[#3c4043]"
+                      }`}
+                    >
+                      {d.date}
+                    </span>
+                    <span className={`h-1 w-1 rounded-full ${hasEvents ? "bg-[#70757a]" : "bg-transparent"}`} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="h-px w-full bg-[#dadce0]" />
+
+          {/* Time grid */}
+          <div className="no-scrollbar flex-1 overflow-y-auto">
+            <div className="relative" style={{ height: (END_HOUR - START_HOUR) * ROW_H + 24 }}>
+              {/* Hour lines + labels */}
+              {hours.map((h, i) => (
+                <div key={h} className="absolute left-0 right-0 flex items-start" style={{ top: i * ROW_H + 12 }}>
+                  <span className="-mt-1.5 w-[52px] pr-2 text-right text-[11px] text-[#70757a]">{hourLabel(h)}</span>
+                  <span className="mt-[1px] h-px flex-1 bg-[#e4e6e9]" />
+                </div>
+              ))}
+
+              {/* Now line (mock, today only) */}
+              {selected === "fri" ? (
+                <div className="absolute left-[52px] right-0 z-10" style={{ top: nowTop + 12 }}>
+                  <div className="relative">
+                    <span className="absolute -left-1 -top-[5px] h-2.5 w-2.5 rounded-full bg-[#ea4335]" />
+                    <span className="block h-[2px] w-full bg-[#ea4335]" />
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Event blocks */}
+              {laidOut.map(({ e, start, col, cols }) => {
+                const top = (start - START_HOUR) * ROW_H + 12;
+                const color = PERSON_COLOR[e.person];
+                // Column geometry within the area between the time gutter (58px) and right edge (12px).
+                const left = `calc(58px + (100% - 70px) * ${col} / ${cols})`;
+                const width = `calc((100% - 70px) / ${cols} - 3px)`;
+                return (
+                  <button
+                    key={e.id}
+                    className="absolute z-20 overflow-hidden rounded-[6px] px-2.5 py-1.5 text-left text-white shadow-sm"
+                    style={{ top, left, width, height: ROW_H - 6, backgroundColor: color }}
+                  >
+                    <div className="truncate text-[13px] font-medium leading-4">{e.title}</div>
+                    <div className="truncate text-[11px] leading-4 text-white/85">
+                      {e.timeLabel} · {PERSON_LABEL[e.person]}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
