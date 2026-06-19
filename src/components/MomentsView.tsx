@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DayGroup, FirstItem, GrowthData, MilestoneSession, OrganizedMedia } from "@/lib/album/types";
+import { useFamilyMember } from "./FamilyContext";
 
 // Fixed gradient classes for seed/placeholder tones (kept literal so Tailwind
 // includes them). Real photos (phone organize) and ingested robot Stories
@@ -251,10 +252,16 @@ export function MomentsView() {
 }
 
 function SessionCard({ session }: { session: MilestoneSession }) {
+  const child = useFamilyMember(session.childId);
   return (
     <section className="mt-1 rounded-[18px] border border-[#ecdebf] bg-gradient-to-br from-[#fbf3e3] to-white p-4">
-      <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#b9772a]">
-        <span>✦</span>
+      <div className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#b9772a]">
+        {child?.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={child.avatarUrl} alt={session.childName} className="h-7 w-7 rounded-full border border-[#ecdebf] object-cover" />
+        ) : (
+          <span>✦</span>
+        )}
         <span>
           Where {session.childName} is now{session.ageShort ? ` · ${session.ageShort}` : ""}
         </span>

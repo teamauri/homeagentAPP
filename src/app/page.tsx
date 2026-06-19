@@ -7,6 +7,7 @@ import { ChatView, LiveChatTurn } from "@/components/ChatView";
 import { MomentsView } from "@/components/MomentsView";
 import { ChatApiResponse, TeamMemberId } from "@/lib/chat-server/types";
 import { teamAgentById } from "@/lib/team";
+import { FamilyProvider } from "@/components/FamilyContext";
 
 function nowLabel() {
   return new Intl.DateTimeFormat("en-US", {
@@ -118,10 +119,12 @@ export default function Home() {
   };
 
   return (
-    <AppShell activeTab={tab} onTabChange={setTab} onComposerSubmit={sendComposerMessage}>
-      {tab === "today" && <TodayView />}
-      {tab === "chat" && <ChatView liveTurns={liveTurns} />}
-      {tab === "memory" && <MomentsView />}
-    </AppShell>
+    <FamilyProvider>
+      <AppShell activeTab={tab} onTabChange={setTab} onComposerSubmit={sendComposerMessage}>
+        {tab === "today" && <TodayView />}
+        {tab === "chat" && <ChatView liveTurns={liveTurns} />}
+        {tab === "memory" && <MomentsView />}
+      </AppShell>
+    </FamilyProvider>
   );
 }

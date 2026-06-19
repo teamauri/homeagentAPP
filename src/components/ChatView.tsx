@@ -3,6 +3,7 @@ import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
 import { TeamBadge } from "./TeamBadge";
+import { useFamilyMember } from "./FamilyContext";
 import { chatFixtureMessages } from "@/lib/chat-fixtures";
 import { ChatMessage } from "@/lib/chat-contracts";
 import { TeamAgentId } from "@/lib/team";
@@ -88,20 +89,28 @@ function ChatTurnRow({ turn }: { turn: ChatTurn }) {
   );
 }
 
+// A parent's avatar: the photo uploaded on the Family page when present, else
+// the gradient + initial fallback.
+function ParentAvatar({ id, fallbackInitial }: { id: "mom" | "dad"; fallbackInitial: string }) {
+  const member = useFamilyMember(id);
+  const initial = member?.name?.slice(0, 1) || fallbackInitial;
+  if (member?.avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={member.avatarUrl} alt={member.name} className="h-10 w-10 rounded-full border border-line object-cover" />
+    );
+  }
+  return (
+    <div className={clsx("grid h-10 w-10 place-items-center overflow-hidden rounded-full border border-transparent bg-gradient-to-br text-[19px] font-semibold", avatarStyles[id])}>
+      {initial}
+    </div>
+  );
+}
+
 function Avatar({ avatar }: { avatar: ChatTurn["avatar"] }) {
   const isParent = avatar === "mom" || avatar === "dad";
   if (!isParent) return <TeamBadge agentId={avatar} size="sm" />;
-
-  return (
-    <div
-      className={clsx(
-        "grid h-10 w-10 place-items-center overflow-hidden rounded-full border text-[19px] font-semibold",
-        isParent ? `border-transparent bg-gradient-to-br ${avatarStyles[avatar]}` : avatarStyles[avatar]
-      )}
-    >
-      {avatar === "mom" ? "J" : "D"}
-    </div>
-  );
+  return <ParentAvatar id={avatar} fallbackInitial={avatar === "mom" ? "J" : "D"} />;
 }
 
 function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
@@ -137,17 +146,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
 function LiveAvatar({ avatar, sender }: { avatar: LiveChatTurn["avatar"]; sender: string }) {
   const isParent = avatar === "mom" || avatar === "dad";
   if (!isParent) return <TeamBadge agentId={avatar} size="sm" />;
-
-  return (
-    <div
-      className={clsx(
-        "grid h-10 w-10 place-items-center overflow-hidden rounded-full border text-[19px] font-semibold",
-        isParent ? `border-transparent bg-gradient-to-br ${avatarStyles[avatar]}` : avatarStyles[avatar]
-      )}
-    >
-      {sender.slice(0, 1)}
-    </div>
-  );
+  return <ParentAvatar id={avatar} fallbackInitial={sender.slice(0, 1)} />;
 }
 
 function iconForApiCard(type: ApiChatCard["type"]) {
