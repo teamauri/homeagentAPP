@@ -56,18 +56,29 @@ export function MomentsView() {
 
   async function onFiles(files: FileList | null) {
     if (!files || !files.length) return;
-    const images = [...files].filter((f) => f.type.startsWith("image/"));
-    if (!images.length) return;
-    setOrganizing({ count: images.length });
+    const all = [...files];
+    const images = all.filter((f) => f.type.startsWith("image/"));
+    const videos = all.filter((f) => f.type.startsWith("video/"));
+    if (!images.length && !videos.length) return;
+    const childId = growth?.child.id ?? "mia";
+    setOrganizing({ count: images.length + videos.length });
     try {
-      const photos = await Promise.all(images.map(fileToPayload));
-      const res = await fetch("/api/album/organize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ childId: growth?.child.id ?? "mia", photos }),
-      });
-      const data = await res.json();
-      if (data.growth) setGrowth(data.growth);
+      // Photos → Gemini vision organize. Videos → stored (real URL) and shown.
+      if (images.length) {
+        const photos = await Promise.all(images.map(fileToPayload));
+        await fetch("/api/album/organize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ childId, photos }),
+        });
+      }
+      if (videos.length) {
+        const form = new FormData();
+        videos.forEach((v) => form.append("files", v));
+        form.append("person", childId);
+        await fetch("/api/media/upload", { method: "POST", body: form });
+      }
+      await refresh();
     } catch {
       /* keep current view on failure */
     } finally {
@@ -116,7 +127,7 @@ export function MomentsView() {
         >
           ＋ Organize photos
         </button>
-        <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
+        <input ref={inputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
       </div>
 
       {organizing ? <OrganizingPanel count={organizing.count} /> : null}
