@@ -18,7 +18,14 @@
 
 html,
 body {
-  min-height: 100%;
+  /* Lock the document so the only scroller is the inner app-shell container.
+     Without this, iOS Safari lets the body scroll itself when the keyboard
+     opens (chat composer / voice) and then leaves the inner scroll area
+     "stuck" until a reflow — the bug where scrolling dies until you switch
+     tabs. overscroll-behavior also kills rubber-band scroll chaining. */
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: #f5f1eb;
   color: var(--ink);
 }

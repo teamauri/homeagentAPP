@@ -337,6 +337,12 @@ function Tile({ media, href, sameTab }: { media: OrganizedMedia; href?: string; 
       ) : (
         <div className={"h-full w-full " + toneClass(media.tone)} />
       )}
+      {/* Robot-captured media is tagged so it's clear it came from Auri. */}
+      {media.source === "auri" ? (
+        <span className="absolute left-1 top-1 flex items-center gap-0.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+          🤖 Auri
+        </span>
+      ) : null}
       {media.kind === "video" ? (
         <>
           <span className="absolute inset-0 grid place-items-center">
@@ -344,7 +350,7 @@ function Tile({ media, href, sameTab }: { media: OrganizedMedia; href?: string; 
           </span>
           {media.durationLabel ? (
             <span className="absolute bottom-1 right-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-white">
-              {media.source === "auri" ? `${media.durationLabel} · Auri` : media.durationLabel}
+              {media.durationLabel}
             </span>
           ) : null}
         </>

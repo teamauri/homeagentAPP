@@ -58,7 +58,7 @@ export function AppShell({
       <div className="mx-auto w-full overflow-hidden bg-paper md:max-w-[430px]">
         <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-paper md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
           <ShellHeader activeTab={activeTab} />
-          <div className="no-scrollbar flex-1 overflow-y-auto px-[26px] pb-6 pt-2">{children}</div>
+          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[26px] pb-6 pt-2">{children}</div>
           <ShellBottom activeTab={activeTab} onTabChange={onTabChange} onComposerSubmit={onComposerSubmit} />
         </div>
       </div>
