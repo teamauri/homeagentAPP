@@ -76,6 +76,7 @@ export function MomentsView() {
   const [filter, setFilter] = useState<Filter>("All");
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -103,28 +104,31 @@ export function MomentsView() {
     }
     const childId = growth?.child.id ?? "mia";
     setError(null);
+    setStatus(null);
     setOrganizing({ count: images.length + videos.length });
     // Trust the growth returned by the organize POST itself — it's computed on
     // the same instance that just did the work. A separate GET can land on a
     // different (stale) serverless instance and show "nothing".
     let nextGrowth: GrowthData | null = null;
-    let notice: string | null = null;
+    const notes: string[] = [];
     try {
       // Photos → Gemini vision organize. Videos → stored (real URL) and shown.
       if (images.length) {
         // Decode each photo independently so one undecodable file doesn't sink
-        // the whole batch; collect any that fail to report back.
+        // the whole batch. A decode that yields empty base64 (e.g. iOS canvas
+        // export failing on HEIC) counts as failed, not a silent empty send.
         type Payload = Awaited<ReturnType<typeof fileToPayload>>;
         const encoded = await Promise.all(
           images.map((f) =>
             fileToPayload(f).then(
-              (p): { p: Payload } | null => ({ p }),
+              (p): { p: Payload } | null => (p.dataBase64 ? { p } : null),
               () => null
             )
           )
         );
         const photos = encoded.filter((e): e is { p: Payload } => e !== null).map((e) => e.p);
         const failed = encoded.length - photos.length;
+        if (failed) notes.push(`${failed} couldn't be read on this device`);
         if (photos.length) {
           const res = await fetch("/api/album/organize", {
             method: "POST",
@@ -132,37 +136,41 @@ export function MomentsView() {
             body: JSON.stringify({ childId, photos }),
           });
           if (!res.ok) {
+            const detail = await res.text().catch(() => "");
             throw new Error(
               res.status === 413
-                ? "Those photos are too large to upload at once — try fewer."
-                : `Organize failed (${res.status})`
+                ? "Those photos are too large — try fewer at once."
+                : `Organize failed (${res.status})${detail ? `: ${detail.slice(0, 140)}` : ""}`
             );
           }
           const data = await res.json();
           if (data.growth) nextGrowth = data.growth as GrowthData;
-          // Gemini may triage a shot out (screenshot / not a clear moment) — say
-          // so instead of leaving the user staring at an unchanged screen.
           const organized = data?.metadata?.organized ?? 0;
           const skipped = data?.metadata?.skipped ?? 0;
-          if (organized === 0 && skipped > 0) {
-            notice = `Iris kept ${skipped} photo${skipped > 1 ? "s" : ""} out — ${skipped > 1 ? "they" : "it"} looked like a screenshot or not a clear moment.`;
-          }
+          const provider = data?.metadata?.provider ?? "?";
+          if (organized > 0) notes.push(`organized ${organized} (${provider})`);
+          // Gemini may triage a shot out (screenshot / not a clear moment).
+          if (organized === 0 && skipped > 0) notes.push(`${skipped} kept out as not-a-clear-moment`);
         }
-        if (failed && !photos.length) throw new Error("Couldn't read those photos on this device.");
-        else if (failed) notice = `${failed} photo${failed > 1 ? "s" : ""} couldn't be read and were skipped.`;
+        if (failed && !photos.length) throw new Error("Couldn't read those photos on this device (try a screenshot or a different photo).");
       }
       if (videos.length) {
         const form = new FormData();
         videos.forEach((v) => form.append("files", v));
         form.append("person", childId);
         const res = await fetch("/api/media/upload", { method: "POST", body: form });
-        if (!res.ok) throw new Error(`Video upload failed (${res.status})`);
+        if (!res.ok) {
+          const detail = await res.text().catch(() => "");
+          throw new Error(`Video upload failed (${res.status})${detail ? `: ${detail.slice(0, 140)}` : ""}`);
+        }
+        notes.push(`${videos.length} video${videos.length > 1 ? "s" : ""} uploaded`);
         // The upload route doesn't return growth, so re-fetch to pull the video in.
         nextGrowth = null;
       }
       if (nextGrowth) setGrowth(nextGrowth);
       else await refresh();
-      if (notice) setError(notice);
+      // Always report the outcome so a no-visible-change is never a silent mystery.
+      setStatus(notes.length ? `Done · ${notes.join(" · ")}` : "Done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed — please try again.");
     } finally {
@@ -220,8 +228,18 @@ export function MomentsView() {
       {error ? (
         <div className="mt-3 flex items-start gap-2 rounded-[12px] border border-[#f0d4cc] bg-[#fdf3f0] px-3 py-2.5 text-[12.5px] text-[#9a4a36]">
           <span>⚠️</span>
-          <span className="flex-1">{error}</span>
+          <span className="flex-1 break-words">{error}</span>
           <button onClick={() => setError(null)} className="text-[#c08070]">
+            ✕
+          </button>
+        </div>
+      ) : null}
+
+      {status ? (
+        <div className="mt-3 flex items-start gap-2 rounded-[12px] border border-[#cfe7d4] bg-[#f1faf3] px-3 py-2.5 text-[12.5px] text-[#3d6b48]">
+          <span>✅</span>
+          <span className="flex-1 break-words">{status}</span>
+          <button onClick={() => setStatus(null)} className="text-[#7aa886]">
             ✕
           </button>
         </div>
