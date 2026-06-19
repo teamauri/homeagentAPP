@@ -63,12 +63,10 @@ export default function ObjectDetailPage({ params }: { params: { id: string } })
   const rows = displayRows(object.payload);
 
   return (
-    <main className="min-h-screen bg-[#f7f4ef] px-3 py-4 md:grid md:place-items-center md:px-10">
-      <div className="phone-shell mx-auto w-full max-w-[430px] overflow-hidden bg-white">
-        <div className="relative flex h-[min(900px,calc(100dvh-2rem))] min-h-[760px] flex-col overflow-hidden bg-white">
-          <div className="pointer-events-none absolute left-1/2 top-[18px] z-20 h-[35px] w-[124px] -translate-x-1/2 rounded-full bg-black shadow-inner" />
-          <div className="z-10 flex items-center justify-between px-[34px] pt-[34px] text-[17px] font-semibold text-ink">
-            <span>9:41</span>
+    <main className="min-h-[100dvh] bg-white md:grid md:min-h-screen md:place-items-center md:bg-[#f7f4ef] md:px-10 md:py-8">
+      <div className="mx-auto w-full overflow-hidden bg-white md:max-w-[430px]">
+        <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-white md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
+          <div className="z-10 flex items-center justify-end px-[34px] pt-[max(34px,env(safe-area-inset-top))] text-[17px] font-semibold text-ink">
             <span className="text-[15px]">Auri</span>
           </div>
           <div className="no-scrollbar flex-1 overflow-y-auto px-[31px] pb-8 pt-[42px]">

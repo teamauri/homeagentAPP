@@ -24,6 +24,7 @@ export type LiveChatTurn = {
   text: string;
   cards?: ApiChatCard[];
   pending?: boolean;
+  imageUrl?: string;
 };
 
 const chatThreadIds = [
@@ -112,7 +113,15 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
           <span className="text-[18px] font-semibold leading-6 text-ink">{turn.sender}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
-        <p className={clsx("max-w-[98%] text-[17px] leading-6", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+        {turn.imageUrl ? (
+          <div className="mb-2 mt-1 overflow-hidden rounded-[16px] border border-line">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={turn.imageUrl} alt="Shared photo" className="max-h-64 w-full object-cover" />
+          </div>
+        ) : null}
+        {turn.text ? (
+          <p className={clsx("max-w-[98%] text-[17px] leading-6", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+        ) : null}
         {turn.cards?.length ? (
           <div className="mt-2 space-y-2">
             {turn.cards.map((card, index) => (
