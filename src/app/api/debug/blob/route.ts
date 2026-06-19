@@ -14,20 +14,20 @@ export async function GET() {
 
   const result: Record<string, unknown> = { blobEnabled: true };
   try {
-    const { put, list, del } = await import("@vercel/blob");
+    const { put, list, del, get } = await import("@vercel/blob");
     const marker = `roundtrip-${Date.now()}`;
     const pathname = `demo-store/_debug/${marker}.json`;
 
     const putRes = await put(pathname, JSON.stringify({ marker }), {
-      access: "public",
+      access: "private",
       contentType: "application/json",
       addRandomSuffix: false,
     });
     result.put = { ok: true, url: putRes.url };
 
-    const fetched = await fetch(putRes.url, { cache: "no-store" });
-    const body = await fetched.json().catch(() => null);
-    result.readBack = { httpOk: fetched.ok, matches: (body as { marker?: string } | null)?.marker === marker };
+    const got = await get(pathname, { access: "private", useCache: false });
+    const body = got?.stream ? await new Response(got.stream as ReadableStream).json().catch(() => null) : null;
+    result.readBack = { found: Boolean(got), matches: (body as { marker?: string } | null)?.marker === marker };
 
     const existing = await list({ prefix: "demo-store/" });
     result.snapshots = existing.blobs
@@ -35,7 +35,7 @@ export async function GET() {
       .map((b) => ({ pathname: b.pathname, size: b.size, uploadedAt: b.uploadedAt }));
 
     await del(putRes.url).catch(() => {});
-    result.roundTrip = result.readBack && (result.readBack as { matches?: boolean }).matches ? "OK" : "FAILED";
+    result.roundTrip = (result.readBack as { matches?: boolean }).matches ? "OK" : "FAILED";
   } catch (error) {
     result.error = error instanceof Error ? error.message : String(error);
     result.roundTrip = "ERROR";

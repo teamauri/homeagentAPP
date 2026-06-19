@@ -5,9 +5,11 @@ import { put } from "@vercel/blob";
 
 // Media storage for ingested DockKit/Auri media.
 //
-// - On Vercel (BLOB_READ_WRITE_TOKEN present) files go to Vercel Blob and the
-//   returned URL is a public CDN URL — required because Vercel's filesystem is
-//   read-only/ephemeral at runtime.
+// - On Vercel (BLOB_READ_WRITE_TOKEN present) files go to Vercel Blob with
+//   PRIVATE access (the store is private) and are served back through
+//   /api/media/blob/<file>, which streams the blob — required because Vercel's
+//   filesystem is read-only/ephemeral and private blob URLs aren't directly
+//   embeddable in <img>/<video>.
 // - Locally (no token) files fall back to public/demo-media, served by Next.js
 //   at /demo-media/<file>, so the endpoint stays testable without a Blob store.
 const MEDIA_DIR = path.join(process.cwd(), "public", "demo-media");
@@ -46,11 +48,13 @@ export async function storeUploadedFile(file: File): Promise<StoredFile> {
   const mimeType = file.type || "application/octet-stream";
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(`demo-media/${fileName}`, buffer, {
-      access: "public",
+    await put(`demo-media/${fileName}`, buffer, {
+      access: "private",
       contentType: mimeType,
+      addRandomSuffix: false,
     });
-    return { url: blob.url, fileName, mimeType, size: buffer.byteLength, storage: "blob" };
+    // Private blobs aren't directly embeddable — serve them through our route.
+    return { url: `/api/media/blob/${fileName}`, fileName, mimeType, size: buffer.byteLength, storage: "blob" };
   }
 
   await mkdir(MEDIA_DIR, { recursive: true });
