@@ -62,13 +62,25 @@ export interface CreatedLocalObject {
   status: "draft" | "logged" | "saved" | "ready" | "added" | "sent";
 }
 
+export interface ChatHelperSegment {
+  teamMemberId: TeamMemberId;
+  name: string;
+  reply: string;
+  cards: ChatResponseCard[];
+  objectsToCreate: ObjectToCreate[];
+}
+
 export interface ChatAIResponse {
+  // Primary voice: Auri, the home agent that frames/answers every turn.
   handledByTeamMemberId: TeamMemberId;
   handledByName: string;
   intent: ChatIntent;
   reply: string;
   cards: ChatResponseCard[];
   objectsToCreate: ObjectToCreate[];
+  // Second voice: a helper who "takes the task". Present only for actionable
+  // (helper-domain) requests; omitted for pure advice/emotional answers.
+  helper?: ChatHelperSegment;
   suggestedFollowups: string[];
 }
 

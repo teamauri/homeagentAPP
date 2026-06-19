@@ -1,29 +1,30 @@
-import { demoFamilyContext } from "@/lib/demo/family-context";
+import { buildFamilyContext } from "@/lib/demo/family-context";
+import { AURI_SYSTEM_PROMPT } from "./persona";
 import { ChatAIResponse, ChatRequestBody } from "./types";
 import { parseJsonObject, validateChatAIResponse } from "./validate";
 
+const cardContract = {
+  type: "calendar_draft | reminder | baby_log | lesson_recap | memory | story_draft | text",
+  title: "string",
+  subtitle: "optional string",
+  body: "optional string",
+  cta: "optional string",
+  targetRoute: "optional string",
+  metadata: "optional object",
+};
+const objectContract = {
+  type: "calendar_draft | reminder_draft | baby_log | memory_item | story_draft | lesson_recap",
+  payload: "object",
+};
+
 const responseContract = {
-  handledByTeamMemberId: "nora | nina | milo | bibi | mira | auri",
-  handledByName: "string",
+  handledByTeamMemberId: "auri (always — Auri is the primary voice)",
+  handledByName: "Auri",
   intent: "calendar_event | reminder | baby_log | lesson_recap | memory_story | reading | photo_video | general_question | unknown",
-  reply: "string",
-  cards: [
-    {
-      type: "calendar_draft | reminder | baby_log | lesson_recap | memory | story_draft | text",
-      title: "string",
-      subtitle: "optional string",
-      body: "optional string",
-      cta: "optional string",
-      targetRoute: "optional string",
-      metadata: "optional object",
-    },
-  ],
-  objectsToCreate: [
-    {
-      type: "calendar_draft | reminder_draft | baby_log | memory_item | story_draft | lesson_recap",
-      payload: "object",
-    },
-  ],
+  reply: "string (Auri speaking)",
+  cards: [cardContract],
+  objectsToCreate: [objectContract],
+  helper: "optional, only when a helper takes a task: { teamMemberId: iris|lumi|vita|nova|sera, name: string, reply: string, cards: [card], objectsToCreate: [object] }",
   suggestedFollowups: ["string"],
 };
 
@@ -32,9 +33,7 @@ function buildMessages(request: ChatRequestBody) {
     {
       role: "system",
       content: [
-        "You are Auri, an app-first family AI operating layer for a 5-day mobile web demo.",
-        "Understand free-form family input, route it to the best helper, and create local draft objects only.",
-        "Do not claim real external integrations were completed. Calendar, reminders, photos, caregiver notifications, and Grandma sending are mocked.",
+        AURI_SYSTEM_PROMPT,
         "Return ONLY valid JSON. No markdown, no code fences, no explanation.",
         "The JSON must match this TypeScript-like contract:",
         JSON.stringify(responseContract),
@@ -43,7 +42,7 @@ function buildMessages(request: ChatRequestBody) {
     {
       role: "user",
       content: JSON.stringify({
-        familyContext: demoFamilyContext,
+        familyContext: buildFamilyContext(),
         request,
       }),
     },

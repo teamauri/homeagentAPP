@@ -1,39 +1,56 @@
+const voiceProps = {
+  cards: {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["calendar_draft", "reminder", "baby_log", "lesson_recap", "memory", "story_draft", "text"] },
+        title: { type: "string" },
+        subtitle: { type: "string" },
+        body: { type: "string" },
+        cta: { type: "string" },
+        targetRoute: { type: "string" },
+        metadata: { type: "object" },
+      },
+      required: ["type", "title"],
+    },
+  },
+  objectsToCreate: {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["calendar_draft", "reminder_draft", "baby_log", "memory_item", "story_draft", "lesson_recap"] },
+        payload: { type: "object" },
+      },
+      required: ["type", "payload"],
+    },
+  },
+} as const;
+
 export const chatResponseJsonSchema = {
   type: "object",
   properties: {
-    handledByTeamMemberId: { type: "string", enum: ["nora", "nina", "milo", "bibi", "mira", "auri"] },
+    // The primary voice is always Auri (the home agent that frames/answers).
+    handledByTeamMemberId: { type: "string", enum: ["iris", "lumi", "vita", "nova", "sera", "auri"] },
     handledByName: { type: "string" },
     intent: {
       type: "string",
       enum: ["calendar_event", "reminder", "baby_log", "lesson_recap", "memory_story", "reading", "photo_video", "general_question", "unknown"],
     },
     reply: { type: "string" },
-    cards: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          type: { type: "string", enum: ["calendar_draft", "reminder", "baby_log", "lesson_recap", "memory", "story_draft", "text"] },
-          title: { type: "string" },
-          subtitle: { type: "string" },
-          body: { type: "string" },
-          cta: { type: "string" },
-          targetRoute: { type: "string" },
-          metadata: { type: "object" },
-        },
-        required: ["type", "title"],
+    ...voiceProps,
+    // Present ONLY when a helper takes actionable work; the helper is the second
+    // voice that "takes the task". Omit for pure advice/emotional answers.
+    helper: {
+      type: "object",
+      properties: {
+        teamMemberId: { type: "string", enum: ["iris", "lumi", "vita", "nova", "sera"] },
+        name: { type: "string" },
+        reply: { type: "string" },
+        ...voiceProps,
       },
-    },
-    objectsToCreate: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          type: { type: "string", enum: ["calendar_draft", "reminder_draft", "baby_log", "memory_item", "story_draft", "lesson_recap"] },
-          payload: { type: "object" },
-        },
-        required: ["type", "payload"],
-      },
+      required: ["teamMemberId", "name", "reply", "cards", "objectsToCreate"],
     },
     suggestedFollowups: { type: "array", items: { type: "string" } },
   },

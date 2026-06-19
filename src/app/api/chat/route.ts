@@ -29,17 +29,29 @@ function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
   );
 }
 
+function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"]) {
+  const created = createDemoObjects(objects);
+  const withRoutes = cards.map((card, index) => (created[index] ? { ...card, targetRoute: created[index].route } : card));
+  return { created, cards: withRoutes };
+}
+
 function withCreatedObjects(response: ChatAIResponse, metadata: ChatApiResponse["metadata"]): ChatApiResponse {
-  const createdLocalObjects = createDemoObjects(response.objectsToCreate);
-  const cards = response.cards.map((card, index) => {
-    const created = createdLocalObjects[index];
-    return created ? { ...card, targetRoute: created.route } : card;
-  });
+  const top = attachRoutes(response.cards, response.objectsToCreate);
+
+  // The helper (second voice) carries the actual task → create its objects too.
+  let helper = response.helper;
+  let helperCreated: typeof top.created = [];
+  if (helper) {
+    const h = attachRoutes(helper.cards, helper.objectsToCreate);
+    helperCreated = h.created;
+    helper = { ...helper, cards: h.cards };
+  }
 
   return {
     ...response,
-    cards,
-    createdLocalObjects,
+    cards: top.cards,
+    helper,
+    createdLocalObjects: [...top.created, ...helperCreated],
     metadata,
   };
 }

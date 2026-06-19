@@ -65,12 +65,14 @@ export default function Home() {
       }
 
       const payload = (await response.json()) as ChatApiResponse;
+      const auriId = `auri-${sentAt}`;
 
-      setLiveTurns((current) =>
-        current.map((turn) =>
+      setLiveTurns((current) => {
+        // Replace the pending bubble with Auri's voice (the primary answer).
+        const next = current.map((turn) =>
           turn.id === pendingId
             ? {
-                id: `helper-${sentAt}`,
+                id: auriId,
                 sender: teamAgentById[payload.handledByTeamMemberId]?.name ?? displayHelperName(payload.handledByName),
                 time: nowLabel(),
                 avatar: payload.handledByTeamMemberId,
@@ -78,8 +80,24 @@ export default function Home() {
                 cards: payload.cards,
               }
             : turn
-        )
-      );
+        );
+
+        // If a helper took the task, add it as a second bubble right after Auri.
+        if (payload.helper) {
+          const helper = payload.helper;
+          const helperTurn: LiveChatTurn = {
+            id: `helper-${sentAt}`,
+            sender: teamAgentById[helper.teamMemberId]?.name ?? displayHelperName(helper.name),
+            time: nowLabel(),
+            avatar: helper.teamMemberId,
+            text: helper.reply,
+            cards: helper.cards,
+          };
+          const idx = next.findIndex((turn) => turn.id === auriId);
+          return [...next.slice(0, idx + 1), helperTurn, ...next.slice(idx + 1)];
+        }
+        return next;
+      });
     } catch {
       setLiveTurns((current) =>
         current.map((turn) =>

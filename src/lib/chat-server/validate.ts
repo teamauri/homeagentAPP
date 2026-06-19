@@ -1,9 +1,23 @@
-import { ChatAIResponse } from "./types";
+import { ChatAIResponse, ChatHelperSegment } from "./types";
 
-const teamMemberIds = new Set(["nora", "nina", "milo", "bibi", "mira", "auri"]);
+const teamMemberIds = new Set(["iris", "lumi", "vita", "nova", "sera", "auri"]);
+const helperIds = new Set(["iris", "lumi", "vita", "nova", "sera"]);
 const intents = new Set(["calendar_event", "reminder", "baby_log", "lesson_recap", "memory_story", "reading", "photo_video", "general_question", "unknown"]);
 const cardTypes = new Set(["calendar_draft", "reminder", "baby_log", "lesson_recap", "memory", "story_draft", "text"]);
 const objectTypes = new Set(["calendar_draft", "reminder_draft", "baby_log", "memory_item", "story_draft", "lesson_recap"]);
+
+function validateCardsAndObjects(cards: unknown, objects: unknown) {
+  if (!Array.isArray(cards)) throw new Error("Invalid cards");
+  if (!Array.isArray(objects)) throw new Error("Invalid objectsToCreate");
+  cards.forEach((card) => {
+    if (!cardTypes.has(String(card?.type))) throw new Error("Invalid card type");
+    if (typeof card?.title !== "string") throw new Error("Invalid card title");
+  });
+  objects.forEach((object) => {
+    if (!objectTypes.has(String(object?.type))) throw new Error("Invalid object type");
+    if (!object?.payload || typeof object.payload !== "object") throw new Error("Invalid object payload");
+  });
+}
 
 export function parseJsonObject(text: string): unknown {
   const trimmed = text.trim();
@@ -24,19 +38,19 @@ export function validateChatAIResponse(value: unknown): ChatAIResponse {
   if (typeof response.handledByName !== "string") throw new Error("Invalid handledByName");
   if (!intents.has(String(response.intent))) throw new Error("Invalid intent");
   if (typeof response.reply !== "string") throw new Error("Invalid reply");
-  if (!Array.isArray(response.cards)) throw new Error("Invalid cards");
-  if (!Array.isArray(response.objectsToCreate)) throw new Error("Invalid objectsToCreate");
   if (!Array.isArray(response.suggestedFollowups)) throw new Error("Invalid suggestedFollowups");
 
-  response.cards.forEach((card) => {
-    if (!cardTypes.has(String(card.type))) throw new Error("Invalid card type");
-    if (typeof card.title !== "string") throw new Error("Invalid card title");
-  });
+  validateCardsAndObjects(response.cards, response.objectsToCreate);
 
-  response.objectsToCreate.forEach((object) => {
-    if (!objectTypes.has(String(object.type))) throw new Error("Invalid object type");
-    if (!object.payload || typeof object.payload !== "object") throw new Error("Invalid object payload");
-  });
+  if (response.helper !== undefined && response.helper !== null) {
+    const helper = response.helper as Partial<ChatHelperSegment>;
+    if (!helperIds.has(String(helper.teamMemberId))) throw new Error("Invalid helper.teamMemberId");
+    if (typeof helper.name !== "string") throw new Error("Invalid helper.name");
+    if (typeof helper.reply !== "string") throw new Error("Invalid helper.reply");
+    validateCardsAndObjects(helper.cards, helper.objectsToCreate);
+  } else {
+    delete (response as { helper?: unknown }).helper;
+  }
 
   return response as ChatAIResponse;
 }

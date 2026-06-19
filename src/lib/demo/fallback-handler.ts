@@ -1,47 +1,76 @@
-import { ChatAIResponse, ChatRequestBody } from "@/lib/chat-server/types";
+import { ChatAIResponse, ChatHelperSegment, ChatRequestBody } from "@/lib/chat-server/types";
+import { seedFamilyMembers } from "@/lib/family/profile";
 
 function lowerInput(request: ChatRequestBody) {
-  const attachmentText = request.attachments?.map((attachment) => `${attachment.type ?? ""} ${attachment.name ?? ""}`).join(" ") ?? "";
+  const attachmentText = request.attachments?.map((a) => `${a.type ?? ""} ${a.name ?? ""}`).join(" ") ?? "";
   return `${request.message ?? ""} ${attachmentText}`.toLowerCase();
 }
 
-// Keyword fallback used only when no model key is configured. Routes to the
-// AURI-site teammates: Vita (keeper), Lumi (reads), Iris (films/album).
+// Auri is always the primary voice. `helper` is the second voice that takes a
+// task — present only for actionable requests, never for advice.
+function auri(reply: string, extra: Partial<ChatAIResponse> = {}): ChatAIResponse {
+  return {
+    handledByTeamMemberId: "auri",
+    handledByName: "Auri",
+    intent: extra.intent ?? "general_question",
+    reply,
+    cards: extra.cards ?? [],
+    objectsToCreate: extra.objectsToCreate ?? [],
+    helper: extra.helper,
+    suggestedFollowups: extra.suggestedFollowups ?? [],
+  };
+}
+
+const ADVICE_HINTS = [
+  "upset", "cry", "crying", "tantrum", "meltdown", "fussy", "clingy", "whining", "whine",
+  "won't sleep", "not sleeping", "won't eat", "not eating", "worried", "worry", "scared",
+  "why is", "why does", "why won't", "why do", "how do i", "how can i", "what should i", "is it normal",
+];
+
 export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResponse {
   const input = lowerInput(request);
+  const mia = seedFamilyMembers.find((m) => m.id === "mia");
+  const med = mia?.health[0]; // "Finishing a 10-day course of medicine"
 
-  if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("drink") || input.includes("water bottle")) {
-    return {
-      handledByTeamMemberId: "vita",
-      handledByName: "Vita the keeper",
-      intent: "reminder",
-      reply: "Done — I set the reminder. When it’s time, whoever’s home can film a quick video receipt.",
+  // 1) Advice / emotional — Auri alone, grounded in what we know. No task.
+  if (ADVICE_HINTS.some((h) => input.includes(h))) {
+    const grounded = med
+      ? `A couple of things I'd gently look at with Mia: she's still ${med.toLowerCase()}, and little ones are often clingier or more easily upset when they're not feeling 100%. Her bedtime has also slipped past 8pm a few nights this week, and short sleep makes the next day rougher.`
+      : "A couple of things worth a look: a slip in sleep or routine, or coming down with something, often shows up as extra fussiness first.";
+    return auri(
+      `That's hard — I'm sorry you're both having a rough patch. ${grounded} Want me to pull up Mia's sleep and meds from this week?`,
+      {
+        intent: "general_question",
+        suggestedFollowups: ["Show Mia's sleep this week", "Was she off her meds?", "Ideas for a calmer evening"],
+      }
+    );
+  }
+
+  // 2) Actionable → Auri frames + a helper takes the task (second voice).
+  if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {
+    const helper: ChatHelperSegment = {
+      teamMemberId: "vita",
+      name: "Vita the keeper",
+      reply: "Done — I set the reminder. When it's time, whoever's home can film a quick video receipt.",
       cards: [
         {
           type: "reminder",
-          title: "Mia’s 2pm medicine",
+          title: "Mia's 2pm medicine",
           subtitle: "Daily · 2:00 PM · video receipt",
           body: "Reminder draft ready for review.",
           cta: "Edit",
-          targetRoute: "/objects/medicine-reminder-demo",
           metadata: { due: "2:00 PM", person: "mia", wantsReceipt: true },
         },
       ],
-      objectsToCreate: [
-        {
-          type: "reminder_draft",
-          payload: { title: "Mia’s 2pm medicine", dueLabel: "Daily · 2:00 PM", person: "mia", wantsReceipt: true },
-        },
-      ],
-      suggestedFollowups: ["Move it earlier", "Who should film it?", "Add a second dose"],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title: "Mia's 2pm medicine", dueLabel: "Daily · 2:00 PM", person: "mia", wantsReceipt: true } }],
     };
+    return auri("Of course — I'll have Vita keep this on the radar.", { intent: "reminder", helper, suggestedFollowups: ["Move it earlier", "Who should film it?"] });
   }
 
-  if (input.includes("calendar") || input.includes("basketball") || input.includes("friday") || input.includes("appointment") || input.includes("5:30")) {
-    return {
-      handledByTeamMemberId: "vita",
-      handledByName: "Vita the keeper",
-      intent: "calendar_event",
+  if (input.includes("calendar") || input.includes("appointment") || input.includes("basketball") || input.includes("checkup") || input.includes("5:30")) {
+    const helper: ChatHelperSegment = {
+      teamMemberId: "vita",
+      name: "Vita the keeper",
       reply: "I created a calendar draft for the whole family to confirm.",
       cards: [
         {
@@ -50,26 +79,19 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
           subtitle: "Friday · 5:30 PM · Leo",
           body: "Calendar draft ready for review.",
           cta: "Review event",
-          targetRoute: "/objects/basketball-calendar-demo",
-          metadata: { person: "leo", date: "Friday", time: "5:30 PM", source: "chat" },
+          metadata: { person: "leo", date: "Friday", time: "5:30 PM" },
         },
       ],
-      objectsToCreate: [
-        {
-          type: "calendar_draft",
-          payload: { title: "Basketball game", person: "leo", dateLabel: "Friday", timeLabel: "5:30 PM", notes: "Bring water bottle." },
-        },
-      ],
-      suggestedFollowups: ["Add Dad as pickup", "Add a reminder", "Add location"],
+      objectsToCreate: [{ type: "calendar_draft", payload: { title: "Basketball game", person: "leo", dateLabel: "Friday", timeLabel: "5:30 PM" } }],
     };
+    return auri("Got it — Vita will add it to the family calendar.", { intent: "calendar_event", helper, suggestedFollowups: ["Add Dad as pickup", "Add a reminder"] });
   }
 
-  if (input.includes("read") || input.includes("reading") || input.includes("book") || input.includes("dinosaur")) {
-    return {
-      handledByTeamMemberId: "lumi",
-      handledByName: "Lumi the companion",
-      intent: "reading",
-      reply: "I saved this as a reading moment. Mia seems especially curious about dinosaurs and volcanoes.",
+  if (input.includes("read") || input.includes("book") || input.includes("dinosaur")) {
+    const helper: ChatHelperSegment = {
+      teamMemberId: "lumi",
+      name: "Lumi the companion",
+      reply: "I saved this as a reading moment — Mia's really into dinosaurs and volcanoes lately.",
       cards: [
         {
           type: "memory",
@@ -77,62 +99,37 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
           subtitle: "Dinosaur Day",
           body: "Saved to Memory",
           cta: "View",
-          targetRoute: "/objects/reading-memory-demo",
-          metadata: { child: "mia", topic: "dinosaurs and volcanoes", source: "reading" },
+          metadata: { child: "mia", topic: "dinosaurs", source: "reading" },
         },
       ],
-      objectsToCreate: [
-        {
-          type: "memory_item",
-          payload: { person: "mia", title: "Dinosaur Day", sourceType: "reading", topics: ["dinosaurs", "volcanoes"] },
-        },
-      ],
-      suggestedFollowups: ["Find another volcano book", "Make a reading note", "Add to Memory"],
+      objectsToCreate: [{ type: "memory_item", payload: { person: "mia", title: "Dinosaur Day", sourceType: "reading", topics: ["dinosaurs"] } }],
     };
+    return auri("Lovely — Lumi will keep that with Mia's reading.", { intent: "reading", helper, suggestedFollowups: ["Find another dinosaur book", "Add to Memory"] });
   }
 
-  if (input.includes("photo") || input.includes("album") || input.includes("video") || input.includes("clip") || input.includes("grandma")) {
-    return {
-      handledByTeamMemberId: "iris",
-      handledByName: "Iris the eye",
-      intent: "memory_story",
+  if (input.includes("photo") || input.includes("album") || input.includes("video") || input.includes("clip")) {
+    const helper: ChatHelperSegment = {
+      teamMemberId: "iris",
+      name: "Iris the eye",
       reply: "I pulled together the best moments and made a warm draft to share.",
       cards: [
         {
           type: "story_draft",
           title: "Family album draft",
           subtitle: "2 clips · 14 photos · warm caption",
-          body: "A warm update is ready to review before sharing.",
+          body: "Ready to review before sharing.",
           cta: "Open draft",
-          targetRoute: "/objects/family-album-demo",
-          metadata: { clips: 2, photos: 14, tone: "warm" },
+          metadata: { clips: 2, photos: 14 },
         },
       ],
-      objectsToCreate: [
-        {
-          type: "story_draft",
-          payload: { audience: "family", clips: 2, photos: 14, tone: "warm", title: "This week with the kids" },
-        },
-      ],
-      suggestedFollowups: ["Make it shorter", "Add the soccer clip", "Preview before sharing"],
+      objectsToCreate: [{ type: "story_draft", payload: { audience: "family", clips: 2, photos: 14, title: "This week with the kids" } }],
     };
+    return auri("On it — Iris will put the best bits together.", { intent: "photo_video", helper, suggestedFollowups: ["Make it shorter", "Add the soccer clip"] });
   }
 
-  return {
-    handledByTeamMemberId: "auri",
-    handledByName: "Auri",
-    intent: "general_question",
-    reply: "I can turn that into a reminder, a calendar event, a family album, or a reading note. What would you like me to do?",
-    cards: [
-      {
-        type: "text",
-        title: "Auri can help",
-        body: "Try a reminder, a calendar event, organizing your photos, or a reading note.",
-        cta: "Try an example",
-        metadata: { mode: "fallback" },
-      },
-    ],
-    objectsToCreate: [],
-    suggestedFollowups: ["Set a reminder", "Organize my photos", "Add a calendar event"],
-  };
+  // 3) Default — warm, not a menu of tasks.
+  return auri(
+    "I'm here. Ask me anything about the kids or the week — or I can set a reminder, sort your photos into an album, or keep a reading note when you need it.",
+    { intent: "general_question", suggestedFollowups: ["How's Mia doing this week?", "Organize my photos", "Set a reminder"] }
+  );
 }

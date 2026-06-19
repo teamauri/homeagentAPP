@@ -1,16 +1,15 @@
-import { demoFamilyContext } from "@/lib/demo/family-context";
+import { buildFamilyContext } from "@/lib/demo/family-context";
+import { AURI_SYSTEM_PROMPT } from "./persona";
 import { chatResponseJsonSchema } from "./response-schema";
 import { ChatAIResponse, ChatRequestBody } from "./types";
 import { parseJsonObject, validateChatAIResponse } from "./validate";
 
 function buildPrompt(request: ChatRequestBody) {
   return [
-    "You are Auri, an app-first family AI operating layer.",
-    "Understand the parent input and route work to the best helper.",
-    "Return ONLY JSON matching the schema. Do not include markdown.",
-    "External integrations are mocked. Create only local draft objects.",
-    "Family/team context:",
-    JSON.stringify(demoFamilyContext),
+    AURI_SYSTEM_PROMPT,
+    "Return ONLY JSON matching the schema. No markdown, no code fences.",
+    "Family context (use it to ground every answer):",
+    JSON.stringify(buildFamilyContext()),
     "User request:",
     JSON.stringify(request),
   ].join("\n\n");
