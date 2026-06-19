@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { listDemoMedia, listDemoMemory } from "@/lib/demo/demo-store";
+import { ensureHydrated } from "@/lib/demo/persistence";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  await ensureHydrated();
   const url = new URL(request.url);
   const sourceType = url.searchParams.get("sourceType");
   const person = url.searchParams.get("person");

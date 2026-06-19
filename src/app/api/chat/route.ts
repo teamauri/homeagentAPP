@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createDemoObjects } from "@/lib/demo/demo-store";
+import { createDemoObjects, persistDemoStore } from "@/lib/demo/demo-store";
+import { ensureHydrated } from "@/lib/demo/persistence";
 import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
@@ -18,10 +19,10 @@ function normalizeRequestBody(body: unknown): ChatRequestBody {
   };
 }
 
-function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
+async function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
   const fallback = createFallbackChatResponse(chatRequest);
   return NextResponse.json(
-    withCreatedObjects(fallback, {
+    await withCreatedObjects(fallback, {
       provider: "fallback",
       fallbackUsed: true,
       fallbackReason: reason,
@@ -29,8 +30,9 @@ function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
   );
 }
 
-function withCreatedObjects(response: ChatAIResponse, metadata: ChatApiResponse["metadata"]): ChatApiResponse {
+async function withCreatedObjects(response: ChatAIResponse, metadata: ChatApiResponse["metadata"]): Promise<ChatApiResponse> {
   const createdLocalObjects = createDemoObjects(response.objectsToCreate);
+  if (createdLocalObjects.length) await persistDemoStore();
   const cards = response.cards.map((card, index) => {
     const created = createdLocalObjects[index];
     return created ? { ...card, targetRoute: created.route } : card;
@@ -45,6 +47,7 @@ function withCreatedObjects(response: ChatAIResponse, metadata: ChatApiResponse[
 }
 
 export async function POST(request: Request) {
+  await ensureHydrated();
   let body: unknown;
 
   try {
@@ -62,11 +65,11 @@ export async function POST(request: Request) {
   if (process.env.DEEPSEEK_API_KEY) {
     try {
       const { response, model } = await callDeepSeekChat(chatRequest);
-      return NextResponse.json(withCreatedObjects(response, { provider: "deepseek", fallbackUsed: false, model }));
+      return NextResponse.json(await withCreatedObjects(response, { provider: "deepseek", fallbackUsed: false, model }));
     } catch (error) {
       console.error("[api/chat] DeepSeek path failed", error);
       if (!process.env.GEMINI_API_KEY) {
-        return fallbackResponse(chatRequest, error instanceof Error ? error.message : "DeepSeek path failed");
+        return await fallbackResponse(chatRequest, error instanceof Error ? error.message : "DeepSeek path failed");
       }
     }
   }
@@ -74,12 +77,12 @@ export async function POST(request: Request) {
   if (process.env.GEMINI_API_KEY) {
     try {
       const { response, model } = await callGeminiChat(chatRequest);
-      return NextResponse.json(withCreatedObjects(response, { provider: "gemini", fallbackUsed: false, model }));
+      return NextResponse.json(await withCreatedObjects(response, { provider: "gemini", fallbackUsed: false, model }));
     } catch (error) {
       console.error("[api/chat] Gemini path failed; using fallback", error);
-      return fallbackResponse(chatRequest, error instanceof Error ? error.message : "Gemini path failed");
+      return await fallbackResponse(chatRequest, error instanceof Error ? error.message : "Gemini path failed");
     }
   }
 
-  return fallbackResponse(chatRequest, "DEEPSEEK_API_KEY and GEMINI_API_KEY are missing");
+  return await fallbackResponse(chatRequest, "DEEPSEEK_API_KEY and GEMINI_API_KEY are missing");
 }

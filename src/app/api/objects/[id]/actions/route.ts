@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { applyDemoObjectAction } from "@/lib/demo/demo-store";
+import { applyDemoObjectAction, persistDemoStore } from "@/lib/demo/demo-store";
+import { ensureHydrated } from "@/lib/demo/persistence";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,7 @@ function normalizeAction(value: unknown): AllowedAction {
 }
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  await ensureHydrated();
   let body: unknown;
 
   try {
@@ -25,6 +27,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!object) {
     return NextResponse.json({ error: "Object not found" }, { status: 404 });
   }
+
+  await persistDemoStore();
 
   return NextResponse.json({
     object,

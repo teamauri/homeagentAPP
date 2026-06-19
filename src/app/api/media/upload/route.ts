@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { addDemoMedia, createDemoMemoryFromMedia, DemoMediaInput } from "@/lib/demo/demo-store";
+import { addDemoMedia, createDemoMemoryFromMedia, DemoMediaInput, persistDemoStore } from "@/lib/demo/demo-store";
+import { ensureHydrated } from "@/lib/demo/persistence";
 import { PersonId } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -51,6 +52,7 @@ async function inputsFromFormData(request: Request): Promise<DemoMediaInput[]> {
 }
 
 export async function POST(request: Request) {
+  await ensureHydrated();
   let inputs: DemoMediaInput[];
 
   try {
@@ -74,6 +76,8 @@ export async function POST(request: Request) {
     status: "saved",
     statusLabel: "Saved",
   });
+
+  await persistDemoStore();
 
   return NextResponse.json({
     media,

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { organizeAlbum } from "@/lib/album/organize";
-import { addOrganized, getGrowth } from "@/lib/album/store";
+import { addOrganized, getGrowth, persistGrowthStore } from "@/lib/album/store";
 import { AlbumPhotoInput } from "@/lib/album/types";
+import { ensureHydrated } from "@/lib/demo/persistence";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,7 @@ function normalizePhotos(value: unknown): AlbumPhotoInput[] {
 }
 
 export async function POST(request: Request) {
+  await ensureHydrated();
   let body: any;
   try {
     body = await request.json();
@@ -37,6 +39,7 @@ export async function POST(request: Request) {
   try {
     const result = await organizeAlbum(photos, childId);
     addOrganized(result);
+    await persistGrowthStore();
     return NextResponse.json({
       growth: getGrowth(),
       metadata: { provider: result.provider, model: result.model, skipped: result.skippedCount, organized: result.growth.days.length },

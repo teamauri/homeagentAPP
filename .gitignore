@@ -11,3 +11,4 @@ out
 *.dataless-backup
 public/demo-media/*
 !public/demo-media/.gitkeep
+.data/
