@@ -1,5 +1,7 @@
-import { needs, suggestions } from "@/lib/mock-data";
+import { needs, upcoming } from "@/lib/mock-data";
 import { teamAgents, teamAgentByName } from "@/lib/team";
+import type { CalendarEvent } from "@/lib/types";
+import { personLabels, StatusPill } from "./calendar-ui";
 import { DoodleIcon } from "./Icons";
 import { TeamBadge } from "./TeamBadge";
 
@@ -49,17 +51,13 @@ export function TodayView() {
       </section>
 
       <section className="pb-2">
-        <div className="mb-2 flex items-center justify-between gap-4">
-          <h2 className="font-display text-[20px] font-normal leading-none tracking-[-0.02em] text-ink">Recent in Memory</h2>
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <h2 className="text-[15px] font-semibold leading-5 text-ink">Up Next</h2>
+          <a href="/calendar" className="text-[12px] font-semibold leading-5 text-ink">View calendar</a>
         </div>
-        <div>
-          {suggestions.map((item) => (
-            <button key={item.id} className="grid min-h-[44px] w-full grid-cols-[40px_74px_minmax(0,1fr)_16px] items-center gap-3 border-b border-line/80 text-left last:border-b-0">
-              {teamAgentByName[item.helper] ? <TeamBadge agentId={teamAgentByName[item.helper].id} size="sm" /> : <DoodleIcon name={item.icon} className="h-8 w-8" />}
-              <span className="rounded-full border border-line bg-white px-3 py-0.5 text-center text-[13px] leading-5 text-ink shadow-[0_3px_10px_rgba(8,8,8,0.025)]">{item.helper}</span>
-              <span className="truncate text-[14px] leading-5 text-ink">{item.text}</span>
-              <span className="text-[30px] font-light leading-none text-ink/45">›</span>
-            </button>
+        <div className="space-y-2.5">
+          {upcoming.slice(0, 3).map((event) => (
+            <EventRow key={event.id} event={event} />
           ))}
         </div>
       </section>
@@ -81,5 +79,25 @@ function NeedRow({ item }: { item: (typeof needs)[number] }) {
       <button className="shrink-0 whitespace-nowrap text-right text-[13px] font-semibold text-ink">{item.actionLabel}</button>
       <span className="text-[30px] font-light leading-none text-ink/45">›</span>
     </article>
+  );
+}
+
+function EventRow({ event }: { event: CalendarEvent }) {
+  return (
+    <button className="flex w-full items-center gap-3 py-1 text-left">
+      <div className="grid h-[40px] w-[40px] shrink-0 place-items-center">
+        <DoodleIcon name={event.icon} className="h-9 w-9" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[15px] font-semibold leading-5 text-ink">{event.title}</span>
+          <StatusPill status={event.status} label={event.statusLabel} />
+        </div>
+        <p className="mt-0.5 truncate text-[13px] leading-5 text-muted">
+          {personLabels[event.person] ?? event.person} · {event.dateLabel} · {event.timeLabel}
+        </p>
+      </div>
+      <span className="text-[28px] font-light leading-none text-ink/40">›</span>
+    </button>
   );
 }
