@@ -20,6 +20,14 @@ const toneClass = (tone?: string) => (tone && TONE[tone]) || TONE.g1;
 // A Memory tab is "All", a source ("auri"/"phone"), or a specific child id.
 type Tab = { key: string; label: string };
 
+// Auri Cut — auto-edit one phone video into a ≤30s short via POST /api/edit.
+type AuriPhase = "idle" | "intro" | "editing" | "done";
+const AURI_STEPS = ["Uploaded", "Analyzed", "Picking highlights", "Rendering"];
+function secLabel(s?: number) {
+  const n = Math.max(0, Math.round(s || 0));
+  return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
+}
+
 // Decode a photo to {width,height,draw}. Tries the fast createImageBitmap path,
 // then falls back to an <img> element — crucial on iPhone Safari, where photos
 // are usually HEIC and createImageBitmap throws, but <img> renders HEIC natively.
@@ -80,6 +88,10 @@ export function MomentsView() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const auriInputRef = useRef<HTMLInputElement>(null);
+  const [auriPhase, setAuriPhase] = useState<AuriPhase>("idle");
+  const [editStep, setEditStep] = useState(0);
+  const [auriResult, setAuriResult] = useState<{ memoryId?: string; durationSeconds?: number } | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/memory/growth", { cache: "no-store" });
@@ -90,6 +102,41 @@ export function MomentsView() {
   useEffect(() => {
     refresh().catch(() => {});
   }, []);
+
+  // Auri Cut: preprocess the video in the browser (ffmpeg.wasm) + drive the Auri
+  // backend directly, then land the rendered short as a Memory. No server job.
+  async function onAuriVideo(files: FileList | null) {
+    const file = files?.[0];
+    if (auriInputRef.current) auriInputRef.current.value = "";
+    if (!file) return;
+    setError(null);
+    setStatus(null);
+    setAuriResult(null);
+    setEditStep(0);
+    setAuriPhase("editing");
+    try {
+      const { editToShortInBrowser } = await import("@/lib/auri/browser/pipeline");
+      const result = await editToShortInBrowser(file, ({ stage, progress }) => {
+        setEditStep(stage === "uploading" ? (progress > 0.2 ? 1 : 0) : stage === "analyzing" ? 2 : 3);
+      });
+      // Land the rendered short as a Memory (reuse the robot ingest path).
+      const form = new FormData();
+      form.append("video", new File([result.videoBlob], "auri-cut.mp4", { type: "video/mp4" }));
+      form.append("memoryTitle", "Auri Cut film");
+      form.append("memoryBody", "A short film from your video, made by Auri Cut.");
+      form.append("tags", "auri-cut");
+      form.append("capturedAt", new Date().toISOString());
+      const res = await fetch("/api/ingest/auri-media", { method: "POST", body: form });
+      if (!res.ok) throw new Error(`Couldn't save the film (${res.status})`);
+      const data = await res.json();
+      setAuriResult({ memoryId: data.memory?.id, durationSeconds: result.durationSeconds });
+      setAuriPhase("done");
+      refresh().catch(() => {});
+    } catch (e) {
+      setAuriPhase("idle");
+      setError(e instanceof Error ? e.message : "Editing failed — please try again.");
+    }
+  }
 
   async function onFiles(files: FileList | null) {
     if (!files || !files.length) return;
@@ -219,16 +266,31 @@ export function MomentsView() {
         <span className="text-[12px] text-muted">
           By day · kept by Iris{growth.skippedCount ? ` · ${growth.skippedCount} skipped` : ""}
         </span>
-        <button
-          onClick={() => inputRef.current?.click()}
-          className="rounded-full border border-line bg-white px-3 py-1.5 text-[12.5px] font-semibold text-ink shadow-[0_2px_8px_rgba(8,8,8,0.04)]"
-        >
-          ＋ Organize photos
-        </button>
+        <div className="flex shrink-0 gap-2">
+          <button
+            onClick={() => setAuriPhase("intro")}
+            className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-semibold text-white shadow-[0_2px_8px_rgba(8,8,8,0.06)]"
+          >
+            ✨ Auri Cut
+          </button>
+          <button
+            onClick={() => inputRef.current?.click()}
+            className="rounded-full border border-line bg-white px-3 py-1.5 text-[12.5px] font-semibold text-ink shadow-[0_2px_8px_rgba(8,8,8,0.04)]"
+          >
+            ＋ Organize
+          </button>
+        </div>
         <input ref={inputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
+        <input ref={auriInputRef} type="file" accept="video/*" hidden onChange={(e) => onAuriVideo(e.target.files)} />
       </div>
 
       {organizing ? <OrganizingPanel count={organizing.count} /> : null}
+
+      {auriPhase === "intro" ? (
+        <AuriCutIntro onPick={() => auriInputRef.current?.click()} onDismiss={() => setAuriPhase("idle")} />
+      ) : null}
+      {auriPhase === "editing" ? <AuriCutEditing step={editStep} /> : null}
+      {auriPhase === "done" ? <AuriCutResult result={auriResult} onDismiss={() => setAuriPhase("idle")} /> : null}
 
       {error ? (
         <div className="mt-3 flex items-start gap-2 rounded-[12px] border border-[#f0d4cc] bg-[#fdf3f0] px-3 py-2.5 text-[12.5px] text-[#9a4a36]">
@@ -293,6 +355,80 @@ function OrganizingPanel({ count }: { count: number }) {
       <div className="mx-auto mt-3 h-1.5 w-40 overflow-hidden rounded-full bg-[#eee]">
         <div className="h-full w-2/3 animate-pulse rounded-full bg-ink" />
       </div>
+    </div>
+  );
+}
+
+function AuriCutIntro({ onPick, onDismiss }: { onPick: () => void; onDismiss: () => void }) {
+  return (
+    <div className="mt-3 rounded-[16px] border border-[#eccfa0] bg-[#fbf3e3] p-3.5">
+      <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.05em] text-[#b9772a]">
+        <span>✨</span>
+        <span>Make a short film</span>
+      </div>
+      <p className="mt-2 text-[12.5px] leading-relaxed text-[#3b3b3b]">
+        Pick one video — Auri keeps the best moments and cuts it into a short film under 30 seconds.
+      </p>
+      <div className="mt-3 flex gap-2">
+        <button onClick={onPick} className="flex-1 rounded-full bg-ink py-2 text-[12.5px] font-semibold text-white">
+          Choose a video
+        </button>
+        <button onClick={onDismiss} className="rounded-full border border-line px-4 py-2 text-[12.5px] text-muted">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AuriCutEditing({ step }: { step: number }) {
+  return (
+    <div className="mt-4 rounded-[16px] border border-line bg-white p-4 text-center shadow-[0_2px_10px_rgba(8,8,8,0.04)]">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#ffe6dd] text-[22px]">🎬</div>
+      <p className="mt-2 font-display text-[18px] text-ink">Auri is cutting your film…</p>
+      <p className="mt-1 text-[12px] text-muted">Keeping the best moments · trimming to a 30s short</p>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+        {AURI_STEPS.map((label, i) => (
+          <span key={label} className="flex items-center gap-1.5">
+            <span className={"text-[11.5px] " + (i < step ? "text-[#3b7a4d]" : i === step ? "font-semibold text-[#b9772a]" : "text-[#b3ada3]")}>
+              {i < step ? "✓ " : ""}
+              {label}
+            </span>
+            {i < AURI_STEPS.length - 1 ? <span className="text-[11px] text-[#cfc8ba]">›</span> : null}
+          </span>
+        ))}
+      </div>
+      <div className="mx-auto mt-3 h-1.5 w-44 overflow-hidden rounded-full bg-[#eee]">
+        <div className="h-full rounded-full bg-ink transition-all duration-500" style={{ width: `${Math.min(100, ((step + 1) / AURI_STEPS.length) * 100)}%` }} />
+      </div>
+      <p className="mt-3 text-[10.5px] text-[#b3ada3]">You can leave — we’ll keep working and notify you</p>
+    </div>
+  );
+}
+
+function AuriCutResult({ result, onDismiss }: { result: { memoryId?: string; durationSeconds?: number } | null; onDismiss: () => void }) {
+  const meta = [result?.durationSeconds ? secLabel(result.durationSeconds) : null, "made by Auri Cut"].filter(Boolean).join(" · ");
+  return (
+    <div className="mt-4 flex items-center gap-3 rounded-[16px] border border-[#eccfa0] bg-[#fbf3e3] p-3">
+      <div className="relative grid h-[60px] w-[60px] shrink-0 place-items-center overflow-hidden rounded-[12px]">
+        <div className={"absolute inset-0 " + toneClass("g1")} />
+        <span className="relative grid h-7 w-7 place-items-center rounded-full bg-white/85 pl-0.5 text-[11px] text-ink">▶</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.04em] text-[#b9772a]">
+          <span>✨</span> Your film is ready
+        </div>
+        <p className="mt-0.5 font-display text-[15px] text-ink">Auri Cut film</p>
+        <p className="text-[11.5px] text-muted">{meta}</p>
+      </div>
+      {result?.memoryId ? (
+        <a href={`/memory/${result.memoryId}`} className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-white">
+          Watch
+        </a>
+      ) : null}
+      <button onClick={onDismiss} aria-label="Dismiss" className="shrink-0 text-[#c0b9ad]">
+        ✕
+      </button>
     </div>
   );
 }
