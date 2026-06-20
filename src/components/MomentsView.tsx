@@ -91,7 +91,7 @@ export function MomentsView() {
   const auriInputRef = useRef<HTMLInputElement>(null);
   const [auriPhase, setAuriPhase] = useState<AuriPhase>("idle");
   const [editStep, setEditStep] = useState(0);
-  const [auriResult, setAuriResult] = useState<{ memoryId?: string; durationSeconds?: number } | null>(null);
+  const [auriResult, setAuriResult] = useState<{ memoryId?: string; durationSeconds?: number; localUrl?: string } | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/memory/growth", { cache: "no-store" });
@@ -119,17 +119,36 @@ export function MomentsView() {
       const result = await editToShortInBrowser(file, ({ stage, progress }) => {
         setEditStep(stage === "uploading" ? (progress > 0.2 ? 1 : 0) : stage === "analyzing" ? 2 : 3);
       });
-      // Land the rendered short as a Memory (reuse the robot ingest path).
-      const form = new FormData();
-      form.append("video", new File([result.videoBlob], "auri-cut.mp4", { type: "video/mp4" }));
-      form.append("memoryTitle", "Auri Cut film");
-      form.append("memoryBody", "A short film from your video, made by Auri Cut.");
-      form.append("tags", "auri-cut");
-      form.append("capturedAt", new Date().toISOString());
-      const res = await fetch("/api/ingest/auri-media", { method: "POST", body: form });
-      if (!res.ok) throw new Error(`Couldn't save the film (${res.status})`);
-      const data = await res.json();
-      setAuriResult({ memoryId: data.memory?.id, durationSeconds: result.durationSeconds });
+      // Always show it playable immediately from the in-browser blob.
+      const localUrl = URL.createObjectURL(result.videoBlob);
+      // Upload the mp4 DIRECTLY to Vercel Blob (the rendered short can exceed the
+      // 4.5MB serverless request-body limit), then create the Memory with just the
+      // URL (tiny JSON). Best-effort: if Blob isn't set up, keep local playback.
+      let memoryId: string | undefined;
+      try {
+        const { upload } = await import("@vercel/blob/client");
+        const blob = await upload(`auri-cut/${crypto.randomUUID()}.mp4`, result.videoBlob, {
+          access: "public",
+          handleUploadUrl: "/api/blob/upload",
+          contentType: "video/mp4",
+        });
+        const res = await fetch("/api/ingest/auri-media", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            memoryTitle: "Auri Cut film",
+            memoryBody: "A short film from your video, made by Auri Cut.",
+            person: growth?.child.id ?? "family",
+            tags: ["auri-cut"],
+            capturedAt: new Date().toISOString(),
+            clips: [{ url: blob.url, type: "video", durationSeconds: result.durationSeconds }],
+          }),
+        });
+        if (res.ok) memoryId = (await res.json()).memory?.id;
+      } catch {
+        /* Blob not configured — the film is still viewable via local playback */
+      }
+      setAuriResult({ memoryId, durationSeconds: result.durationSeconds, localUrl });
       setAuriPhase("done");
       refresh().catch(() => {});
     } catch (e) {
@@ -406,29 +425,33 @@ function AuriCutEditing({ step }: { step: number }) {
   );
 }
 
-function AuriCutResult({ result, onDismiss }: { result: { memoryId?: string; durationSeconds?: number } | null; onDismiss: () => void }) {
+function AuriCutResult({ result, onDismiss }: { result: { memoryId?: string; durationSeconds?: number; localUrl?: string } | null; onDismiss: () => void }) {
   const meta = [result?.durationSeconds ? secLabel(result.durationSeconds) : null, "made by Auri Cut"].filter(Boolean).join(" · ");
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-[16px] border border-[#eccfa0] bg-[#fbf3e3] p-3">
-      <div className="relative grid h-[60px] w-[60px] shrink-0 place-items-center overflow-hidden rounded-[12px]">
-        <div className={"absolute inset-0 " + toneClass("g1")} />
-        <span className="relative grid h-7 w-7 place-items-center rounded-full bg-white/85 pl-0.5 text-[11px] text-ink">▶</span>
-      </div>
-      <div className="min-w-0 flex-1">
+    <div className="mt-4 rounded-[16px] border border-[#eccfa0] bg-[#fbf3e3] p-3">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.04em] text-[#b9772a]">
           <span>✨</span> Your film is ready
         </div>
-        <p className="mt-0.5 font-display text-[15px] text-ink">Auri Cut film</p>
-        <p className="text-[11.5px] text-muted">{meta}</p>
+        <button onClick={onDismiss} aria-label="Dismiss" className="text-[#c0b9ad]">
+          ✕
+        </button>
       </div>
-      {result?.memoryId ? (
-        <a href={`/memory/${result.memoryId}`} className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-white">
-          Watch
-        </a>
+      {result?.localUrl ? (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <video src={result.localUrl} controls playsInline className="mt-2 aspect-video w-full rounded-[12px] bg-black object-cover" />
       ) : null}
-      <button onClick={onDismiss} aria-label="Dismiss" className="shrink-0 text-[#c0b9ad]">
-        ✕
-      </button>
+      <div className="mt-2 flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="font-display text-[15px] text-ink">Auri Cut film</p>
+          <p className="text-[11.5px] text-muted">{meta}</p>
+        </div>
+        {result?.memoryId ? (
+          <a href={`/memory/${result.memoryId}`} className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-white">
+            Open
+          </a>
+        ) : null}
+      </div>
     </div>
   );
 }
