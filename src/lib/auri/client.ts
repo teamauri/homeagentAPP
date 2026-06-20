@@ -13,7 +13,8 @@
  * The DEPLOYED backend allowlists app UUIDs (+ HMAC) — see AURI_APP_ID / docs.
  */
 
-import { randomUUID } from "node:crypto";
+// Isomorphic UUID — works in the browser and in Node 18+ (both expose global crypto).
+const randomUUID = (): string => globalThis.crypto.randomUUID();
 
 // ---------------------------------------------------------------------------
 // Config
@@ -29,8 +30,10 @@ export interface AuriClientConfig {
 
 export function auriConfigFromEnv(): AuriClientConfig {
   return {
-    host: (process.env.AURI_HOST || "http://localhost:8000").replace(/\/$/, ""),
-    appId: process.env.AURI_APP_ID || "homeagent-memory",
+    // NEXT_PUBLIC_* is readable in the browser (client-side pipeline); plain
+    // AURI_* is the server-side fallback. Default to the deployed backend.
+    host: (process.env.NEXT_PUBLIC_AURI_HOST || process.env.AURI_HOST || "https://auriedit.onrender.com").replace(/\/$/, ""),
+    appId: process.env.NEXT_PUBLIC_AURI_APP_ID || process.env.AURI_APP_ID || "homeagent-memory",
     authToken: process.env.AURI_AUTH_TOKEN || undefined,
     pollIntervalMs: Number(process.env.AURI_POLL_INTERVAL_MS || 5000),
     pollTimeoutMs: Number(process.env.AURI_POLL_TIMEOUT_MS || 20 * 60 * 1000),
@@ -224,9 +227,13 @@ export class AuriClient {
     if (!res.ok) throw this.toError(res.status, await res.text());
   }
 
-  /** POST /v1/videos/{id}/chunks/{chunkId}:commit */
-  async commitChunk(videoId: string, chunkId: string, checksumMd5: string, sizeBytes: number): Promise<void> {
-    await this.requestJSON("POST", this.v1(`/videos/${videoId}/chunks/${chunkId}:commit`), { checksum_md5: checksumMd5, size_bytes: sizeBytes });
+  /**
+   * POST /v1/videos/{id}/chunks/{chunkId}:commit. `checksum_md5` is a required
+   * body field (Pydantic), but the handler only *verifies* it when non-empty — so
+   * the browser path sends "" to satisfy the schema and skip md5 work.
+   */
+  async commitChunk(videoId: string, chunkId: string, sizeBytes: number, checksumMd5?: string): Promise<void> {
+    await this.requestJSON("POST", this.v1(`/videos/${videoId}/chunks/${chunkId}:commit`), { size_bytes: sizeBytes, checksum_md5: checksumMd5 ?? "" });
   }
 
   /** POST /v1/videos/{id}:complete-upload */
@@ -262,7 +269,7 @@ export class AuriClient {
   async uploadVlogClip(videoId: string, vlogId: string, segmentIndex: number, bytes: Uint8Array, checksumMd5?: string): Promise<void> {
     const fd = new FormData();
     fd.append("segment_index", String(segmentIndex));
-    if (checksumMd5) fd.append("checksum_md5", checksumMd5);
+    fd.append("checksum_md5", checksumMd5 ?? "");
     fd.append("file", new Blob([bytes], { type: "video/mp4" }), `segment_${segmentIndex}.mp4`);
     const res = await fetch(this.v1(`/videos/${videoId}/vlogs/${vlogId}/clips`), { method: "POST", headers: this.baseHeaders(), body: fd });
     if (!res.ok) throw this.toError(res.status, await res.text());

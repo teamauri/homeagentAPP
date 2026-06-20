@@ -13,6 +13,33 @@ DockKit robot ───── render Story ─────► POST /api/ingest/a
 Memory page  ──► pick a long video ──► Auri compose+vlog ──► Story ──► Memory feed
 ```
 
+## ✅ SHIPPED architecture — client-side (Journey "✨ Auri Cut")
+
+The feature runs **entirely in the browser + the Auri backend** — Vercel-friendly,
+no server ffmpeg, no long-lived job. Verified end-to-end (browser → live backend
+→ 8.4s 720p short landed as a Memory).
+
+```
+Phone Safari (MomentsView "✨ Auri Cut")
+  pick one video
+  → src/lib/auri/browser/ffmpeg-wasm.ts : WORKERFS-mount + per-chunk `-c copy`
+      (validated on iPhone: 8-min/474MB splits in ~8s, peak memory ≈ one chunk)
+  → src/lib/auri/browser/pipeline.ts : drive auri-editor DIRECTLY (CORS allow-origins=*)
+      createVideo → upload chunks (commit needs a real 32-char md5 → spark-md5)
+      → createVlog(uploaded_clips, retry TIMELINE_NOT_READY) → wait contracts
+      → extract+upload one HQ clip per contract → render → poll → download mp4
+  → POST the rendered mp4 to /api/ingest/auri-media → Memory (source:"auri") → feed
+```
+
+Config: `NEXT_PUBLIC_AURI_HOST` / `NEXT_PUBLIC_AURI_APP_ID` (browser-readable).
+ffmpeg.wasm runtime self-hosted at `/public/ffmpeg/` (same-origin worker — a
+CDN worker throws SecurityError; do NOT pass classWorkerURL). See memory
+[[auri-cut-client-preprocessing]].
+
+> The server-side path below (`src/lib/auri/{editor,jobs}.ts`, `/api/edit/*`) was
+> the first cut — it works locally but needs server ffmpeg + a long process, so it
+> does NOT run on Vercel. Kept as a local fallback / reference, not the shipped path.
+
 ## Hard constraints (locked)
 
 1. **The robot auto-edit product = two active repos: `dockkit-demo` (frontend)

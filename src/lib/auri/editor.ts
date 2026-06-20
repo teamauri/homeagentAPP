@@ -53,7 +53,7 @@ export class AuriEditor implements Editor {
     for (const seg of segments) {
       const prep = await this.client.prepareChunk(video.videoId, seg.index, Math.min(seg.durationSeconds, 30), seg.sizeBytes, seg.md5);
       await this.client.uploadChunk(prep.uploadContract, await fs.readFile(seg.path));
-      await this.client.commitChunk(video.videoId, prep.chunkId, seg.md5, seg.sizeBytes);
+      await this.client.commitChunk(video.videoId, prep.chunkId, seg.sizeBytes, seg.md5);
       onProgress?.({ stage: "uploading", progress: 0.05 + (0.3 * (seg.index + 1)) / segments.length });
     }
 

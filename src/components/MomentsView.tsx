@@ -23,8 +23,6 @@ type Tab = { key: string; label: string };
 // Auri Cut — auto-edit one phone video into a ≤30s short via POST /api/edit.
 type AuriPhase = "idle" | "intro" | "editing" | "done";
 const AURI_STEPS = ["Uploaded", "Analyzed", "Picking highlights", "Rendering"];
-// Edit-job status → which step the editing card highlights.
-const AURI_STEP_FOR: Record<string, number> = { queued: 0, uploading: 0, analyzing: 2, rendering: 3, ready: 4, failed: 0 };
 function secLabel(s?: number) {
   const n = Math.max(0, Math.round(s || 0));
   return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}`;
@@ -93,7 +91,6 @@ export function MomentsView() {
   const auriInputRef = useRef<HTMLInputElement>(null);
   const [auriPhase, setAuriPhase] = useState<AuriPhase>("idle");
   const [editStep, setEditStep] = useState(0);
-  const [jobId, setJobId] = useState<string | null>(null);
   const [auriResult, setAuriResult] = useState<{ memoryId?: string; durationSeconds?: number } | null>(null);
 
   async function refresh() {
@@ -106,7 +103,8 @@ export function MomentsView() {
     refresh().catch(() => {});
   }, []);
 
-  // Auri Cut: pick one video → start an edit job → poll it to completion.
+  // Auri Cut: preprocess the video in the browser (ffmpeg.wasm) + drive the Auri
+  // backend directly, then land the rendered short as a Memory. No server job.
   async function onAuriVideo(files: FileList | null) {
     const file = files?.[0];
     if (auriInputRef.current) auriInputRef.current.value = "";
@@ -117,51 +115,28 @@ export function MomentsView() {
     setEditStep(0);
     setAuriPhase("editing");
     try {
+      const { editToShortInBrowser } = await import("@/lib/auri/browser/pipeline");
+      const result = await editToShortInBrowser(file, ({ stage, progress }) => {
+        setEditStep(stage === "uploading" ? (progress > 0.2 ? 1 : 0) : stage === "analyzing" ? 2 : 3);
+      });
+      // Land the rendered short as a Memory (reuse the robot ingest path).
       const form = new FormData();
-      form.append("video", file);
-      form.append("title", "Auri Cut film");
-      const res = await fetch("/api/edit/create", { method: "POST", body: form });
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new Error(`Couldn't start editing (${res.status})${detail ? `: ${detail.slice(0, 120)}` : ""}`);
-      }
+      form.append("video", new File([result.videoBlob], "auri-cut.mp4", { type: "video/mp4" }));
+      form.append("memoryTitle", "Auri Cut film");
+      form.append("memoryBody", "A short film from your video, made by Auri Cut.");
+      form.append("tags", "auri-cut");
+      form.append("capturedAt", new Date().toISOString());
+      const res = await fetch("/api/ingest/auri-media", { method: "POST", body: form });
+      if (!res.ok) throw new Error(`Couldn't save the film (${res.status})`);
       const data = await res.json();
-      setJobId(data.jobId);
+      setAuriResult({ memoryId: data.memory?.id, durationSeconds: result.durationSeconds });
+      setAuriPhase("done");
+      refresh().catch(() => {});
     } catch (e) {
       setAuriPhase("idle");
-      setError(e instanceof Error ? e.message : "Couldn't start editing.");
+      setError(e instanceof Error ? e.message : "Editing failed — please try again.");
     }
   }
-
-  useEffect(() => {
-    if (auriPhase !== "editing" || !jobId) return;
-    let active = true;
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/edit/${jobId}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const j = await res.json();
-        if (!active) return;
-        setEditStep(AURI_STEP_FOR[j.status] ?? 0);
-        if (j.status === "ready") {
-          setAuriResult(j.result || {});
-          setAuriPhase("done");
-          refresh().catch(() => {});
-        } else if (j.status === "failed") {
-          setAuriPhase("idle");
-          setError(j.error ? `Editing failed: ${String(j.error).slice(0, 160)}` : "Editing failed.");
-        }
-      } catch {
-        /* transient — keep polling */
-      }
-    };
-    poll();
-    const iv = setInterval(poll, 1500);
-    return () => {
-      active = false;
-      clearInterval(iv);
-    };
-  }, [auriPhase, jobId]);
 
   async function onFiles(files: FileList | null) {
     if (!files || !files.length) return;
