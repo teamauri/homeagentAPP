@@ -20,8 +20,11 @@ function md5(bytes: Uint8Array): string {
 
 export type EditStage = "uploading" | "analyzing" | "rendering";
 export type BrowserEditProgress = (p: { stage: EditStage; progress: number }) => void;
+// The phone doesn't download the rendered mp4 — it returns the ids so the server
+// fetches it from auri-editor and stores it (avoids a phone→Blob roundtrip).
 export interface BrowserEditResult {
-  videoBlob: Blob;
+  videoId: string;
+  vlogId: string;
   durationSeconds: number;
 }
 
@@ -100,7 +103,7 @@ export async function editToShortInBrowser(file: File, onProgress?: BrowserEditP
     onProgress?.({ stage: "rendering", progress: Math.min(0.95, 0.62 + (s.progress ?? 0) * 0.33) }),
   );
 
-  const bytes = await client.downloadVlog(video.videoId, done.vlogId);
-  const videoBlob = new Blob([bytes], { type: "video/mp4" });
-  return { videoBlob, durationSeconds: Math.round(done.storyBudgetSeconds ?? (await probeDuration(videoBlob))) };
+  // The server downloads the rendered mp4 from auri-editor + stores it; the phone
+  // just hands back the ids (no big download/upload on the phone).
+  return { videoId: video.videoId, vlogId: done.vlogId, durationSeconds: Math.round(done.storyBudgetSeconds ?? 0) };
 }
