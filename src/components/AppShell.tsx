@@ -12,7 +12,7 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   onresult: (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
   onend: () => void;
-  onerror: () => void;
+  onerror: (event: { error?: string }) => void;
   start: () => void;
   stop: () => void;
 };
@@ -141,10 +141,19 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   // Snapshot of the text box from before recording started, so Cancel can
   // restore it (dropping only what this dictation session added).
   const baseTextRef = useRef("");
+  // The Web Speech API auto-ends each utterance after a pause. We keep dictation
+  // alive until the user taps Done/Cancel by restarting on every onend while this
+  // flag is set. finalizedRef holds transcript locked in from prior sessions
+  // (each restart begins a fresh results buffer); sessionTextRef is the current
+  // session's interim/final text.
+  const keepListeningRef = useRef(false);
+  const finalizedRef = useRef("");
+  const sessionTextRef = useRef("");
 
   // Stop recognition AND detach its handlers, so a final onresult fired by
   // stop() can't write the transcript back into the box after we've cleared it.
   const stopRecognition = () => {
+    keepListeningRef.current = false;
     const rec = recognitionRef.current;
     if (rec) {
       rec.onresult = () => {};
@@ -214,18 +223,45 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;
     const base = value.trim() ? `${value.trim()} ` : "";
     baseTextRef.current = base;
+    finalizedRef.current = base;
+    sessionTextRef.current = "";
+    keepListeningRef.current = true;
+
     recognition.onresult = (event) => {
       let transcript = "";
       for (let i = 0; i < event.results.length; i += 1) {
         transcript += event.results[i][0].transcript;
       }
-      setValue((base + transcript).replace(/\s+/g, " ").trimStart());
+      sessionTextRef.current = transcript;
+      setValue((finalizedRef.current + transcript).replace(/\s+/g, " ").trimStart());
     };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    // A pause ends the session; while the user hasn't tapped Done/Cancel, fold
+    // what we heard into the running transcript and restart so it feels continuous.
+    recognition.onend = () => {
+      if (!keepListeningRef.current) {
+        setListening(false);
+        return;
+      }
+      const merged = (finalizedRef.current + sessionTextRef.current).replace(/\s+/g, " ").trimStart();
+      finalizedRef.current = merged ? `${merged} ` : "";
+      sessionTextRef.current = "";
+      try {
+        recognition.start();
+      } catch {
+        setListening(false);
+      }
+    };
+    recognition.onerror = (event) => {
+      // Permission/hardware failures are terminal — stop retrying. Transient ones
+      // (e.g. "no-speech") fall through to onend, which restarts.
+      if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "audio-capture") {
+        keepListeningRef.current = false;
+        setListening(false);
+      }
+    };
 
     recognitionRef.current = recognition;
     setListening(true);
