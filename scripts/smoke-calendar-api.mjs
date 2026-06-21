@@ -123,10 +123,15 @@ async function postJsonWithParams(route, url, body, params) {
   );
 }
 
+async function getWithParams(route, url, params) {
+  return route.GET(new Request(url, { method: "GET" }), { params });
+}
+
 prepareNextServerChunks();
 
 const calendarRoute = routeUserland("api/calendar");
 const memoryRoute = routeUserland("api/memory");
+const mediaBlobRoute = routeUserland("api/media/blob/[name]");
 const smokeId = `smoke_calendar_${Date.now()}`;
 
 const seedResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?source=seed"));
@@ -272,6 +277,19 @@ await withFakeAuriServer(async () => {
   });
   assert(rawOutputSyncPayload.outcome === "ready", "raw output sync: expected ready outcome", rawOutputSyncPayload);
   assert(rawOutputSyncPayload.event?.robot?.rawOutputMemoryId, "raw output sync: expected memory id in sync result", rawOutputSyncPayload.event);
+  const syncedRobot = rawOutputSyncPayload.event?.robot;
+  for (const artifactUrl of [syncedRobot?.rawOutputVideoUrl, syncedRobot?.transcriptJsonUrl, syncedRobot?.transcriptTxtUrl]) {
+    assert(artifactUrl?.startsWith("/api/media/blob/"), "raw output sync: expected artifacts to use media blob route", {
+      artifactUrl,
+      syncedRobot,
+    });
+    const mediaName = artifactUrl.split("/").pop();
+    const artifactResponse = await getWithParams(mediaBlobRoute, `http://localhost${artifactUrl}`, { name: mediaName });
+    assert(artifactResponse.status === 200 || artifactResponse.status === 307, "media blob: expected stored artifact to be servable", {
+      artifactUrl,
+      status: artifactResponse.status,
+    });
+  }
 
   const missingRawOutputSyncResponse = await postJsonWithParams(
     rawOutputSyncRoute,
