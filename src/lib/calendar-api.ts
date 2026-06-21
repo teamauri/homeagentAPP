@@ -1,7 +1,23 @@
 import type { PersonId, Status } from "./types";
 
 export type CalendarApiEventSource = "seed" | "created";
-export type CalendarApiEventStatus = Status | "scheduled" | "recording" | "done";
+export type CalendarApiEventStatus = Status | "scheduled" | "recording" | "uploading" | "uploaded" | "done" | "failed";
+export type CalendarRobotCaptureStatus = "scheduled" | "recording" | "uploading" | "uploaded" | "done" | "failed";
+export type CalendarRawOutputStatus = "pending" | "processing" | "ready" | "failed";
+
+export interface CalendarRobotCaptureState {
+  status: CalendarRobotCaptureStatus;
+  robotId?: string;
+  auriVideoId?: string;
+  auriClientVideoUuid?: string;
+  recordingMode?: string;
+  rawOutputStatus?: CalendarRawOutputStatus;
+  startedAt?: string;
+  uploadedAt?: string;
+  failedAt?: string;
+  error?: string;
+  updatedAt: string;
+}
 
 export interface CalendarApiEvent {
   id: string;
@@ -17,6 +33,8 @@ export interface CalendarApiEvent {
   body?: string;
   note?: string;
   suggested?: boolean;
+  auriClientVideoUuid?: string;
+  robot?: CalendarRobotCaptureState;
   photoUrl?: string;
   voiceUrl?: string;
   voiceDuration?: number;

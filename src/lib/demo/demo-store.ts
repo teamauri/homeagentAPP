@@ -1,5 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
-import { CalendarApiEvent, CalendarEventInput, deriveCalendarEventIcon } from "@/lib/calendar-api";
+import {
+  CalendarApiEvent,
+  CalendarEventInput,
+  CalendarRawOutputStatus,
+  CalendarRobotCaptureStatus,
+  deriveCalendarEventIcon,
+} from "@/lib/calendar-api";
 import { moments } from "@/lib/mock-data";
 import { PersonId, SourceType, Status } from "@/lib/types";
 import { persistStore, registerStore } from "./persistence";
@@ -186,6 +193,7 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
   const currentStore = store();
   const now = new Date().toISOString();
   const existing = input.id ? currentStore.__auriDemoCalendarEvents?.find((event) => event.id === input.id) : undefined;
+  const forRobot = Boolean(input.forRobot);
   const event: CalendarApiEvent = {
     ...existing,
     id: nextCalendarId(input.id),
@@ -197,7 +205,9 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
     timeLabel: input.timeLabel,
     icon: existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
     source: "created",
-    forRobot: Boolean(input.forRobot),
+    forRobot,
+    auriClientVideoUuid: forRobot ? (existing?.auriClientVideoUuid ?? randomUUID()) : undefined,
+    robot: forRobot ? existing?.robot : undefined,
     photoUrl: input.photoUrl,
     voiceUrl: input.voiceUrl,
     voiceDuration: input.voiceDuration,
@@ -214,6 +224,66 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
 
 export function listDemoCalendarEvents() {
   return [...(store().__auriDemoCalendarEvents ?? [])];
+}
+
+export interface DemoRobotCaptureStatusInput {
+  status: CalendarRobotCaptureStatus;
+  robotId?: string;
+  auriVideoId?: string;
+  auriClientVideoUuid?: string;
+  recordingMode?: string;
+  startedAt?: string;
+  uploadedAt?: string;
+  failedAt?: string;
+  error?: string;
+  rawOutputStatus?: CalendarRawOutputStatus;
+}
+
+function statusLabelFromRobotStatus(status: CalendarRobotCaptureStatus) {
+  if (status === "recording") return "Recording";
+  if (status === "uploading") return "Uploading";
+  if (status === "uploaded") return "Uploaded";
+  if (status === "done") return "Done";
+  if (status === "failed") return "Failed";
+  return "Scheduled";
+}
+
+function rawOutputStatusFor(input: DemoRobotCaptureStatusInput, existing?: CalendarApiEvent["robot"]): CalendarRawOutputStatus | undefined {
+  if (input.rawOutputStatus) return input.rawOutputStatus;
+  if (input.status === "failed") return "failed";
+  if (input.auriVideoId && input.auriVideoId !== existing?.auriVideoId) return "pending";
+  if (existing?.rawOutputStatus) return existing.rawOutputStatus;
+  if (input.auriVideoId) return "pending";
+  return undefined;
+}
+
+export function updateDemoCalendarRobotStatus(taskId: string, input: DemoRobotCaptureStatusInput): CalendarApiEvent | undefined {
+  const currentStore = store();
+  const events = currentStore.__auriDemoCalendarEvents ?? [];
+  const event = events.find((current) => current.id === taskId);
+  if (!event || !event.forRobot) return undefined;
+
+  const now = new Date().toISOString();
+  const auriClientVideoUuid = input.auriClientVideoUuid ?? event.auriClientVideoUuid ?? event.robot?.auriClientVideoUuid ?? randomUUID();
+  event.auriClientVideoUuid = auriClientVideoUuid;
+  event.robot = {
+    ...event.robot,
+    status: input.status,
+    robotId: input.robotId ?? event.robot?.robotId,
+    auriVideoId: input.auriVideoId ?? event.robot?.auriVideoId,
+    auriClientVideoUuid,
+    recordingMode: input.recordingMode ?? event.robot?.recordingMode,
+    rawOutputStatus: rawOutputStatusFor(input, event.robot),
+    startedAt: input.startedAt ?? event.robot?.startedAt,
+    uploadedAt: input.uploadedAt ?? (input.status === "uploaded" ? now : event.robot?.uploadedAt),
+    failedAt: input.failedAt ?? (input.status === "failed" ? now : event.robot?.failedAt),
+    error: input.error ?? event.robot?.error,
+    updatedAt: now,
+  };
+  event.status = input.status;
+  event.statusLabel = statusLabelFromRobotStatus(input.status);
+  event.updatedAt = now;
+  return event;
 }
 
 export function removeDemoCalendarEvent(id: string) {

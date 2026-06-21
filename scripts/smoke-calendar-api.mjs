@@ -50,6 +50,17 @@ async function postJson(route, url, body) {
   );
 }
 
+async function postJsonWithParams(route, url, body, params) {
+  return route.POST(
+    new Request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    { params }
+  );
+}
+
 prepareNextServerChunks();
 
 const calendarRoute = routeUserland("api/calendar");
@@ -74,12 +85,46 @@ const createPayload = await jsonFromResponse(createResponse);
 assert(createResponse.status === 201, "calendar: expected create 201", { status: createResponse.status, payload: createPayload });
 assert(createPayload.event?.id, "calendar: expected created event id", createPayload);
 assert(createPayload.event.source === "created", "calendar: expected created event source", createPayload);
+assert(
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(createPayload.event.auriClientVideoUuid),
+  "calendar: expected robot event to include an Auri client video UUID",
+  createPayload.event
+);
 
 const robotResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?robot=true"));
 const robotPayload = await jsonFromResponse(robotResponse);
 assert(robotResponse.status === 200, "calendar: expected 200 for robot read", { status: robotResponse.status, payload: robotPayload });
 assert(robotPayload.items.some((item) => item.id === createPayload.event.id && item.forRobot === true), "calendar: expected created robot event", robotPayload.items);
 assert(robotPayload.items.every((item) => item.forRobot === true), "calendar: robot filter should only return robot events", robotPayload.items);
+const robotTask = robotPayload.items.find((item) => item.id === createPayload.event.id);
+assert(robotTask?.auriClientVideoUuid === createPayload.event.auriClientVideoUuid, "calendar: robot read should expose the Auri client video UUID", robotTask);
+
+const robotStatusRoute = routeUserland("api/robot/capture-tasks/[taskId]/status");
+const robotStatusResponse = await postJsonWithParams(
+  robotStatusRoute,
+  `http://localhost/api/robot/capture-tasks/${encodeURIComponent(createPayload.event.id)}/status`,
+  {
+    status: "uploading",
+    robotId: "dockkit_living_room",
+    auriVideoId: "video-smoke-from-auri",
+    auriClientVideoUuid: createPayload.event.auriClientVideoUuid,
+    recordingMode: "story_tracking_raw_transcript",
+    startedAt: "2026-06-21T10:00:00Z",
+  },
+  { taskId: createPayload.event.id }
+);
+const robotStatusPayload = await jsonFromResponse(robotStatusResponse);
+assert(robotStatusResponse.status === 200, "robot status: expected 200", { status: robotStatusResponse.status, payload: robotStatusPayload });
+assert(robotStatusPayload.event?.id === createPayload.event.id, "robot status: expected same capture task", robotStatusPayload);
+assert(robotStatusPayload.event?.robot?.status === "uploading", "robot status: expected uploading state", robotStatusPayload.event);
+assert(robotStatusPayload.event?.robot?.auriVideoId === "video-smoke-from-auri", "robot status: expected Auri video id", robotStatusPayload.event);
+assert(robotStatusPayload.event?.robot?.auriClientVideoUuid === createPayload.event.auriClientVideoUuid, "robot status: expected Auri client video UUID", robotStatusPayload.event);
+assert(robotStatusPayload.event?.robot?.rawOutputStatus === "pending", "robot status: expected raw output pending", robotStatusPayload.event);
+
+const afterStatusResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?robot=true"));
+const afterStatusPayload = await jsonFromResponse(afterStatusResponse);
+const updatedRobotTask = afterStatusPayload.items.find((item) => item.id === createPayload.event.id);
+assert(updatedRobotTask?.robot?.auriVideoId === "video-smoke-from-auri", "calendar: expected robot linkage to persist", updatedRobotTask);
 
 const deleteResponse = await calendarRoute.DELETE(
   new Request(`http://localhost/api/calendar?id=${encodeURIComponent(createPayload.event.id)}`, {
