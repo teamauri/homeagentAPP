@@ -28,10 +28,14 @@ export default function Home() {
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
 
-  // The chat thread lives in page state, so a full-page nav (e.g. tapping
-  // "View calendar", which is an <a href>) would otherwise wipe it. Persist it
-  // to sessionStorage so the conversation survives the round-trip.
+  // Persist both the active tab and the chat thread so full-page navigations
+  // (e.g. tapping "View calendar" or opening a memory detail) return the user
+  // to exactly where they left off.
   useEffect(() => {
+    try {
+      const savedTab = sessionStorage.getItem("auri.tab.v1") as TabKey | null;
+      if (savedTab && ["today", "chat", "memory"].includes(savedTab)) setTab(savedTab);
+    } catch { /* ignore */ }
     try {
       const raw = sessionStorage.getItem("auri.liveTurns.v1");
       if (raw) {
@@ -54,8 +58,13 @@ export default function Home() {
     }
   }, [liveTurns, liveLoaded]);
 
+  const switchTab = (next: TabKey) => {
+    setTab(next);
+    try { sessionStorage.setItem("auri.tab.v1", next); } catch { /* ignore */ }
+  };
+
   const sendComposerMessage = async (message: string, imageUrl?: string) => {
-    setTab("chat");
+    switchTab("chat");
     const sentAt = Date.now();
     const pendingId = `helper-pending-${sentAt}`;
     const outgoing = message || (imageUrl ? "📷 Photo" : "");
@@ -154,7 +163,7 @@ export default function Home() {
 
   return (
     <FamilyProvider>
-      <AppShell activeTab={tab} onTabChange={setTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage}>
+      <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage}>
         {/*
           Keep every tab mounted and just toggle visibility. Conditional rendering
           (`tab === x && <View/>`) unmounts the inactive views, which made Memory
@@ -162,7 +171,7 @@ export default function Home() {
           Hiding with `hidden` preserves each view's state between tab switches.
         */}
         <div className={tab === "today" ? "" : "hidden"}>
-          <JobsView onRunActivity={() => setTab("chat")} onSubpageChange={setJobsSubpage} />
+          <JobsView onRunActivity={() => switchTab("chat")} onSubpageChange={setJobsSubpage} />
         </div>
         <div className={tab === "chat" ? "" : "hidden"}>
           <ChatView liveTurns={liveTurns} />
