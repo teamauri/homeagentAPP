@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DayGroup, GrowthData, MilestoneSession, OrganizedMedia } from "@/lib/album/types";
 import { useChildren, useFamilyMember } from "./FamilyContext";
+import { RobotEvent, useRobotEvents } from "./RobotEventContext";
 
 // Fixed gradient classes for seed/placeholder tones (kept literal so Tailwind
 // includes them). Real photos (phone organize) and ingested robot Stories
@@ -82,6 +83,9 @@ async function fileToPayload(file: File) {
 
 export function MomentsView() {
   const children = useChildren();
+  const { completions } = useRobotEvents();
+  // Clips the robot captured this session (events + highlights) — playable here.
+  const robotClips = completions.filter((event) => event.result);
   const [growth, setGrowth] = useState<GrowthData | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
@@ -91,7 +95,7 @@ export function MomentsView() {
   const auriInputRef = useRef<HTMLInputElement>(null);
   const [auriPhase, setAuriPhase] = useState<AuriPhase>("idle");
   const [editStep, setEditStep] = useState(0);
-  const [auriResult, setAuriResult] = useState<{ memoryId?: string; durationSeconds?: number } | null>(null);
+  const [auriResult, setAuriResult] = useState<{ memoryId?: string; durationSeconds?: number; mediaUrl?: string } | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/memory/growth", { cache: "no-store" });
@@ -119,17 +123,21 @@ export function MomentsView() {
       const result = await editToShortInBrowser(file, ({ stage, progress }) => {
         setEditStep(stage === "uploading" ? (progress > 0.2 ? 1 : 0) : stage === "analyzing" ? 2 : 3);
       });
-      // Land the rendered short as a Memory (reuse the robot ingest path).
-      const form = new FormData();
-      form.append("video", new File([result.videoBlob], "auri-cut.mp4", { type: "video/mp4" }));
-      form.append("memoryTitle", "Auri Cut film");
-      form.append("memoryBody", "A short film from your video, made by Auri Cut.");
-      form.append("tags", "auri-cut");
-      form.append("capturedAt", new Date().toISOString());
-      const res = await fetch("/api/ingest/auri-media", { method: "POST", body: form });
+      // The phone just hands the ids to the server, which downloads the rendered
+      // mp4 from auri-editor, stores it, and creates the Memory. No big upload here.
+      const res = await fetch("/api/edit/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoId: result.videoId,
+          vlogId: result.vlogId,
+          durationSeconds: result.durationSeconds,
+          person: growth?.child.id ?? "family",
+        }),
+      });
       if (!res.ok) throw new Error(`Couldn't save the film (${res.status})`);
       const data = await res.json();
-      setAuriResult({ memoryId: data.memory?.id, durationSeconds: result.durationSeconds });
+      setAuriResult({ memoryId: data.memoryId, durationSeconds: data.durationSeconds, mediaUrl: data.mediaUrl });
       setAuriPhase("done");
       refresh().catch(() => {});
     } catch (e) {
@@ -312,7 +320,67 @@ export function MomentsView() {
         </div>
       ) : null}
 
+      {robotClips.length ? <RobotKeepsakes events={robotClips} /> : null}
+
       <Feed days={days} />
+    </div>
+  );
+}
+
+// Clips Auri Robot captured this session, surfaced in Memory and playable inline.
+function RobotKeepsakes({ events }: { events: RobotEvent[] }) {
+  return (
+    <section className="mt-4">
+      <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-muted">
+        <span aria-hidden="true">🤖</span>
+        <span>From Auri Robot</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        {events.map((event) => (
+          <RobotClipTile key={event.id} event={event} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RobotClipTile({ event }: { event: RobotEvent }) {
+  const result = event.result!;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-[12px] border border-line bg-white shadow-[0_2px_8px_rgba(8,8,8,0.04)]">
+      <div className="relative aspect-video bg-[#17181b]">
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video
+          ref={videoRef}
+          src={result.videoUrl}
+          poster={result.poster}
+          playsInline
+          controls={playing}
+          onEnded={() => setPlaying(false)}
+          onPause={() => setPlaying(false)}
+          className="h-full w-full object-cover"
+        />
+        {!playing ? (
+          <button
+            type="button"
+            onClick={() => {
+              videoRef.current?.play();
+              setPlaying(true);
+            }}
+            className="absolute inset-0 grid place-items-center"
+            aria-label="Play clip"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-white/90 pl-0.5 text-[12px] text-ink">▶</span>
+            <span className="absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">{result.duration}</span>
+          </button>
+        ) : null}
+      </div>
+      <div className="px-2.5 py-1.5">
+        <div className="truncate text-[12.5px] font-semibold text-ink">{event.title}</div>
+        {event.completedAtLabel ? <div className="text-[11px] text-muted">{event.completedAtLabel}</div> : null}
+      </div>
     </div>
   );
 }
@@ -406,29 +474,33 @@ function AuriCutEditing({ step }: { step: number }) {
   );
 }
 
-function AuriCutResult({ result, onDismiss }: { result: { memoryId?: string; durationSeconds?: number } | null; onDismiss: () => void }) {
+function AuriCutResult({ result, onDismiss }: { result: { memoryId?: string; durationSeconds?: number; mediaUrl?: string } | null; onDismiss: () => void }) {
   const meta = [result?.durationSeconds ? secLabel(result.durationSeconds) : null, "made by Auri Cut"].filter(Boolean).join(" · ");
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-[16px] border border-[#eccfa0] bg-[#fbf3e3] p-3">
-      <div className="relative grid h-[60px] w-[60px] shrink-0 place-items-center overflow-hidden rounded-[12px]">
-        <div className={"absolute inset-0 " + toneClass("g1")} />
-        <span className="relative grid h-7 w-7 place-items-center rounded-full bg-white/85 pl-0.5 text-[11px] text-ink">▶</span>
-      </div>
-      <div className="min-w-0 flex-1">
+    <div className="mt-4 rounded-[16px] border border-[#eccfa0] bg-[#fbf3e3] p-3">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.04em] text-[#b9772a]">
           <span>✨</span> Your film is ready
         </div>
-        <p className="mt-0.5 font-display text-[15px] text-ink">Auri Cut film</p>
-        <p className="text-[11.5px] text-muted">{meta}</p>
+        <button onClick={onDismiss} aria-label="Dismiss" className="text-[#c0b9ad]">
+          ✕
+        </button>
       </div>
-      {result?.memoryId ? (
-        <a href={`/memory/${result.memoryId}`} className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-white">
-          Watch
-        </a>
+      {result?.mediaUrl ? (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <video src={result.mediaUrl} controls playsInline className="mt-2 aspect-video w-full rounded-[12px] bg-black object-cover" />
       ) : null}
-      <button onClick={onDismiss} aria-label="Dismiss" className="shrink-0 text-[#c0b9ad]">
-        ✕
-      </button>
+      <div className="mt-2 flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="font-display text-[15px] text-ink">Auri Cut film</p>
+          <p className="text-[11.5px] text-muted">{meta}</p>
+        </div>
+        {result?.memoryId ? (
+          <a href={`/memory/${result.memoryId}`} className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-white">
+            Open
+          </a>
+        ) : null}
+      </div>
     </div>
   );
 }

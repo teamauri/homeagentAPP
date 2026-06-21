@@ -12,7 +12,9 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     title: "Medicine taken · 2:04 PM",
     body: "A 6-second video receipt confirms Mia’s 2pm dose.",
     metadata: ["Auri Robot", "0:06", "Mia"],
-    action: { label: "Watch", intent: "view" },
+    videoUrl: "/demo-media/67fd7e14-aaab-4092-9b9c-1091ec2f87b7.mp4",
+    poster: "/demo-media/77128c23-7216-4012-aaea-2a8c21e74de5.jpg",
+    durationLabel: "0:06",
     memory: {
       sourceType: "auri",
       capturedAtLabel: "Today 2:04 PM",
@@ -27,7 +29,9 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     title: "She walked!",
     body: "Three steps to the couch — a 30-second film, sent to the group.",
     metadata: ["Auri Robot", "0:30", "Mia"],
-    action: { label: "View", intent: "view" },
+    videoUrl: "/demo-media/e82d1f82-ca73-4222-8db0-4fe4799b9f04.mp4",
+    poster: "/demo-media/7fada8f9-fc26-417f-86c7-80fd6b3048b8.jpg",
+    durationLabel: "0:30",
     memory: {
       sourceType: "auri",
       capturedAtLabel: "Today 5:12 PM",
@@ -49,6 +53,20 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
       timeLabel: "9:30 AM",
       location: "Clinic",
     },
+  },
+  {
+    id: "morning-routine",
+    kind: "job",
+    icon: "backpack",
+    typeLabel: "Routine",
+    title: "Leaving for school",
+    metadata: ["Leo", "weekday mornings"],
+    subtasks: [
+      { label: "Water bottle in bag", state: "done", timeLabel: "7:31" },
+      { label: "Fruit packed", state: "active", timeLabel: "now" },
+      { label: "Shoes on", state: "todo" },
+      { label: "Coat", state: "todo" },
+    ],
   },
   {
     id: "reading-moment",
@@ -129,6 +147,15 @@ export const chatFixtureMessages: ChatMessage[] = [
     timeLabel: "8:10 PM",
     text: "Mia and I read Goodnight Moon — she asked where the mouse went 🐭",
     cards: [cardById["reading-moment"]],
+  },
+  {
+    id: "vita-routine",
+    role: "helper",
+    sender: "Vita",
+    avatar: "vita",
+    timeLabel: "7:33 AM",
+    text: "On it — walking Leo through the morning routine.",
+    cards: [cardById["morning-routine"]],
   },
 ];
 

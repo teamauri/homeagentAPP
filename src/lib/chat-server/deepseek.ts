@@ -24,7 +24,7 @@ const responseContract = {
   reply: "string (Auri speaking)",
   cards: [cardContract],
   objectsToCreate: [objectContract],
-  helper: "optional, only when a helper takes a task: { teamMemberId: iris|lumi|vita|nova|sera, name: string, reply: string, cards: [card], objectsToCreate: [object] }",
+  helper: "optional, only when a helper takes a task: { teamMemberId: iris|lumi|vita|nova, name: string, reply: string, cards: [card], objectsToCreate: [object] }",
   suggestedFollowups: ["string"],
 };
 

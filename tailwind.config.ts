@@ -21,7 +21,7 @@ const config: Config = {
         card: "0 20px 60px rgba(8,8,8,0.06)",
       },
       fontFamily: {
-        display: ["Georgia", "Times New Roman", "ui-serif", "serif"],
+        display: ["Playfair Display", "Georgia", "ui-serif", "serif"],
         body: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
       },
     },

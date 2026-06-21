@@ -50,10 +50,36 @@ function statusLabelFor(status: string) {
   return "Draft";
 }
 
+function prettyLabel(key: string) {
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim();
+}
+
+// Render ISO datetimes as something a parent can read, leave everything else.
+function prettyValue(key: string, value: string | number) {
+  if (typeof value === "string" && /date|time|when/i.test(key)) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime()) && /\d{4}-\d{2}-\d{2}/.test(value)) {
+      return new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: "UTC",
+      }).format(d);
+    }
+  }
+  return String(value);
+}
+
 function displayRows(payload: Record<string, unknown>) {
   return Object.entries(payload)
     .filter(([, value]) => typeof value === "string" || typeof value === "number")
-    .slice(0, 6);
+    .slice(0, 6) as [string, string | number][];
 }
 
 export default function ObjectDetailPage({ params }: { params: { id: string } }) {
@@ -78,17 +104,17 @@ export default function ObjectDetailPage({ params }: { params: { id: string } })
               <DoodleIcon name={iconFor(object.type)} className="h-14 w-14" />
             </div>
 
-            <p className="mb-2 text-[14px] font-medium text-muted">{object.type.replaceAll("_", " ")}</p>
+            <p className="mb-2 text-[14px] font-medium capitalize text-muted">{prettyLabel(object.type)}</p>
             <h1 className="font-display text-[42px] leading-[0.95] tracking-[-0.04em] text-ink">{titleFor(object)}</h1>
             <p className="mt-4 text-[17px] leading-6 text-ink/80">
-              Review this local draft before Auri writes to an external family app. External calendar, reminder, and sharing actions are mocked for this demo.
+              Auri put this together for you. Check the details, then confirm to save it.
             </p>
 
             <section className="mt-7 rounded-[22px] border border-line bg-white px-4 py-2 shadow-[0_8px_24px_rgba(8,8,8,0.035)]">
               {rows.map(([key, value]) => (
                 <div key={key} className="flex min-h-[46px] items-center justify-between gap-4 border-b border-line/80 py-2 last:border-b-0">
-                  <span className="text-[14px] capitalize text-muted">{key.replaceAll(/([A-Z])/g, " $1")}</span>
-                  <span className="min-w-0 flex-1 truncate text-right text-[15px] font-medium text-ink">{String(value)}</span>
+                  <span className="text-[14px] text-muted">{prettyLabel(key)}</span>
+                  <span className="min-w-0 flex-1 truncate text-right text-[15px] font-medium text-ink">{prettyValue(key, value)}</span>
                 </div>
               ))}
             </section>

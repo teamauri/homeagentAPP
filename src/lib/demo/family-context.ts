@@ -57,11 +57,6 @@ export const demoFamilyContext = {
       name: "Nova the coach",
       handles: ["home workout", "quick sets", "form", "reps"],
     },
-    {
-      id: "sera",
-      name: "Sera the calm",
-      handles: ["breathing", "a hard day", "pointing you to a real person"],
-    },
   ],
   availableLocalActions: [
     "create_reminder_draft",
