@@ -30,7 +30,16 @@ export type LiveChatTurn = {
   cards?: ChatTurnCard[];
   pending?: boolean;
   imageUrl?: string;
+  // Epoch ms for chronological ordering across all chat sources.
+  createdAt?: number;
 };
+
+// Both chat turns and robot events carry an epoch in their id (`auri-<ts>`,
+// `revent_<ts>`); pull it out so everything can share one timeline.
+function epochFromId(id: string): number {
+  const m = id.match(/(\d{10,})/);
+  return m ? Number(m[1]) : 0;
+}
 
 const chatThreadIds = [
   "mom-meds",
@@ -64,21 +73,34 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
   // Highlight jobs that are mid-capture: Iris shows a live counter card that
   // climbs as the run catches real clips/photos, then hands off to the keepsake.
   const runningHighlights = events.filter((event) => event.kind === "highlight" && event.status === "recording");
+  // Merge live chat turns with robot-event activity (completions + in-flight
+  // highlights) into one timeline sorted oldest → newest, so the latest item is
+  // always at the bottom no matter which source it came from.
+  const stream = [
+    ...liveTurns.map((turn) => ({
+      key: turn.id,
+      at: turn.createdAt ?? epochFromId(turn.id),
+      node: <LiveChatTurnRow key={turn.id} turn={turn} />,
+    })),
+    ...completions.map((event) => ({
+      key: `done-${event.id}`,
+      at: epochFromId(event.id),
+      node: <RobotCompletionRow key={`done-${event.id}`} event={event} />,
+    })),
+    ...runningHighlights.map((event) => ({
+      key: `live-${event.id}`,
+      at: epochFromId(event.id),
+      node: <HighlightProgressRow key={`live-${event.id}`} event={event} />,
+    })),
+  ].sort((a, b) => a.at - b.at);
+
   return (
     <div className="pb-4">
       <div className="space-y-5">
         {turns.map((turn) => (
           <ChatTurnRow key={turn.id} turn={turn} />
         ))}
-        {liveTurns.map((turn) => (
-          <LiveChatTurnRow key={turn.id} turn={turn} />
-        ))}
-        {completions.map((event) => (
-          <RobotCompletionRow key={`done-${event.id}`} event={event} />
-        ))}
-        {runningHighlights.map((event) => (
-          <HighlightProgressRow key={`live-${event.id}`} event={event} />
-        ))}
+        {stream.map((item) => item.node)}
       </div>
     </div>
   );
@@ -341,12 +363,39 @@ function ApiResponseCard({ card }: { card: ChatTurnCard }) {
   );
 }
 
+type DraftState = "confirmed" | "dismissed";
+const DRAFT_STATE_KEY = "auri.draftStates.v1";
+
+// A stable key per draft so its confirmed/dismissed state survives a full-page
+// nav (the card's state would otherwise reset to "draft" on remount).
+function draftKey(d: DraftInfo) {
+  return d.objectId ?? `${d.kind}|${d.title}|${d.dateLabel}|${d.timeLabel}|${d.person}`;
+}
+function readDraftStates(): Record<string, DraftState> {
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_STATE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+function writeDraftState(key: string, value: DraftState) {
+  try {
+    const map = readDraftStates();
+    map[key] = value;
+    sessionStorage.setItem(DRAFT_STATE_KEY, JSON.stringify(map));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 // A reminder / calendar draft the user confirms right in chat. Confirming adds
 // it to the calendar (via the shared event store) and flips the card to a
-// settled state — no navigating away, so the thread stays intact.
+// settled state — no navigating away, so the thread stays intact. The settled
+// state is persisted so it stays confirmed/dismissed after a page nav.
 function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const { addEvent } = useRobotEvents();
-  const [state, setState] = useState<"draft" | "confirmed" | "dismissed">("draft");
+  const key = draftKey(draft);
+  const [state, setState] = useState<"draft" | "confirmed" | "dismissed">(() => readDraftStates()[key] ?? "draft");
 
   const isReminder = draft.kind === "reminder";
   const whenLine = [draft.dateLabel, draft.timeLabel, draft.personLabel].filter(Boolean).join(" · ");
@@ -360,7 +409,13 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
       timeLabel: draft.timeLabel,
       forRobot: false,
     });
+    writeDraftState(key, "confirmed");
     setState("confirmed");
+  };
+
+  const dismiss = () => {
+    writeDraftState(key, "dismissed");
+    setState("dismissed");
   };
 
   if (state === "dismissed") return null;
@@ -395,7 +450,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
           <button onClick={confirm} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
             {isReminder ? "Add reminder" : "Add to calendar"}
           </button>
-          <button onClick={() => setState("dismissed")} className="rounded-full border border-line px-4 py-2 text-[14px] font-medium text-muted">
+          <button onClick={dismiss} className="rounded-full border border-line px-4 py-2 text-[14px] font-medium text-muted">
             Dismiss
           </button>
         </div>

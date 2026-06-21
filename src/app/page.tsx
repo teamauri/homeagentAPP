@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell, TabKey } from "@/components/AppShell";
 import { JobsView } from "@/components/JobsView";
 import { ChatView, LiveChatTurn } from "@/components/ChatView";
@@ -25,7 +25,34 @@ function displayHelperName(name: string) {
 export default function Home() {
   const [tab, setTab] = useState<TabKey>("chat");
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
+  const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
+
+  // The chat thread lives in page state, so a full-page nav (e.g. tapping
+  // "View calendar", which is an <a href>) would otherwise wipe it. Persist it
+  // to sessionStorage so the conversation survives the round-trip.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("auri.liveTurns.v1");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setLiveTurns(parsed);
+      }
+    } catch {
+      // ignore malformed storage
+    }
+    setLiveLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!liveLoaded) return;
+    try {
+      // Drop transient "thinking…" bubbles so they don't restore as stuck spinners.
+      sessionStorage.setItem("auri.liveTurns.v1", JSON.stringify(liveTurns.filter((turn) => !turn.pending)));
+    } catch {
+      // ignore quota / serialization failures
+    }
+  }, [liveTurns, liveLoaded]);
 
   const sendComposerMessage = async (message: string, imageUrl?: string) => {
     setTab("chat");
@@ -42,6 +69,7 @@ export default function Home() {
         avatar: "mom",
         text: outgoing,
         imageUrl,
+        createdAt: sentAt,
       },
       {
         id: pendingId,
@@ -50,6 +78,7 @@ export default function Home() {
         avatar: "auri",
         text: "Auri is thinking…",
         pending: true,
+        createdAt: sentAt,
       },
     ]);
 
@@ -83,6 +112,7 @@ export default function Home() {
                 avatar: payload.handledByTeamMemberId,
                 text: payload.reply,
                 cards: enrichCards(payload.cards, payload.objectsToCreate, payload.createdLocalObjects, 0),
+                createdAt: sentAt,
               }
             : turn
         );
@@ -97,6 +127,7 @@ export default function Home() {
             avatar: helper.teamMemberId,
             text: helper.reply,
             cards: enrichCards(helper.cards, helper.objectsToCreate, payload.createdLocalObjects, payload.objectsToCreate?.length ?? 0),
+            createdAt: sentAt + 1,
           };
           const idx = next.findIndex((turn) => turn.id === auriId);
           return [...next.slice(0, idx + 1), helperTurn, ...next.slice(idx + 1)];
@@ -113,6 +144,7 @@ export default function Home() {
                 time: nowLabel(),
                 avatar: "auri",
                 text: "I couldn’t reach the helper service. Try again in a moment.",
+                createdAt: sentAt,
               }
             : turn
         )
