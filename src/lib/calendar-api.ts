@@ -12,6 +12,13 @@ export interface CalendarRobotCaptureState {
   auriClientVideoUuid?: string;
   recordingMode?: string;
   rawOutputStatus?: CalendarRawOutputStatus;
+  rawOutputMemoryId?: string;
+  rawOutputVideoUrl?: string;
+  transcriptJsonUrl?: string;
+  transcriptTxtUrl?: string;
+  rawOutputReadyAt?: string;
+  rawOutputSyncedAt?: string;
+  rawOutputError?: string;
   startedAt?: string;
   uploadedAt?: string;
   failedAt?: string;

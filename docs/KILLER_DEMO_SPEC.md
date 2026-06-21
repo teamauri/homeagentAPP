@@ -64,6 +64,31 @@ proves the Home Agent ↔ Auri Editor integration end to end; see
   finished Memory attaches to the originating calendar task.
 - Auth between DockKit and Home Agent (the robot-facing API).
 
+## Raw + Transcript Home Agent path
+
+For the Story Tracking `Raw + Transcript` mode, Home Agent is only a consumer of
+existing Auri Editor raw-output artifacts. Home Agent does not create the
+raw-output job, does not call Story/Vlog APIs, and does not use the multipart
+Story ingest path for this mode.
+
+DockKit reports the canonical `auriVideoId` to Home Agent through:
+
+```http
+POST /api/robot/capture-tasks/{taskId}/status
+```
+
+Home Agent then polls/downloads by `video_id` with:
+
+- `GET /v1/videos/{video_id}/raw-output`
+- `HEAD /v1/videos/{video_id}/raw-output/video/download`
+- `GET /v1/videos/{video_id}/raw-output/video/download`
+- `HEAD /v1/videos/{video_id}/raw-output/transcript/download?format=json|txt`
+- `GET /v1/videos/{video_id}/raw-output/transcript/download?format=json|txt`
+
+When the raw output is ready, Home Agent stores the video and transcripts,
+creates a Memory, links it back to the capture task, and the chat renders the
+recorded video from the completed robot event.
+
 ## Boundaries / coordination
 - This is a 3-repo feature. **Home Agent only owns ①(model)②(the fetch/report
   API)⑤⑥.** ③④ + the iOS auto-trigger live in `dockkit-demo` — do **not** edit

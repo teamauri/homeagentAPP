@@ -63,6 +63,26 @@ Response: `{ media: DemoMediaItem[], memory: DemoMemoryItem, metadata }`.
 Enable on device by setting `HOME_AGENT_INGEST_URL` to e.g.
 `https://<your-app>.vercel.app/api/ingest/auri-media`.
 
+## Raw + Transcript mode
+
+The Story Tracking `Raw + Transcript` mode is not the existing Story/Vlog ingest
+path. For that mode, Home Agent does not receive a multipart Story upload and
+does not call Auri Story/Vlog APIs. DockKit reports the `auriVideoId` through the
+robot capture-task status callback, then Home Agent downloads existing
+raw-output artifacts from Auri Editor by `video_id`.
+
+Home Agent uses only:
+
+- `GET /v1/videos/{video_id}/raw-output`
+- `HEAD /v1/videos/{video_id}/raw-output/video/download`
+- `GET /v1/videos/{video_id}/raw-output/video/download`
+- `HEAD /v1/videos/{video_id}/raw-output/transcript/download?format=json|txt`
+- `GET /v1/videos/{video_id}/raw-output/transcript/download?format=json|txt`
+
+After download, Home Agent stores the raw video and transcripts through its media
+storage, creates a Memory linked to the capture task, and surfaces the recorded
+video in Chat through the completed robot event.
+
 ## Known limitations / decisions the Memory-UX refactor should address
 
 1. **`demo-store` is in-memory & process-local** — resets on server restart and

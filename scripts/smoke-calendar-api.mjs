@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -38,6 +39,57 @@ function routeUserland(routePath) {
 
 async function jsonFromResponse(response) {
   return response.json();
+}
+
+async function withFakeAuriServer(fn) {
+  const videoBytes = Buffer.from("fake mp4 bytes");
+  const transcriptJson = Buffer.from(JSON.stringify({ text: "Mia read the story." }));
+  const transcriptTxt = Buffer.from("Mia read the story.");
+
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url, "http://localhost");
+    if (req.method === "GET" && url.pathname === "/v1/videos/video-smoke-from-auri/raw-output") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ success: true, data: { video_id: "video-smoke-from-auri", status: "ready", progress: 1 } }));
+      return;
+    }
+
+    if (url.pathname === "/v1/videos/video-smoke-from-auri/raw-output/video/download") {
+      res.writeHead(200, { "content-type": "video/mp4", "content-length": String(videoBytes.length) });
+      if (req.method === "HEAD") res.end();
+      else res.end(videoBytes);
+      return;
+    }
+
+    if (url.pathname === "/v1/videos/video-smoke-from-auri/raw-output/transcript/download" && url.searchParams.get("format") === "json") {
+      res.writeHead(200, { "content-type": "application/json", "content-length": String(transcriptJson.length) });
+      if (req.method === "HEAD") res.end();
+      else res.end(transcriptJson);
+      return;
+    }
+
+    if (url.pathname === "/v1/videos/video-smoke-from-auri/raw-output/transcript/download" && url.searchParams.get("format") === "txt") {
+      res.writeHead(200, { "content-type": "text/plain", "content-length": String(transcriptTxt.length) });
+      if (req.method === "HEAD") res.end();
+      else res.end(transcriptTxt);
+      return;
+    }
+
+    res.writeHead(404, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "not found" }));
+  });
+
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const previousHost = process.env.AURI_HOST;
+  process.env.AURI_HOST = `http://127.0.0.1:${address.port}`;
+  try {
+    return await fn();
+  } finally {
+    if (previousHost === undefined) delete process.env.AURI_HOST;
+    else process.env.AURI_HOST = previousHost;
+    await new Promise((resolve) => server.close(resolve));
+  }
 }
 
 async function postJson(route, url, body) {
@@ -125,6 +177,24 @@ const afterStatusResponse = await calendarRoute.GET(new Request("http://localhos
 const afterStatusPayload = await jsonFromResponse(afterStatusResponse);
 const updatedRobotTask = afterStatusPayload.items.find((item) => item.id === createPayload.event.id);
 assert(updatedRobotTask?.robot?.auriVideoId === "video-smoke-from-auri", "calendar: expected robot linkage to persist", updatedRobotTask);
+
+await withFakeAuriServer(async () => {
+  const rawOutputSyncRoute = routeUserland("api/robot/capture-tasks/[taskId]/raw-output/sync");
+  const rawOutputSyncResponse = await postJsonWithParams(
+    rawOutputSyncRoute,
+    `http://localhost/api/robot/capture-tasks/${encodeURIComponent(createPayload.event.id)}/raw-output/sync`,
+    {},
+    { taskId: createPayload.event.id }
+  );
+  const rawOutputSyncPayload = await jsonFromResponse(rawOutputSyncResponse);
+  assert(rawOutputSyncResponse.status === 200, "raw output sync: expected 200", { status: rawOutputSyncResponse.status, payload: rawOutputSyncPayload });
+  assert(rawOutputSyncPayload.event?.robot?.rawOutputStatus === "ready", "raw output sync: expected ready state", rawOutputSyncPayload.event);
+  assert(rawOutputSyncPayload.event?.robot?.rawOutputVideoUrl, "raw output sync: expected stored video URL", rawOutputSyncPayload.event);
+  assert(rawOutputSyncPayload.event?.robot?.transcriptJsonUrl, "raw output sync: expected JSON transcript URL", rawOutputSyncPayload.event);
+  assert(rawOutputSyncPayload.event?.robot?.transcriptTxtUrl, "raw output sync: expected text transcript URL", rawOutputSyncPayload.event);
+  assert(rawOutputSyncPayload.memory?.id, "raw output sync: expected memory", rawOutputSyncPayload);
+  assert(rawOutputSyncPayload.media?.some((item) => item.mediaType === "video"), "raw output sync: expected video media", rawOutputSyncPayload.media);
+});
 
 const deleteResponse = await calendarRoute.DELETE(
   new Request(`http://localhost/api/calendar?id=${encodeURIComponent(createPayload.event.id)}`, {

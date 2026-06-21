@@ -226,6 +226,10 @@ export function listDemoCalendarEvents() {
   return [...(store().__auriDemoCalendarEvents ?? [])];
 }
 
+export function getDemoCalendarEvent(id: string) {
+  return store().__auriDemoCalendarEvents?.find((event) => event.id === id);
+}
+
 export interface DemoRobotCaptureStatusInput {
   status: CalendarRobotCaptureStatus;
   robotId?: string;
@@ -237,6 +241,13 @@ export interface DemoRobotCaptureStatusInput {
   failedAt?: string;
   error?: string;
   rawOutputStatus?: CalendarRawOutputStatus;
+  rawOutputMemoryId?: string;
+  rawOutputVideoUrl?: string;
+  transcriptJsonUrl?: string;
+  transcriptTxtUrl?: string;
+  rawOutputReadyAt?: string;
+  rawOutputSyncedAt?: string;
+  rawOutputError?: string;
 }
 
 function statusLabelFromRobotStatus(status: CalendarRobotCaptureStatus) {
@@ -274,6 +285,13 @@ export function updateDemoCalendarRobotStatus(taskId: string, input: DemoRobotCa
     auriClientVideoUuid,
     recordingMode: input.recordingMode ?? event.robot?.recordingMode,
     rawOutputStatus: rawOutputStatusFor(input, event.robot),
+    rawOutputMemoryId: input.rawOutputMemoryId ?? event.robot?.rawOutputMemoryId,
+    rawOutputVideoUrl: input.rawOutputVideoUrl ?? event.robot?.rawOutputVideoUrl,
+    transcriptJsonUrl: input.transcriptJsonUrl ?? event.robot?.transcriptJsonUrl,
+    transcriptTxtUrl: input.transcriptTxtUrl ?? event.robot?.transcriptTxtUrl,
+    rawOutputReadyAt: input.rawOutputReadyAt ?? event.robot?.rawOutputReadyAt,
+    rawOutputSyncedAt: input.rawOutputSyncedAt ?? event.robot?.rawOutputSyncedAt,
+    rawOutputError: input.rawOutputError ?? event.robot?.rawOutputError,
     startedAt: input.startedAt ?? event.robot?.startedAt,
     uploadedAt: input.uploadedAt ?? (input.status === "uploaded" ? now : event.robot?.uploadedAt),
     failedAt: input.failedAt ?? (input.status === "failed" ? now : event.robot?.failedAt),
