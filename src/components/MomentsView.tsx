@@ -504,7 +504,7 @@ function AuriCutResult({ result, onDismiss, onPlay }: { result: { memoryId?: str
       </div>
       {result?.mediaUrl ? (
         // eslint-disable-next-line jsx-a11y/media-has-caption
-        <video src={result.mediaUrl} controls playsInline className="mt-2 aspect-video w-full rounded-[12px] bg-black object-cover" />
+        <video src={`${result.mediaUrl}#t=0.1`} controls playsInline preload="metadata" className="mt-2 aspect-video w-full rounded-[12px] bg-black object-cover" />
       ) : null}
       <div className="mt-2 flex items-center justify-between">
         <div className="min-w-0">
