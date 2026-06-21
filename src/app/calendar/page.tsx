@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { upcoming } from "@/lib/mock-data";
 import type { PersonId } from "@/lib/types";
 import { useRobotEvents } from "@/components/RobotEventContext";
-import type { RobotEvent } from "@/components/RobotEventContext";
-import { DoodleIcon } from "@/components/Icons";
+import { EventDetailSheet } from "@/components/EventDetailSheet";
 
 const HIDDEN_KEY = "auri.hiddenCalIds.v1";
 
@@ -124,12 +123,12 @@ export default function CalendarPage() {
       if (!day) return;
       (map[day] ??= []).push(b);
     };
+    // Every calendar event is a robot task, so all blocks get the robot marker.
     for (const e of upcoming) {
-      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: false }, e.dateLabel);
+      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: true }, e.dateLabel);
     }
-    // Events the family created — robot or not — show alongside the rest.
     for (const e of events) {
-      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: e.forRobot }, e.dateLabel);
+      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: true }, e.dateLabel);
     }
     return map;
   }, [events, hidden]);
@@ -279,66 +278,31 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Tap an event → full details + delete. */}
-      {sel ? (
-        <EventDetailSheet block={sel} events={events} onDelete={() => deleteBlock(sel)} onClose={() => setSel(null)} />
-      ) : null}
+      {/* Tap an event → full details + delete (shared with Jobs). */}
+      {sel ? (() => {
+        const created = sel.id.startsWith("revent_") ? events.find((e) => e.id === sel.id) : undefined;
+        const mock = created ? undefined : upcoming.find((e) => e.id === sel.id);
+        const dateLabel = created?.dateLabel ?? mock?.dateLabel ?? "";
+        const whenLine = [dateLabel, sel.timeLabel, PERSON_LABEL[sel.person]].filter(Boolean).join(" · ");
+        return (
+          <EventDetailSheet
+            detail={{
+              title: sel.title,
+              icon: created?.icon ?? mock?.icon ?? "calendar",
+              whenLine,
+              note: created?.note ?? mock?.body,
+              quoteNote: !!created,
+              statusLabel: created ? STATUS_LABEL[created.status] : undefined,
+              hasPhoto: !!created?.photoUrl,
+              hasVoice: !!created?.voiceUrl,
+            }}
+            onDelete={() => deleteBlock(sel)}
+            onClose={() => setSel(null)}
+          />
+        );
+      })() : null}
     </main>
   );
 }
 
 const STATUS_LABEL: Record<string, string> = { scheduled: "Scheduled", recording: "Recording", done: "Done" };
-
-// Event details, styled like the event cards elsewhere in the app (doodle icon,
-// type label, title, when, note) — plus delete. Pulls the rich fields from the
-// created event (or the mock seed) behind the tapped block.
-function EventDetailSheet({ block, events, onDelete, onClose }: { block: Block; events: RobotEvent[]; onDelete: () => void; onClose: () => void }) {
-  const created = block.id.startsWith("revent_") ? events.find((e) => e.id === block.id) : undefined;
-  const mock = created ? undefined : upcoming.find((e) => e.id === block.id);
-  const icon = created?.icon ?? mock?.icon ?? "calendar";
-  const dateLabel = created?.dateLabel ?? mock?.dateLabel ?? "";
-  const note = created?.note ?? mock?.body;
-  const forRobot = created?.forRobot ?? false;
-  const when = [dateLabel, block.timeLabel, PERSON_LABEL[block.person]].filter(Boolean).join(" · ");
-  const color = PERSON_COLOR[block.person];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 md:items-center" onClick={onClose}>
-      <div className="w-full max-w-[430px] rounded-t-[22px] bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:rounded-[22px]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start gap-3">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[14px] border" style={{ borderColor: `${color}33`, backgroundColor: `${color}12` }}>
-            <DoodleIcon name={icon} className="h-9 w-9" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-medium text-[#70757a]">{forRobot ? "Auri Robot event" : "Calendar event"}</div>
-            <div className="truncate text-[18px] font-semibold text-[#202124]">{block.title}</div>
-            <div className="mt-0.5 text-[13px] text-[#5f6368]">{when}</div>
-          </div>
-        </div>
-
-        {note ? (
-          <p className="mt-3 rounded-[12px] bg-[#f6f7f9] px-3 py-2.5 text-[13px] leading-[18px] text-[#3c4043]">{forRobot ? `“${note}”` : note}</p>
-        ) : null}
-
-        {forRobot ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px]">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#eef3f0] px-2.5 py-1 font-medium text-[#2E7B5B]">
-              🤖 {created?.status ? STATUS_LABEL[created.status] : "On Auri Robot"}
-            </span>
-            {created?.photoUrl ? <span className="rounded-full bg-[#f1efe8] px-2.5 py-1 text-[#5f6368]">📷 Photo</span> : null}
-            {created?.voiceUrl ? <span className="rounded-full bg-[#f1efe8] px-2.5 py-1 text-[#5f6368]">🎙 Voice note</span> : null}
-          </div>
-        ) : null}
-
-        <div className="mt-5 flex gap-2.5">
-          <button onClick={onDelete} className="flex-1 rounded-full bg-[#d93025] py-2.5 text-[14px] font-semibold text-white">
-            Delete event
-          </button>
-          <button onClick={onClose} className="rounded-full border border-[#dadce0] px-5 py-2.5 text-[14px] font-medium text-[#3c4043]">
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -1,23 +1,76 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { jobIcon, seedStanding, seedUpcoming, type StandingJob, type UpcomingJob } from "@/lib/jobs";
-import { teamAgentById, type TeamAgentId } from "@/lib/team";
+import { jobIcon, seedStanding, seedUpcoming, type JobSource, type StandingJob } from "@/lib/jobs";
+import { teamAgentById } from "@/lib/team";
+import { personLabels } from "./calendar-ui";
 import { DoodleIcon } from "./Icons";
 import { NewJobView } from "./NewJobView";
+import { EventDetailSheet } from "./EventDetailSheet";
 import { useRobotEvents } from "./RobotEventContext";
+
+const STATUS_LABEL: Record<string, string> = { scheduled: "Scheduled", recording: "Recording", done: "Done" };
 
 // "Jobs" — everything the family has set Auri to do, in two zones:
 //   Upcoming   · one-time + imported calendar events (clears after it runs)
 //   Every day  · standing recurring jobs with on/off toggles
 // This replaces the old "Inbox / Needs You" surface. No drafts to confirm — just
 // what Auri is set to deliver, and the switches that control it.
+
+// One unified row for the Upcoming zone, whether it came from a created event
+// (also shown on the calendar) or the mock seed.
+type UpcomingItem = {
+  id: string;
+  eventId?: string; // present when backed by a real event (opens the calendar)
+  title: string;
+  dateLabel: string;
+  timeLabel: string;
+  iconName: string;
+  meta: string;
+  source: JobSource;
+  forRobot: boolean;
+};
+
+// Every calendar event is a robot task, so the Auri Robot badge shows on all of them.
+const SHORT_DAY: Record<string, string> = {
+  Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun", Tomorrow: "Tmrw",
+};
+const shortDay = (d: string) => SHORT_DAY[d] ?? d;
+
 export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: () => void; onSubpageChange?: (open: boolean) => void } = {}) {
-  const { startHighlight } = useRobotEvents();
+  const { events, addEvent, removeEvent, startHighlight } = useRobotEvents();
   const [standing, setStanding] = useState<StandingJob[]>(seedStanding);
-  const [upcoming, setUpcoming] = useState<UpcomingJob[]>(seedUpcoming);
   const [creating, setCreating] = useState(false);
   const [editJob, setEditJob] = useState<StandingJob | null>(null);
+  const [sel, setSel] = useState<UpcomingItem | null>(null);
+
+  // Upcoming = one-time events the family created (live in the shared store, so
+  // they also appear on the calendar) + the mock seed. "Done" events clear out.
+  const upcomingItems: UpcomingItem[] = [
+    ...events
+      .filter((e) => !e.kind && e.status !== "done")
+      .map<UpcomingItem>((e) => ({
+        id: e.id,
+        eventId: e.id,
+        title: e.title,
+        dateLabel: e.dateLabel,
+        timeLabel: e.timeLabel,
+        iconName: e.icon,
+        meta: personLabels[e.person],
+        source: "auri",
+        forRobot: true,
+      })),
+    ...seedUpcoming.map<UpcomingItem>((j) => ({
+      id: j.id,
+      title: j.title,
+      dateLabel: j.dateLabel,
+      timeLabel: j.timeLabel,
+      iconName: jobIcon[j.type],
+      meta: j.subtitle,
+      source: j.source,
+      forRobot: true,
+    })),
+  ];
 
   // Tell the shell to drop its "Jobs" header while the New/Edit page is open —
   // that page has its own "‹ Back · New job" header, so the global one is noise.
@@ -50,8 +103,9 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
           setStanding((cur) => (isEdit ? cur.map((j) => (j.id === job.id ? job : j)) : [...cur, job]));
           closeForm();
         }}
-        onSubmitUpcoming={(job) => {
-          setUpcoming((cur) => [job, ...cur]);
+        onSubmitOnce={(input) => {
+          // A one-time job IS an event — store it so it shows here AND on the calendar.
+          addEvent(input);
           closeForm();
         }}
         onDelete={(id) => {
@@ -77,8 +131,8 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
           <span className="text-[12px] leading-4 text-muted">clears after it runs</span>
         </div>
         <div className="overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
-          {upcoming.length ? (
-            upcoming.map((job, i) => <UpcomingRow key={job.id} job={job} first={i === 0} />)
+          {upcomingItems.length ? (
+            upcomingItems.map((item, i) => <UpcomingRow key={item.id} item={item} first={i === 0} onSelect={() => setSel(item)} />)
           ) : (
             <p className="px-4 py-5 text-[13px] leading-5 text-muted">Nothing one-time yet. Tap “New”, choose “One time”, and it lands here.</p>
           )}
@@ -105,30 +159,61 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
           ))}
         </div>
       </section>
+
+      {/* Tap a row → the shared event detail sheet (created events can be deleted). */}
+      {sel ? (() => {
+        const created = sel.eventId ? events.find((e) => e.id === sel.eventId) : undefined;
+        const whenLine = [sel.dateLabel, sel.timeLabel, created ? personLabels[created.person] : ""].filter(Boolean).join(" · ");
+        return (
+          <EventDetailSheet
+            detail={{
+              title: sel.title,
+              icon: sel.iconName,
+              whenLine,
+              note: created?.note,
+              quoteNote: !!created,
+              statusLabel: created ? STATUS_LABEL[created.status] : undefined,
+              hasPhoto: !!created?.photoUrl,
+              hasVoice: !!created?.voiceUrl,
+            }}
+            onDelete={created ? () => { removeEvent(sel.eventId!); setSel(null); } : undefined}
+            onClose={() => setSel(null)}
+          />
+        );
+      })() : null}
     </div>
   );
 }
 
-function UpcomingRow({ job, first }: { job: UpcomingJob; first: boolean }) {
+function RobotBadge() {
   return (
-    <button className={`flex w-full items-center gap-3 px-3.5 py-3 text-left ${first ? "" : "border-t border-line/70"}`}>
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f3f3] px-1.5 py-0.5 text-[10.5px] font-semibold leading-3 text-[#0a7d7d]">
+      <DoodleIcon name="robot" className="h-3 w-3" /> Auri Robot
+    </span>
+  );
+}
+
+function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boolean; onSelect: () => void }) {
+  return (
+    <button onClick={onSelect} className={`flex w-full items-center gap-3 px-3.5 py-3 text-left ${first ? "" : "border-t border-line/70"}`}>
       <div className="w-[40px] shrink-0 text-center">
-        <div className="text-[11px] leading-4 text-muted">{job.dateLabel}</div>
-        <div className="text-[14px] font-semibold leading-4 text-ink">{job.timeLabel.replace(/\s?[AP]M$/i, "")}</div>
+        <div className="text-[11px] leading-4 text-muted">{shortDay(item.dateLabel)}</div>
+        <div className="text-[14px] font-semibold leading-4 text-ink">{item.timeLabel.replace(/\s?[AP]M$/i, "")}</div>
       </div>
       <span className="h-8 w-px shrink-0 bg-line" aria-hidden="true" />
       <div className="grid h-[40px] w-[40px] shrink-0 place-items-center">
-        <DoodleIcon name={jobIcon[job.type]} className="h-8 w-8" />
+        <DoodleIcon name={item.iconName} className="h-8 w-8" />
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{job.title}</h3>
-        <div className="mt-0.5 flex items-center gap-1.5">
-          {job.source === "gcal" ? (
+        <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{item.title}</h3>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+          {item.forRobot ? <RobotBadge /> : null}
+          {item.source === "gcal" ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#2e7dd1]/10 px-1.5 py-0.5 text-[10.5px] font-semibold leading-3 text-[#2e7dd1]">
               <DoodleIcon name="calendar" className="h-3 w-3" /> Google
             </span>
           ) : null}
-          <span className="text-[12.5px] leading-[18px] tracking-[0] text-muted">{job.subtitle}</span>
+          <span className="text-[12.5px] leading-[18px] tracking-[0] text-muted">{item.meta}</span>
         </div>
       </div>
       <span className="text-[26px] font-light leading-none text-ink/40">›</span>

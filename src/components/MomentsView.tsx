@@ -270,7 +270,7 @@ export function MomentsView() {
 
       {activeSession ? <SessionCard session={activeSession} /> : null}
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="sticky -top-2 z-10 flex items-center justify-between bg-paper pb-1.5 pt-3">
         <span className="text-[12px] text-muted">
           By day · kept by Iris{growth.skippedCount ? ` · ${growth.skippedCount} skipped` : ""}
         </span>

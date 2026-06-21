@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { PersonId } from "@/lib/types";
-import { type JobType, type StandingJob, type UpcomingJob } from "@/lib/jobs";
+import { type JobType, type StandingJob } from "@/lib/jobs";
 import { teamAgentById, type TeamAgentId } from "@/lib/team";
 import { personLabels } from "./calendar-ui";
 import { TeamBadge } from "./TeamBadge";
@@ -41,13 +41,13 @@ export function NewJobView({
   editJob,
   onClose,
   onSubmitStanding,
-  onSubmitUpcoming,
+  onSubmitOnce,
   onDelete,
 }: {
   editJob?: StandingJob;
   onClose: () => void;
   onSubmitStanding: (job: StandingJob, isEdit: boolean) => void;
-  onSubmitUpcoming: (job: UpcomingJob) => void;
+  onSubmitOnce: (input: { title: string; person: PersonId; dateLabel: string; timeLabel: string; forRobot: boolean }) => void;
   onDelete?: (id: string) => void;
 }) {
   const isEdit = !!editJob;
@@ -72,17 +72,16 @@ export function NewJobView({
     if (!tpl) return;
     const personLabel = personLabels[person];
     if (repeat === "once") {
+      // Full weekday name so it maps onto the calendar's day strip.
       const d = onceDate ? new Date(`${onceDate}T00:00:00`) : null;
-      const dateLabel = d ? new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(d) : "Soon";
-      onSubmitUpcoming({
-        id: `job_${Date.now()}`,
-        type: tpl.type,
-        agent: tpl.agent,
+      const dateLabel = d ? new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(d) : "Today";
+      onSubmitOnce({
         title: title || tpl.label,
-        subtitle: `${teamAgentById[tpl.agent].name} · one-time`,
+        person,
         dateLabel,
         timeLabel: fmtTime(onceTime),
-        source: "auri",
+        // Every calendar event is a robot task.
+        forRobot: true,
       });
       return;
     }
