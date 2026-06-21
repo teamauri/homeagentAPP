@@ -1,9 +1,9 @@
 # Killer demo — scheduled autonomous capture (spec)
 
 > **Vision:** Mom schedules a moment in Home Agent → the robot cameraman wakes up
-> at that time, films the family on its own → Auri edits it into a polished vlog →
-> the finished film appears in Home Agent's Memory for her to watch. No manual
-> filming, no manual editing, no manual import.
+> at that time, films the family on its own → Auri produces raw-output video +
+> transcript artifacts → the finished recording appears in Home Agent's Memory
+> for her to watch. No manual filming, no manual editing, no manual import.
 
 ## The three pieces
 
@@ -11,7 +11,7 @@
 |---|---|---|
 | **Home Agent** | `home-agent-app` (this repo) | AI home organizer for mom — schedules the capture, and is where the finished film lands + is viewed. |
 | **DockKit (Talkie)** | `dockkit-demo` (iOS) | The robot cameraman — auto-tracks family members and records. |
-| **Auri Editor** | `auri-editor` (backend) | Video editing service — turns the raw recording into an AI-edited vlog. |
+| **Auri Editor** | `auri-editor` (backend) | Video backend — stores the raw recording and produces low-quality raw-output video + transcript artifacts for this mode. |
 
 ## End-to-end loop
 
@@ -21,27 +21,27 @@
         ▼
 ③ At event time → DockKit auto-starts tracking + recording (no human start)
         ▼
-④ Recording done → DockKit uploads the raw video to Auri Editor
+④ Recording done → DockKit uploads the raw video chunks to Auri Editor
         ▼
-⑤ Auri Editor renders the vlog → Home Agent backend fetches + stores it
+⑤ Home Agent sync route checks Auri raw-output → downloads video + transcripts
         ▼
 ⑥ Mom watches the finished film in Home Agent's Memory/Journey timeline
 ```
 
 | Step | Owner | Status |
 |---|---|---|
-| ① create capture task | Home Agent | ⚠️ calendar events/objects exist; a robot-consumable **capture task** + display is partial / in progress |
-| ② DockKit fetches schedule | Home Agent exposes API · DockKit consumes | ⚠️ Home Agent now exposes `GET /api/calendar?robot=true`; DockKit polling/auth/status linkage still not wired |
-| ③ auto-start at event time | DockKit (iOS) | ❌ DockKit-side (out of this repo) |
-| ④ upload raw video → Auri | DockKit · Auri | ✅ robot's existing capture→compose→vlog flow |
-| ⑤ Auri → Home Agent ingest + store | Auri · Home Agent | ✅ `POST /api/ingest/auri-media` (multipart video + highlight images) → stored → Memory. See `DOCKIT_MEMORY_INTEGRATION.md` |
+| ① create capture task | Home Agent | ✅ created calendar events can be marked `forRobot` and receive an `auriClientVideoUuid`. |
+| ② DockKit fetches schedule | Home Agent exposes API · DockKit consumes | ✅ Home Agent exposes `GET /api/calendar?robot=true`; DockKit polls it through `HomeAgentRobotClient`. |
+| ③ auto-start at event time | DockKit (iOS) | ✅ DockKit maps due HomeAgent tasks into the #309 reminder UI and starts Story Tracking Raw Recording Mode after countdown. |
+| ④ upload raw video → Auri | DockKit · Auri | ✅ DockKit uploads live chunks for the raw recording and reports canonical `auriVideoId` to Home Agent. |
+| ⑤ Auri → Home Agent ingest + store | Auri · Home Agent | ✅ the task-scoped `POST /api/robot/capture-tasks/{taskId}/raw-output/sync` route fetches raw-output video plus transcripts by `auriVideoId`, stores artifacts, and links Memory to the task. |
 | ⑥ view in Home Agent | Home Agent | ✅ merges into the Journey timeline + `/memory/[id]` player |
 
-So the **back half (④⑤⑥) works today**; the **front half (①②③) now has a
-Home Agent schedule-read API, but DockKit polling, auto-triggering, auth, and
-task→Memory linkage remain.** (Auri Cut — mom picks a phone video to auto-edit — already
-proves the Home Agent ↔ Auri Editor integration end to end; see
-`MEMORY_AUTO_EDIT_DESIGN.md`.)
+The core contract is now wired for the Raw + Transcript demo path. The current
+implementation keeps polling coordination in the Home Agent browser UI: it finds
+pending robot events and calls the idempotent task-scoped sync route. A separate
+batch poll API is only needed later if polling coordination moves to cron or a
+server-owned scheduler.
 
 ## The missing link (front half)
 
@@ -49,13 +49,15 @@ proves the Home Agent ↔ Auri Editor integration end to end; see
 - Model a **capture task**: currently a created calendar event with `forRobot:
   true`, time, subject, and optional media hints.
 - Expose a **robot-readable API**: `GET /api/calendar?robot=true` returns created
-  robot capture events from the demo store. Still missing: auth, explicit status
-  report/update API, and task→Memory linkage after the finished film lands.
+  robot capture events from the demo store.
+- Accept robot status updates through `POST /api/robot/capture-tasks/{taskId}/status`.
+- Expose `POST /api/robot/capture-tasks/{taskId}/raw-output/sync` for one
+  idempotent Auri raw-output status/download attempt. The browser candidate loop
+  calls this route for pending robot events.
 
 **DockKit side (`dockkit-demo`, out of this repo):**
 - Poll/fetch the schedule from Home Agent; at event time auto-start tracking;
-  after upload+edit, ingest the result back to Home Agent (existing path),
-  tagged with the task id so Home Agent can link film → task.
+  after upload, report the canonical `auriVideoId` back to Home Agent.
 
 ## Open design questions
 - Pull vs push: does DockKit **poll** Home Agent for tasks, or does Home Agent
@@ -77,7 +79,8 @@ DockKit reports the canonical `auriVideoId` to Home Agent through:
 POST /api/robot/capture-tasks/{taskId}/status
 ```
 
-Home Agent then polls/downloads by `video_id` with:
+When the task-scoped sync route runs, Home Agent polls/downloads by `video_id`
+with:
 
 - `GET /v1/videos/{video_id}/raw-output`
 - `HEAD /v1/videos/{video_id}/raw-output/video/download`
@@ -88,6 +91,15 @@ Home Agent then polls/downloads by `video_id` with:
 When the raw output is ready, Home Agent stores the video and transcripts,
 creates a Memory, links it back to the capture task, and the chat renders the
 recorded video from the completed robot event.
+
+For Raw + Transcript mode, HomeAgent does not create raw-output jobs. In the
+current implementation, the browser UI owns candidate selection and calls the
+task-scoped sync route; the server route owns Auri artifact download, media
+storage, Memory creation, and task updates.
+
+A future `/api/robot/raw-output/poll` route can move candidate scanning out of
+`RobotEventContext` for cron/server-driven polling. If added, it should reuse
+the same one-task sync helper rather than duplicating ingestion logic.
 
 ## Boundaries / coordination
 - This is a 3-repo feature. **Home Agent only owns ①(model)②(the fetch/report

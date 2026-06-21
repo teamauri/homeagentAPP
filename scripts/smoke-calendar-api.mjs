@@ -116,6 +116,7 @@ async function postJsonWithParams(route, url, body, params) {
 prepareNextServerChunks();
 
 const calendarRoute = routeUserland("api/calendar");
+const memoryRoute = routeUserland("api/memory");
 const smokeId = `smoke_calendar_${Date.now()}`;
 
 const seedResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?source=seed"));
@@ -152,6 +153,7 @@ const robotTask = robotPayload.items.find((item) => item.id === createPayload.ev
 assert(robotTask?.auriClientVideoUuid === createPayload.event.auriClientVideoUuid, "calendar: robot read should expose the Auri client video UUID", robotTask);
 
 const robotStatusRoute = routeUserland("api/robot/capture-tasks/[taskId]/status");
+const rawOutputSyncRoute = routeUserland("api/robot/capture-tasks/[taskId]/raw-output/sync");
 const robotStatusResponse = await postJsonWithParams(
   robotStatusRoute,
   `http://localhost/api/robot/capture-tasks/${encodeURIComponent(createPayload.event.id)}/status`,
@@ -178,8 +180,41 @@ const afterStatusPayload = await jsonFromResponse(afterStatusResponse);
 const updatedRobotTask = afterStatusPayload.items.find((item) => item.id === createPayload.event.id);
 assert(updatedRobotTask?.robot?.auriVideoId === "video-smoke-from-auri", "calendar: expected robot linkage to persist", updatedRobotTask);
 
+const missingRawOutputResponse = await postJson(calendarRoute, "http://localhost/api/calendar", {
+  id: `${smokeId}_missing_raw_output`,
+  title: "Robot raw output pending",
+  note: "Auri raw output job may not be visible on the first sync attempt",
+  person: "mia",
+  dateLabel: "Tomorrow",
+  timeLabel: "4:00 PM",
+  forRobot: true,
+});
+const missingRawOutputPayload = await jsonFromResponse(missingRawOutputResponse);
+assert(missingRawOutputResponse.status === 201, "calendar: expected second robot event create 201", {
+  status: missingRawOutputResponse.status,
+  payload: missingRawOutputPayload,
+});
+
+const missingRawOutputStatusResponse = await postJsonWithParams(
+  robotStatusRoute,
+  `http://localhost/api/robot/capture-tasks/${encodeURIComponent(missingRawOutputPayload.event.id)}/status`,
+  {
+    status: "uploading",
+    robotId: "dockkit_living_room",
+    auriVideoId: "video-raw-job-missing",
+    auriClientVideoUuid: missingRawOutputPayload.event.auriClientVideoUuid,
+    recordingMode: "story_tracking_raw_transcript",
+    startedAt: "2026-06-21T10:05:00Z",
+  },
+  { taskId: missingRawOutputPayload.event.id }
+);
+const missingRawOutputStatusPayload = await jsonFromResponse(missingRawOutputStatusResponse);
+assert(missingRawOutputStatusResponse.status === 200, "robot status: expected second status 200", {
+  status: missingRawOutputStatusResponse.status,
+  payload: missingRawOutputStatusPayload,
+});
+
 await withFakeAuriServer(async () => {
-  const rawOutputSyncRoute = routeUserland("api/robot/capture-tasks/[taskId]/raw-output/sync");
   const rawOutputSyncResponse = await postJsonWithParams(
     rawOutputSyncRoute,
     `http://localhost/api/robot/capture-tasks/${encodeURIComponent(createPayload.event.id)}/raw-output/sync`,
@@ -187,14 +222,60 @@ await withFakeAuriServer(async () => {
     { taskId: createPayload.event.id }
   );
   const rawOutputSyncPayload = await jsonFromResponse(rawOutputSyncResponse);
-  assert(rawOutputSyncResponse.status === 200, "raw output sync: expected 200", { status: rawOutputSyncResponse.status, payload: rawOutputSyncPayload });
-  assert(rawOutputSyncPayload.event?.robot?.rawOutputStatus === "ready", "raw output sync: expected ready state", rawOutputSyncPayload.event);
-  assert(rawOutputSyncPayload.event?.robot?.rawOutputVideoUrl, "raw output sync: expected stored video URL", rawOutputSyncPayload.event);
-  assert(rawOutputSyncPayload.event?.robot?.transcriptJsonUrl, "raw output sync: expected JSON transcript URL", rawOutputSyncPayload.event);
-  assert(rawOutputSyncPayload.event?.robot?.transcriptTxtUrl, "raw output sync: expected text transcript URL", rawOutputSyncPayload.event);
-  assert(rawOutputSyncPayload.memory?.id, "raw output sync: expected memory", rawOutputSyncPayload);
-  assert(rawOutputSyncPayload.media?.some((item) => item.mediaType === "video"), "raw output sync: expected video media", rawOutputSyncPayload.media);
+  assert(rawOutputSyncResponse.status === 200, "raw output sync: expected 200", {
+    status: rawOutputSyncResponse.status,
+    payload: rawOutputSyncPayload,
+  });
+  assert(rawOutputSyncPayload.outcome === "ready", "raw output sync: expected ready outcome", rawOutputSyncPayload);
+  assert(rawOutputSyncPayload.event?.robot?.rawOutputMemoryId, "raw output sync: expected memory id in sync result", rawOutputSyncPayload.event);
+
+  const missingRawOutputSyncResponse = await postJsonWithParams(
+    rawOutputSyncRoute,
+    `http://localhost/api/robot/capture-tasks/${encodeURIComponent(missingRawOutputPayload.event.id)}/raw-output/sync`,
+    {},
+    { taskId: missingRawOutputPayload.event.id }
+  );
+  const missingRawOutputSyncPayload = await jsonFromResponse(missingRawOutputSyncResponse);
+  assert(missingRawOutputSyncResponse.status === 202, "raw output sync: expected missing raw-output job to remain pending", {
+    status: missingRawOutputSyncResponse.status,
+    payload: missingRawOutputSyncPayload,
+  });
+  assert(missingRawOutputSyncPayload.outcome === "pending", "raw output sync: expected pending outcome for missing raw-output job", missingRawOutputSyncPayload);
+
+  const afterSyncResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?robot=true"));
+  const afterSyncPayload = await jsonFromResponse(afterSyncResponse);
+  const syncedRobotTask = afterSyncPayload.items.find((item) => item.id === createPayload.event.id);
+  const missingRawOutputTask = afterSyncPayload.items.find((item) => item.id === missingRawOutputPayload.event.id);
+  assert(syncedRobotTask?.robot?.rawOutputStatus === "ready", "raw output sync: expected ready state", syncedRobotTask);
+  assert(syncedRobotTask?.robot?.rawOutputMemoryId, "raw output sync: expected memory id on robot task", syncedRobotTask);
+  assert(syncedRobotTask?.robot?.rawOutputVideoUrl, "raw output sync: expected stored video URL", syncedRobotTask);
+  assert(syncedRobotTask?.robot?.transcriptJsonUrl, "raw output sync: expected JSON transcript URL", syncedRobotTask);
+  assert(syncedRobotTask?.robot?.transcriptTxtUrl, "raw output sync: expected text transcript URL", syncedRobotTask);
+  assert(missingRawOutputTask?.robot?.rawOutputStatus === "pending", "raw output sync: expected missing raw-output job to stay pending", missingRawOutputTask);
+  assert(missingRawOutputTask?.status !== "failed", "raw output sync: missing raw-output job should not fail the capture task", missingRawOutputTask);
+
+  const memoryResponse = await memoryRoute.GET(new Request("http://localhost/api/memory"));
+  const memoryPayload = await jsonFromResponse(memoryResponse);
+  assert(memoryResponse.status === 200, "memory: expected 200 after raw output sync", { status: memoryResponse.status, payload: memoryPayload });
+  assert(
+    memoryPayload.items.some((item) => item.id === syncedRobotTask.robot.rawOutputMemoryId),
+    "memory: expected raw output memory to be listed",
+    memoryPayload.items
+  );
+  assert(
+    memoryPayload.media.some((item) => item.mediaType === "video" && item.metadata?.captureTaskId === createPayload.event.id),
+    "memory: expected raw output video media to be listed",
+    memoryPayload.media
+  );
 });
+
+const deleteSecondResponse = await calendarRoute.DELETE(
+  new Request(`http://localhost/api/calendar?id=${encodeURIComponent(missingRawOutputPayload.event.id)}`, {
+    method: "DELETE",
+  })
+);
+const deleteSecondPayload = await jsonFromResponse(deleteSecondResponse);
+assert(deleteSecondResponse.status === 200, "calendar: expected second delete 200", { status: deleteSecondResponse.status, payload: deleteSecondPayload });
 
 const deleteResponse = await calendarRoute.DELETE(
   new Request(`http://localhost/api/calendar?id=${encodeURIComponent(createPayload.event.id)}`, {
@@ -207,6 +288,7 @@ assert(deleteResponse.status === 200, "calendar: expected delete 200", { status:
 const afterDeleteResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?robot=true"));
 const afterDeletePayload = await jsonFromResponse(afterDeleteResponse);
 assert(!afterDeletePayload.items.some((item) => item.id === createPayload.event.id), "calendar: deleted event should not be listed", afterDeletePayload.items);
+assert(!afterDeletePayload.items.some((item) => item.id === missingRawOutputPayload.event.id), "calendar: deleted second event should not be listed", afterDeletePayload.items);
 
 console.log(
   JSON.stringify(

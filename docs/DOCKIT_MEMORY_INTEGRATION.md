@@ -65,11 +65,27 @@ Enable on device by setting `HOME_AGENT_INGEST_URL` to e.g.
 
 ## Raw + Transcript mode
 
+Story/Vlog Memory delivery still uses `POST /api/ingest/auri-media`.
+
 The Story Tracking `Raw + Transcript` mode is not the existing Story/Vlog ingest
 path. For that mode, Home Agent does not receive a multipart Story upload and
 does not call Auri Story/Vlog APIs. DockKit reports the `auriVideoId` through the
 robot capture-task status callback, then Home Agent downloads existing
 raw-output artifacts from Auri Editor by `video_id`.
+
+DockKit reports the canonical Auri video id to
+`POST /api/robot/capture-tasks/{taskId}/status` with
+`recordingMode=story_tracking_raw_transcript`. The Home Agent UI currently finds
+pending raw-output tasks and calls the idempotent task-scoped sync endpoint:
+
+```http
+POST /api/robot/capture-tasks/{taskId}/raw-output/sync
+```
+
+That server route performs one Auri raw-output status check, downloads
+`/v1/videos/{video_id}/raw-output` artifacts when ready, and creates the Memory
+record. A future batch poll route can move candidate scanning out of the browser
+if cron/server-driven polling is needed.
 
 Home Agent uses only:
 
