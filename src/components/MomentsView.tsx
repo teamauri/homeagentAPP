@@ -144,7 +144,15 @@ export function MomentsView() {
       refresh().catch(() => {});
     } catch (e) {
       setAuriPhase("idle");
-      setError(e instanceof Error ? e.message : "Editing failed — please try again.");
+      // A stale deploy (the app updated while this tab stayed open) makes a
+      // code-split chunk 404. Recover by reloading to the fresh build.
+      const msg = e instanceof Error ? e.message : String(e);
+      if ((e as { name?: string })?.name === "ChunkLoadError" || /Loading chunk \S+ failed|ChunkLoadError/.test(msg)) {
+        setError("The app just updated — refreshing…");
+        setTimeout(() => window.location.reload(), 700);
+        return;
+      }
+      setError(msg || "Editing failed — please try again.");
     }
   }
 
