@@ -142,6 +142,11 @@ export interface RawOutputStatusResponse {
   error?: unknown;
 }
 
+export interface AuriDownloadHeadResponse {
+  contentType?: string;
+  contentLength?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -264,20 +269,29 @@ export class AuriClient {
 
   // --- Raw + Transcript output --------------------------------------------
 
-  /** POST /v1/videos/{id}/raw-output — idempotently creates or adopts the raw-output job. */
-  async createRawOutput(videoId: string): Promise<RawOutputStatusResponse> {
-    const data = await this.requestJSON<RawRawOutput>(
-      "POST",
-      this.v1(`/videos/${videoId}/raw-output`),
-      {},
-      `raw-output-${videoId}`,
-    );
-    return mapRawOutput(data, videoId);
-  }
-
   /** GET /v1/videos/{id}/raw-output */
   async fetchRawOutputStatus(videoId: string): Promise<RawOutputStatusResponse> {
     return mapRawOutput(await this.requestJSON<RawRawOutput>("GET", this.v1(`/videos/${videoId}/raw-output`)), videoId);
+  }
+
+  private async headDownload(fullUrl: string): Promise<AuriDownloadHeadResponse> {
+    const res = await fetch(fullUrl, { method: "HEAD", headers: this.baseHeaders() });
+    if (!res.ok) throw this.toError(res.status, "");
+    const length = Number(res.headers.get("content-length") || "");
+    return {
+      contentType: res.headers.get("content-type") || undefined,
+      contentLength: Number.isFinite(length) ? length : undefined,
+    };
+  }
+
+  /** HEAD /v1/videos/{id}/raw-output/video/download */
+  async headRawOutputVideo(videoId: string): Promise<AuriDownloadHeadResponse> {
+    return this.headDownload(this.v1(`/videos/${videoId}/raw-output/video/download`));
+  }
+
+  /** HEAD /v1/videos/{id}/raw-output/transcript/download?format=json|txt */
+  async headRawOutputTranscript(videoId: string, format: RawOutputTranscriptFormat): Promise<AuriDownloadHeadResponse> {
+    return this.headDownload(this.v1(`/videos/${videoId}/raw-output/transcript/download`, { format }));
   }
 
   /** GET /v1/videos/{id}/raw-output/video/download → source mp4 bytes */

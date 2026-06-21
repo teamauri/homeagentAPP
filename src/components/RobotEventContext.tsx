@@ -16,6 +16,9 @@ export interface RobotEventResult {
   videoUrl: string;
   poster?: string;
   duration: string;
+  memoryUrl?: string;
+  transcriptJsonUrl?: string;
+  transcriptTxtUrl?: string;
 }
 
 export interface RobotEvent {
@@ -35,6 +38,7 @@ export interface RobotEvent {
   status: RobotEventStatus;
   completedAtLabel?: string;
   result?: RobotEventResult;
+  robot?: CalendarApiEvent["robot"];
   // Highlight jobs capture real moments across a window. While "recording" the
   // counters climb from actual run state (see startHighlight); on "done" the
   // edited set lands as the keepsake.
@@ -88,7 +92,14 @@ function statusFromApi(status: CalendarApiEvent["status"]): RobotEventStatus {
   return "scheduled";
 }
 
+function labelFromIso(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return nowLabel();
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(date);
+}
+
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
+  const rawVideoUrl = event.robot?.rawOutputVideoUrl;
   return {
     id: event.id,
     title: event.title,
@@ -101,7 +112,18 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     photoUrl: event.photoUrl,
     voiceUrl: event.voiceUrl,
     voiceDuration: event.voiceDuration,
-    status: statusFromApi(event.status),
+    robot: event.robot,
+    status: rawVideoUrl ? "done" : statusFromApi(event.status),
+    completedAtLabel: event.robot?.rawOutputReadyAt ? labelFromIso(event.robot.rawOutputReadyAt) : undefined,
+    result: rawVideoUrl
+      ? {
+          videoUrl: rawVideoUrl,
+          duration: "Recorded",
+          memoryUrl: event.robot?.rawOutputMemoryId ? `/memory/${event.robot.rawOutputMemoryId}` : undefined,
+          transcriptJsonUrl: event.robot?.transcriptJsonUrl,
+          transcriptTxtUrl: event.robot?.transcriptTxtUrl,
+        }
+      : undefined,
   };
 }
 
@@ -143,6 +165,19 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const completedCount = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const syncingTasks = useRef<Set<string>>(new Set());
+
+  const refreshCreatedEvents = useCallback(() => {
+    return fetch("/api/calendar?source=created")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { items?: CalendarApiEvent[] } | null) => {
+        if (!Array.isArray(payload?.items)) return;
+        const apiEvents = payload.items.map(eventFromApi);
+        setEvents((current) => mergeEvents(current, apiEvents));
+        completedCount.current = apiEvents.filter((event) => event.status === "done").length;
+      })
+      .catch(() => undefined);
+  }, []);
 
   // Hydrate created events from localStorage so they survive reloads and the
   // full-page navigation to /calendar (which is a separate route).
@@ -163,20 +198,10 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
     for (const event of localEvents) persistEventToCalendarApi(event);
 
-    fetch("/api/calendar?source=created")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload: { items?: CalendarApiEvent[] } | null) => {
-        if (!Array.isArray(payload?.items)) return;
-        const apiEvents = payload.items.map(eventFromApi);
-        setEvents((current) => mergeEvents(current, apiEvents));
-        completedCount.current = apiEvents.filter((event) => event.status === "done").length;
-      })
-      .catch(() => {
-        // The localStorage copy remains the fallback source of truth.
-      });
+    void refreshCreatedEvents();
 
     setReady(true);
-  }, []);
+  }, [refreshCreatedEvents]);
 
   // Persist after hydration (the `ready` gate avoids clobbering storage with the
   // initial empty array before the load effect has run).
@@ -188,6 +213,37 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       // ignore quota / serialization failures
     }
   }, [events, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const interval = setInterval(() => {
+      void refreshCreatedEvents();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [ready, refreshCreatedEvents]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const candidates = events.filter(
+      (event) =>
+        event.forRobot &&
+        event.robot?.auriVideoId &&
+        event.robot?.recordingMode === "story_tracking_raw_transcript" &&
+        (event.robot.rawOutputStatus === "pending" || event.robot.rawOutputStatus === "processing") &&
+        !event.robot.rawOutputVideoUrl &&
+        !syncingTasks.current.has(event.id)
+    );
+
+    for (const event of candidates) {
+      syncingTasks.current.add(event.id);
+      fetch(`/api/robot/capture-tasks/${encodeURIComponent(event.id)}/raw-output/sync`, { method: "POST" })
+        .then(() => refreshCreatedEvents())
+        .catch(() => undefined)
+        .finally(() => {
+          syncingTasks.current.delete(event.id);
+        });
+    }
+  }, [events, ready, refreshCreatedEvents]);
 
   // Clear any pending demo transitions if the app unmounts.
   useEffect(() => {
