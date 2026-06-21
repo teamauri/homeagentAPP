@@ -1,4 +1,5 @@
 import { CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
+import { CalendarApiEvent, CalendarEventInput, deriveCalendarEventIcon } from "@/lib/calendar-api";
 import { moments } from "@/lib/mock-data";
 import { PersonId, SourceType, Status } from "@/lib/types";
 import { persistStore, registerStore } from "./persistence";
@@ -62,18 +63,22 @@ const globalStore = globalThis as typeof globalThis & {
   __auriDemoObjects?: StoredObject[];
   __auriDemoMedia?: DemoMediaItem[];
   __auriDemoMemory?: DemoMemoryItem[];
+  __auriDemoCalendarEvents?: CalendarApiEvent[];
   __auriDemoCounter?: number;
   __auriDemoMediaCounter?: number;
   __auriDemoMemoryCounter?: number;
+  __auriDemoCalendarCounter?: number;
 };
 
 function store() {
   globalStore.__auriDemoObjects ??= [];
   globalStore.__auriDemoMedia ??= [];
   globalStore.__auriDemoMemory ??= [];
+  globalStore.__auriDemoCalendarEvents ??= [];
   globalStore.__auriDemoCounter ??= 0;
   globalStore.__auriDemoMediaCounter ??= 0;
   globalStore.__auriDemoMemoryCounter ??= 0;
+  globalStore.__auriDemoCalendarCounter ??= 0;
   return globalStore;
 }
 
@@ -85,9 +90,11 @@ registerStore({
       objects: current.__auriDemoObjects,
       media: current.__auriDemoMedia,
       memory: current.__auriDemoMemory,
+      calendarEvents: current.__auriDemoCalendarEvents,
       counter: current.__auriDemoCounter,
       mediaCounter: current.__auriDemoMediaCounter,
       memoryCounter: current.__auriDemoMemoryCounter,
+      calendarCounter: current.__auriDemoCalendarCounter,
     };
   },
   restore: (data) => {
@@ -95,9 +102,11 @@ registerStore({
     if (Array.isArray(data.objects)) current.__auriDemoObjects = data.objects as StoredObject[];
     if (Array.isArray(data.media)) current.__auriDemoMedia = data.media as DemoMediaItem[];
     if (Array.isArray(data.memory)) current.__auriDemoMemory = data.memory as DemoMemoryItem[];
+    if (Array.isArray(data.calendarEvents)) current.__auriDemoCalendarEvents = data.calendarEvents as CalendarApiEvent[];
     if (typeof data.counter === "number") current.__auriDemoCounter = data.counter;
     if (typeof data.mediaCounter === "number") current.__auriDemoMediaCounter = data.mediaCounter;
     if (typeof data.memoryCounter === "number") current.__auriDemoMemoryCounter = data.memoryCounter;
+    if (typeof data.calendarCounter === "number") current.__auriDemoCalendarCounter = data.calendarCounter;
   },
 });
 
@@ -112,9 +121,11 @@ export function resetDemoStore() {
   current.__auriDemoObjects = [];
   current.__auriDemoMedia = [];
   current.__auriDemoMemory = [];
+  current.__auriDemoCalendarEvents = [];
   current.__auriDemoCounter = 0;
   current.__auriDemoMediaCounter = 0;
   current.__auriDemoMemoryCounter = 0;
+  current.__auriDemoCalendarCounter = 0;
 }
 
 function statusFor(type: ObjectToCreate["type"]): CreatedLocalObject["status"] {
@@ -162,6 +173,54 @@ export function applyDemoObjectAction(id: string, action: DemoObjectAction) {
     updatedAt: new Date().toISOString(),
   };
   return object;
+}
+
+function nextCalendarId(inputId?: string) {
+  if (inputId) return inputId;
+  const currentStore = store();
+  currentStore.__auriDemoCalendarCounter = (currentStore.__auriDemoCalendarCounter ?? 0) + 1;
+  return `revent_${Date.now()}_${currentStore.__auriDemoCalendarCounter}`;
+}
+
+export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiEvent {
+  const currentStore = store();
+  const now = new Date().toISOString();
+  const existing = input.id ? currentStore.__auriDemoCalendarEvents?.find((event) => event.id === input.id) : undefined;
+  const event: CalendarApiEvent = {
+    ...existing,
+    id: nextCalendarId(input.id),
+    title: input.title,
+    note: input.note,
+    body: input.body ?? input.note,
+    person: input.person,
+    dateLabel: input.dateLabel,
+    timeLabel: input.timeLabel,
+    icon: existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
+    source: "created",
+    forRobot: Boolean(input.forRobot),
+    photoUrl: input.photoUrl,
+    voiceUrl: input.voiceUrl,
+    voiceDuration: input.voiceDuration,
+    status: existing?.status ?? "scheduled",
+    statusLabel: existing?.statusLabel ?? "Scheduled",
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  currentStore.__auriDemoCalendarEvents = (currentStore.__auriDemoCalendarEvents ?? []).filter((current) => current.id !== event.id);
+  currentStore.__auriDemoCalendarEvents.push(event);
+  return event;
+}
+
+export function listDemoCalendarEvents() {
+  return [...(store().__auriDemoCalendarEvents ?? [])];
+}
+
+export function removeDemoCalendarEvent(id: string) {
+  const currentStore = store();
+  const before = currentStore.__auriDemoCalendarEvents?.length ?? 0;
+  currentStore.__auriDemoCalendarEvents = (currentStore.__auriDemoCalendarEvents ?? []).filter((event) => event.id !== id);
+  return (currentStore.__auriDemoCalendarEvents?.length ?? 0) !== before;
 }
 
 function nextId(prefix: string, key: "__auriDemoMediaCounter" | "__auriDemoMemoryCounter") {

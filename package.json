@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "smoke:calendar": "node scripts/smoke-calendar-api.mjs",
     "smoke:mvp": "node scripts/smoke-mvp.mjs",
     "start": "next start"
   },
