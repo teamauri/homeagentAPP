@@ -26,18 +26,18 @@ declare global {
 
 const tabs: { key: TabKey; label: string; icon: string }[] = [
   { key: "chat", label: "Chat", icon: "family" },
-  { key: "today", label: "Inbox", icon: "bell" },
+  { key: "today", label: "Jobs", icon: "bell" },
   { key: "memory", label: "Journey", icon: "photos" },
 ];
 
 const titles: Record<TabKey, string> = {
-  today: "Inbox",
+  today: "Jobs",
   chat: "Jane’s Family",
   memory: "Journey",
 };
 
 const subtitles: Record<TabKey, string> = {
-  today: "Here’s what needs you today.",
+  today: "What Auri’s set to do for you.",
   chat: "Mom, Dad · Iris, Lumi, Vita",
   memory: "Watch your family grow, together.",
 };
@@ -47,17 +47,19 @@ export function AppShell({
   activeTab,
   onTabChange,
   onComposerSubmit,
+  hideHeader = false,
 }: {
   children: ReactNode;
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   onComposerSubmit?: (message: string, imageUrl?: string) => Promise<void> | void;
+  hideHeader?: boolean;
 }) {
   return (
     <main className="min-h-[100dvh] bg-paper md:grid md:min-h-screen md:place-items-center md:bg-[#f5f1eb] md:px-10 md:py-8">
       <div className="mx-auto w-full overflow-hidden bg-paper md:max-w-[430px]">
         <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-paper md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
-          <ShellHeader activeTab={activeTab} />
+          {hideHeader ? <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]" /> : <ShellHeader activeTab={activeTab} />}
           <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[26px] pb-3 pt-2">{children}</div>
           <ShellBottom activeTab={activeTab} onTabChange={onTabChange} onComposerSubmit={onComposerSubmit} />
         </div>

@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { upcoming } from "@/lib/mock-data";
-import type { CalendarEvent, PersonId } from "@/lib/types";
+import type { PersonId } from "@/lib/types";
+import { useRobotEvents } from "@/components/RobotEventContext";
+
+// A calendar block — either a mock upcoming event or one the family created
+// (which may or may not be handed to the robot).
+type Block = { id: string; title: string; person: PersonId; timeLabel: string; robot: boolean };
 
 // A Google-Calendar-style day view. This screen stands in for the user's real
 // Google Calendar, so it deliberately mimics GCal: a week date strip, an hourly
@@ -19,12 +24,18 @@ const WEEK: { key: string; dow: string; date: number; today?: boolean }[] = [
   { key: "thu", dow: "THU", date: 25 },
 ];
 
-// Which day each upcoming event lands on (dateLabel → strip key).
+// Which day each event lands on (dateLabel → strip key). "Today" is Friday the
+// 19th in this demo week.
 const DAY_OF: Record<string, string> = {
+  Today: "fri",
   Friday: "fri",
   Tomorrow: "sat",
   Saturday: "sat",
   Sunday: "sun",
+  Monday: "mon",
+  Tuesday: "tue",
+  Wednesday: "wed",
+  Thursday: "thu",
 };
 
 // Google event colors, keyed by whose calendar the event belongs to.
@@ -69,16 +80,24 @@ function hourLabel(h: number): string {
 
 export default function CalendarPage() {
   const [selected, setSelected] = useState("fri");
+  const { events } = useRobotEvents();
 
   const byDay = useMemo(() => {
-    const map: Record<string, CalendarEvent[]> = {};
+    const map: Record<string, Block[]> = {};
+    const push = (b: Block, dateLabel: string) => {
+      const day = DAY_OF[dateLabel];
+      if (!day) return;
+      (map[day] ??= []).push(b);
+    };
     for (const e of upcoming) {
-      const day = DAY_OF[e.dateLabel];
-      if (!day) continue;
-      (map[day] ??= []).push(e);
+      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: false }, e.dateLabel);
+    }
+    // Events the family created — robot or not — show alongside the rest.
+    for (const e of events) {
+      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: e.forRobot }, e.dateLabel);
     }
     return map;
-  }, []);
+  }, [events]);
 
   // Lay out the day's events, splitting overlapping ones into side-by-side
   // columns the way Google Calendar does.
@@ -204,7 +223,15 @@ export default function CalendarPage() {
                     className="absolute z-20 overflow-hidden rounded-[6px] px-2.5 py-1.5 text-left text-white shadow-sm"
                     style={{ top, left, width, height: ROW_H - 6, backgroundColor: color }}
                   >
-                    <div className="truncate text-[13px] font-medium leading-4">{e.title}</div>
+                    <div className="flex items-center gap-1">
+                      {e.robot ? (
+                        <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Auri Robot">
+                          <rect x="5" y="8" width="14" height="10" rx="2" />
+                          <path d="M12 8V5M9 13h.01M15 13h.01M2 12v2M22 12v2" />
+                        </svg>
+                      ) : null}
+                      <span className="truncate text-[13px] font-medium leading-4">{e.title}</span>
+                    </div>
                     <div className="truncate text-[11px] leading-4 text-white/85">
                       {e.timeLabel} · {PERSON_LABEL[e.person]}
                     </div>

@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { AppShell, TabKey } from "@/components/AppShell";
-import { TodayView } from "@/components/TodayView";
+import { JobsView } from "@/components/JobsView";
 import { ChatView, LiveChatTurn } from "@/components/ChatView";
 import { MomentsView } from "@/components/MomentsView";
 import { ChatApiResponse, TeamMemberId } from "@/lib/chat-server/types";
 import { teamAgentById } from "@/lib/team";
 import { FamilyProvider } from "@/components/FamilyContext";
+import { enrichCards } from "@/lib/chat-draft";
 
 function nowLabel() {
   return new Intl.DateTimeFormat("en-US", {
@@ -24,6 +25,7 @@ function displayHelperName(name: string) {
 export default function Home() {
   const [tab, setTab] = useState<TabKey>("chat");
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
+  const [jobsSubpage, setJobsSubpage] = useState(false);
 
   const sendComposerMessage = async (message: string, imageUrl?: string) => {
     setTab("chat");
@@ -80,7 +82,7 @@ export default function Home() {
                 time: nowLabel(),
                 avatar: payload.handledByTeamMemberId,
                 text: payload.reply,
-                cards: payload.cards,
+                cards: enrichCards(payload.cards, payload.objectsToCreate, payload.createdLocalObjects, 0),
               }
             : turn
         );
@@ -94,7 +96,7 @@ export default function Home() {
             time: nowLabel(),
             avatar: helper.teamMemberId,
             text: helper.reply,
-            cards: helper.cards,
+            cards: enrichCards(helper.cards, helper.objectsToCreate, payload.createdLocalObjects, payload.objectsToCreate?.length ?? 0),
           };
           const idx = next.findIndex((turn) => turn.id === auriId);
           return [...next.slice(0, idx + 1), helperTurn, ...next.slice(idx + 1)];
@@ -120,7 +122,7 @@ export default function Home() {
 
   return (
     <FamilyProvider>
-      <AppShell activeTab={tab} onTabChange={setTab} onComposerSubmit={sendComposerMessage}>
+      <AppShell activeTab={tab} onTabChange={setTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage}>
         {/*
           Keep every tab mounted and just toggle visibility. Conditional rendering
           (`tab === x && <View/>`) unmounts the inactive views, which made Memory
@@ -128,7 +130,7 @@ export default function Home() {
           Hiding with `hidden` preserves each view's state between tab switches.
         */}
         <div className={tab === "today" ? "" : "hidden"}>
-          <TodayView />
+          <JobsView onRunActivity={() => setTab("chat")} onSubpageChange={setJobsSubpage} />
         </div>
         <div className={tab === "chat" ? "" : "hidden"}>
           <ChatView liveTurns={liveTurns} />

@@ -51,6 +51,20 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     },
   },
   {
+    id: "morning-routine",
+    kind: "job",
+    icon: "backpack",
+    typeLabel: "Routine",
+    title: "Leaving for school",
+    metadata: ["Leo", "weekday mornings"],
+    subtasks: [
+      { label: "Water bottle in bag", state: "done", timeLabel: "7:31" },
+      { label: "Fruit packed", state: "active", timeLabel: "now" },
+      { label: "Shoes on", state: "todo" },
+      { label: "Coat", state: "todo" },
+    ],
+  },
+  {
     id: "reading-moment",
     kind: "memory",
     icon: "book",
@@ -129,6 +143,15 @@ export const chatFixtureMessages: ChatMessage[] = [
     timeLabel: "8:10 PM",
     text: "Mia and I read Goodnight Moon — she asked where the mouse went 🐭",
     cards: [cardById["reading-moment"]],
+  },
+  {
+    id: "vita-routine",
+    role: "helper",
+    sender: "Vita",
+    avatar: "vita",
+    timeLabel: "7:33 AM",
+    text: "On it — walking Leo through the morning routine.",
+    cards: [cardById["morning-routine"]],
   },
 ];
 

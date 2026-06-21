@@ -9,6 +9,7 @@ export type ChatCardKind =
   | "lesson_recap"
   | "memory"
   | "story_draft"
+  | "job"
   | "text";
 
 export type ChatMessageRole = "user" | "helper" | "system";
@@ -16,6 +17,15 @@ export type ChatMessageRole = "user" | "helper" | "system";
 export interface ChatCardAction {
   label: string;
   intent: "review" | "edit" | "open" | "save" | "send" | "view" | "log";
+}
+
+// A session reports its progress in place on the card: done steps collapse to a
+// ticked line, the current step is highlighted, the rest wait. The card never
+// balloons, and no new chat message is sent until the session delivers.
+export interface Subtask {
+  label: string;
+  state: "done" | "active" | "todo";
+  timeLabel?: string;
 }
 
 interface ChatCardBase {
@@ -27,6 +37,10 @@ interface ChatCardBase {
   body?: string;
   metadata: string[];
   action?: ChatCardAction;
+  // Optional live progress (routine steps, capture counters, …). When present,
+  // the card renders a checklist that updates in place instead of a flat card.
+  subtasks?: Subtask[];
+  progressLabel?: string;
 }
 
 export interface CalendarDraftChatCard extends ChatCardBase {
@@ -92,6 +106,12 @@ export interface TextChatCard extends ChatCardBase {
   };
 }
 
+// A job in progress — any session running its steps. The progress lives on the
+// base (subtasks / progressLabel); the kind just marks it as a live job card.
+export interface JobChatCard extends ChatCardBase {
+  kind: "job";
+}
+
 export type ChatCard =
   | CalendarDraftChatCard
   | ReminderChatCard
@@ -99,6 +119,7 @@ export type ChatCard =
   | LessonRecapChatCard
   | MemoryChatCard
   | StoryDraftChatCard
+  | JobChatCard
   | TextChatCard;
 
 export interface ChatMessage {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { Viewport } from "next";
 import "./globals.css";
+import { RobotEventProvider } from "@/components/RobotEventContext";
 
 export const metadata: Metadata = {
   title: "Auri Family OS",
@@ -16,7 +17,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <RobotEventProvider>{children}</RobotEventProvider>
+      </body>
     </html>
   );
 }

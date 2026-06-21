@@ -1,8 +1,8 @@
 // AI teammates — aligned with the AURI product site.
 // Iris (the eye), Lumi (the companion), Vita (the keeper) live in the family group.
-// Nova (the coach) and Sera (the calm) work with you privately, outside the group.
+// Nova (the coach) works with you privately, outside the group.
 // Auri is the device itself / the router that brings in the right teammate.
-export type TeamAgentId = "iris" | "lumi" | "vita" | "nova" | "sera" | "auri";
+export type TeamAgentId = "iris" | "lumi" | "vita" | "nova" | "auri";
 
 export type TeamAgentScope = "group" | "private" | "device";
 
@@ -54,16 +54,6 @@ export const teamAgents: TeamAgent[] = [
     role: "The coach — your home workout",
     shortRole: "Your coach",
     icon: "spark",
-    tone: "bg-[#F0EADE]",
-    accent: "text-[#6F6A60]",
-    scope: "private",
-  },
-  {
-    id: "sera",
-    name: "Sera",
-    role: "The calm — a breath on a hard day",
-    shortRole: "The calm",
-    icon: "heart",
     tone: "bg-[#F0EADE]",
     accent: "text-[#6F6A60]",
     scope: "private",

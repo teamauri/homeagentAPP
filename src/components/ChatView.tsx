@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { useRef, useState } from "react";
 import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
@@ -7,6 +8,9 @@ import { useFamilyMember } from "./FamilyContext";
 import { chatFixtureMessages } from "@/lib/chat-fixtures";
 import { ChatMessage } from "@/lib/chat-contracts";
 import { TeamAgentId } from "@/lib/team";
+import { personLabels } from "./calendar-ui";
+import { RobotEvent, useRobotEvents } from "./RobotEventContext";
+import { ChatTurnCard, DraftInfo } from "@/lib/chat-draft";
 
 type ChatTurn = {
   id: string;
@@ -23,7 +27,7 @@ export type LiveChatTurn = {
   time: string;
   avatar: "mom" | "dad" | TeamAgentId;
   text: string;
-  cards?: ApiChatCard[];
+  cards?: ChatTurnCard[];
   pending?: boolean;
   imageUrl?: string;
 };
@@ -36,6 +40,7 @@ const chatThreadIds = [
   "mom-react",
   "vita-checkup",
   "lumi-reading",
+  "vita-routine",
 ];
 
 const turns: ChatTurn[] = chatFixtureMessages
@@ -55,6 +60,10 @@ const avatarStyles = {
 };
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
+  const { completions, events } = useRobotEvents();
+  // Highlight jobs that are mid-capture: Iris shows a live counter card that
+  // climbs as the run catches real clips/photos, then hands off to the keepsake.
+  const runningHighlights = events.filter((event) => event.kind === "highlight" && event.status === "recording");
   return (
     <div className="pb-4">
       <div className="space-y-5">
@@ -64,6 +73,137 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
         {liveTurns.map((turn) => (
           <LiveChatTurnRow key={turn.id} turn={turn} />
         ))}
+        {completions.map((event) => (
+          <RobotCompletionRow key={`done-${event.id}`} event={event} />
+        ))}
+        {runningHighlights.map((event) => (
+          <HighlightProgressRow key={`live-${event.id}`} event={event} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// A highlight job catching moments right now. Counters are bound to the event's
+// live run state — no fixture, no fake timer in the view.
+function HighlightProgressRow({ event }: { event: RobotEvent }) {
+  const progress = event.highlightProgress ?? { clips: 0, photos: 0 };
+  const target = event.highlight ?? { clipTarget: 0, photoTarget: 0 };
+  return (
+    <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
+      <TeamBadge agentId="iris" size="sm" />
+      <div className="min-w-0">
+        <div className="mb-1 flex items-baseline gap-3">
+          <span className="text-[15px] font-semibold leading-5 text-ink">Iris</span>
+          <span className="text-[13px] text-muted">{event.timeLabel}</span>
+        </div>
+        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px] text-ink">Catching the highlights — eyes up.</p>
+        <div className="mt-2 w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
+          <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
+            <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
+              <DoodleIcon name="camera-note" className="h-8 w-8" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] leading-4 text-muted">Highlight</div>
+              <div className="truncate text-[15px] font-semibold leading-5 text-ink">{event.title}</div>
+            </div>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#C0492C]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#C0492C]">
+              <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-[#C0492C]" aria-hidden="true" />
+              capturing
+            </span>
+          </div>
+          <div className="border-t border-line/70 px-3.5 pb-3 pt-2">
+            <CounterRow label="Clips · 30s" done={progress.clips} total={target.clipTarget} />
+            <CounterRow label="Photos" done={progress.photos} total={target.photoTarget} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CounterRow({ label, done, total }: { label: string; done: number; total: number }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <div className="py-1.5">
+      <div className="flex items-center justify-between text-[13px] leading-4">
+        <span className="text-ink/80">{label}</span>
+        <span className="font-semibold text-ink">
+          {done} <span className="font-normal text-muted">/ {total}</span>
+        </span>
+      </div>
+      <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-[#efece6]">
+        <div className="h-full rounded-full bg-[#C0492C] transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// A finished robot event lands in chat as a keepsake: Vita (the family keeper)
+// shares the clip the robot captured, marked as the event's completion.
+function RobotCompletionRow({ event }: { event: RobotEvent }) {
+  const who = personLabels[event.person] ?? event.person;
+  return (
+    <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
+      <TeamBadge agentId="vita" size="sm" />
+      <div className="min-w-0">
+        <div className="mb-1 flex items-baseline gap-3">
+          <span className="text-[15px] font-semibold leading-5 text-ink">Vita</span>
+          <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
+        </div>
+        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px] text-ink">
+          {who} finished “{event.title}.” Saved the moment for you.
+        </p>
+        {event.result ? <VideoResultCard event={event} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function VideoResultCard({ event }: { event: RobotEvent }) {
+  const result = event.result!;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  const play = () => {
+    videoRef.current?.play();
+    setPlaying(true);
+  };
+
+  return (
+    <div className="mt-2 max-w-[98%] overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
+      <div className="relative bg-[#17181b]">
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video
+          ref={videoRef}
+          src={result.videoUrl}
+          poster={result.poster}
+          playsInline
+          controls={playing}
+          onEnded={() => setPlaying(false)}
+          onPause={() => setPlaying(false)}
+          className="block max-h-72 w-full object-cover"
+        />
+        {!playing ? (
+          <button onClick={play} className="absolute inset-0 grid place-items-center" aria-label="Play clip">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/95 text-ink shadow">
+              <svg viewBox="0 0 24 24" className="h-6 w-6 translate-x-[1px]" fill="currentColor" aria-hidden="true">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </span>
+            <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">{result.duration}</span>
+          </button>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-2 px-3.5 py-2.5">
+        <span className="text-mint">
+          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="m8.5 12 2.5 2.5 4.5-5" />
+          </svg>
+        </span>
+        <span className="flex-1 truncate text-[13px] font-semibold text-ink">Event complete · {event.title}</span>
+        <span className="shrink-0 text-[12px] font-medium text-gold">Keep ♡</span>
       </div>
     </div>
   );
@@ -78,7 +218,7 @@ function ChatTurnRow({ turn }: { turn: ChatTurn }) {
           <span className="text-[15px] font-semibold leading-5 text-ink">{turn.sender}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
-        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[15px] leading-[21px] text-ink">{turn.text}</p>
+        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px] text-ink">{turn.text}</p>
         {turn.cards ? (
           <div className="mt-2">
             <ChatCardList cards={turn.cards} />
@@ -129,7 +269,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
           </div>
         ) : null}
         {turn.text ? (
-          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[15px] leading-[21px]", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px]", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
         ) : null}
         {turn.cards?.length ? (
           <div className="mt-2 space-y-2">
@@ -175,7 +315,9 @@ function labelForApiCard(type: ApiChatCard["type"]) {
   return labels[type];
 }
 
-function ApiResponseCard({ card }: { card: ApiChatCard }) {
+function ApiResponseCard({ card }: { card: ChatTurnCard }) {
+  if (card.draft) return <DraftActionCard draft={card.draft} />;
+
   const handleClick = () => {
     if (card.targetRoute) {
       window.location.href = card.targetRoute;
@@ -196,5 +338,68 @@ function ApiResponseCard({ card }: { card: ApiChatCard }) {
       </div>
       {card.cta ? <span className="shrink-0 rounded-full border border-line px-3 py-1.5 text-[13px] font-medium text-ink">{card.cta}</span> : null}
     </button>
+  );
+}
+
+// A reminder / calendar draft the user confirms right in chat. Confirming adds
+// it to the calendar (via the shared event store) and flips the card to a
+// settled state — no navigating away, so the thread stays intact.
+function DraftActionCard({ draft }: { draft: DraftInfo }) {
+  const { addEvent } = useRobotEvents();
+  const [state, setState] = useState<"draft" | "confirmed" | "dismissed">("draft");
+
+  const isReminder = draft.kind === "reminder";
+  const whenLine = [draft.dateLabel, draft.timeLabel, draft.personLabel].filter(Boolean).join(" · ");
+
+  const confirm = () => {
+    addEvent({
+      title: draft.title,
+      note: draft.note,
+      person: draft.person,
+      dateLabel: draft.dateLabel,
+      timeLabel: draft.timeLabel,
+      forRobot: false,
+    });
+    setState("confirmed");
+  };
+
+  if (state === "dismissed") return null;
+  const confirmed = state === "confirmed";
+
+  return (
+    <div className="max-w-[98%] overflow-hidden rounded-[16px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
+      <div className="flex items-start gap-3 px-3.5 pt-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center">
+          <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-8 w-8" />
+        </div>
+        <div className="min-w-0 flex-1 pb-1">
+          <div className="text-[13px] leading-4 text-muted">{isReminder ? "Reminder" : "Calendar event"}</div>
+          <div className="text-[15px] font-semibold leading-5 text-ink">{draft.title}</div>
+          {whenLine ? <div className="mt-0.5 text-[13px] leading-4 text-muted">{whenLine}</div> : null}
+          {draft.note ? <div className="mt-1 line-clamp-2 text-[13px] leading-[17px] text-ink/70">“{draft.note}”</div> : null}
+        </div>
+      </div>
+
+      {confirmed ? (
+        <div className="mt-2 flex items-center justify-between border-t border-line/80 px-4 py-2.5">
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-mint">
+            <svg viewBox="0 0 24 24" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m5 12 4.5 4.5L19 7" />
+            </svg>
+            {isReminder ? "Reminder set" : "Added to your calendar"}
+          </span>
+          <a href="/calendar" className="text-[13px] font-semibold text-ink">View calendar</a>
+        </div>
+      ) : (
+        <div className="mt-2 flex gap-2 border-t border-line/80 px-3 py-2.5">
+          <button onClick={confirm} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
+            {isReminder ? "Add reminder" : "Add to calendar"}
+          </button>
+          <button onClick={() => setState("dismissed")} className="rounded-full border border-line px-4 py-2 text-[14px] font-medium text-muted">
+            Dismiss
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
