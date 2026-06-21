@@ -9,7 +9,10 @@ Next.js 14 (App Router). Two paths — pick by how reliable live uploads must be
 | `GEMINI_API_KEY` | Real AI — album vision + chat | Without it everything falls back (UI identical). |
 | `DEEPSEEK_API_KEY` | Chat text routing | Optional; chat tries DeepSeek → Gemini → keyword fallback. |
 | `GEMINI_MODEL` | — | Optional, default `gemini-2.5-flash`. |
-| `BLOB_READ_WRITE_TOKEN` | Robot media on Vercel | Required on Vercel (read-only FS). Auto-set when you create a Vercel Blob store. Locally, media falls back to `public/demo-media`. |
+| `AURI_HOST` | Robot raw-output sync | Default is `https://auriedit.onrender.com`; set explicitly in production. |
+| `AURI_APP_ID` | Auri Editor auth | Default is `homeagent-memory`; use the allowlisted app id for the deployed backend. |
+| `AURI_AUTH_TOKEN` | Auri Editor auth | Optional bearer token if required by the deployed Auri Editor. |
+| `BLOB_READ_WRITE_TOKEN` | Robot media on Vercel | Required on Vercel (read-only FS). Auto-set when you create a Vercel Blob store. Locally and on a writable long-running host, media falls back to `public/demo-media`. |
 
 Secrets live on the platform / your shell — never commit them (`.env*` is gitignored).
 For a local real-AI run: put them in `.env.local`, then `npm run dev`.
@@ -28,11 +31,11 @@ For a local real-AI run: put them in `.env.local`, then `npm run dev`.
 
 ## A. Single instance (most reliable today) — e.g. Render
 
-1. New Web Service → connect `teamauri/homeagentAPP` → branch
-   `claude/great-albattani-8pavj2`.
+1. New Web Service → connect `teamauri/homeagentAPP` → branch `main` or the
+   active demo branch.
 2. Build: `npm install && npm run build` · Start: `npm start`
-3. Add env vars (optional, for real AI): `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`.
-4. Open the `https://…onrender.com` URL on a phone.
+3. Add env vars from the table above.
+4. Open the live root on a phone: `https://homeagentapp.onrender.com/`.
 
 ## B. Vercel (fully reliable once persistence lands)
 
@@ -41,6 +44,22 @@ For a local real-AI run: put them in `.env.local`, then `npm run dev`.
    `claude/great-albattani-8pavj2` (or merge the PR to `main` and deploy `main`).
 3. Confirm env: `GEMINI_API_KEY`, `DEEPSEEK_API_KEY`, `BLOB_READ_WRITE_TOKEN`.
 4. Deploy (Next.js auto-detected).
+
+## Robot raw-output sync
+
+DockKit reports the canonical `auriVideoId`; Home Agent owns artifact download
+and Memory creation through the task-scoped sync endpoint. In the current demo,
+the Home Agent browser finds pending `story_tracking_raw_transcript` tasks and
+calls:
+
+Manual check:
+
+```bash
+curl -fsS -X POST https://homeagentapp.onrender.com/api/robot/capture-tasks/<taskId>/raw-output/sync
+```
+
+A future batch poll endpoint can be added when polling coordination needs to
+move out of `RobotEventContext` and into cron or a server scheduler.
 
 Function timeouts for the slow model calls are set in code via route segment
 config (`export const maxDuration = 60`) on `/api/chat` and
