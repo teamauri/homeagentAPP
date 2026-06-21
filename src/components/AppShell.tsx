@@ -199,6 +199,13 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     }
   };
 
+  // Finish dictation: send straight away if anything was captured (submit() stops
+  // recognition itself); otherwise just close the panel.
+  const finishVoice = () => {
+    if (value.trim() || image) submit();
+    else stopRecognition();
+  };
+
   const pickImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = ""; // allow re-selecting the same file
@@ -223,7 +230,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
+    recognition.lang = "zh-CN"; // Chinese model; tolerates mixed Chinese/English
     recognition.interimResults = true;
     recognition.continuous = true;
     const base = value.trim() ? `${value.trim()} ` : "";
@@ -290,7 +297,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
         </div>
       ) : null}
       {listening ? (
-        <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={stopRecognition} />
+        <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={finishVoice} />
       ) : (
         <div className="flex h-[54px] items-center gap-2.5 rounded-full border border-ink/15 bg-white px-2.5 shadow-[0_10px_30px_rgba(8,8,8,0.1)]">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} className="hidden" />
@@ -345,7 +352,7 @@ function formatElapsed(seconds: number) {
 
 // A calm "listening" panel that rises in place of the composer while dictation
 // is active: a mic with soft breathing halos, a timer, the full live transcript
-// (wraps freely — never truncated), and two clear actions (Cancel / Done).
+// (wraps freely — never truncated), and two clear actions (Cancel / Send).
 function RecordingPanel({
   transcript,
   elapsed,
@@ -394,9 +401,9 @@ function RecordingPanel({
           type="button"
           onClick={onStop}
           className="h-11 flex-1 rounded-full bg-mint text-[15px] font-medium text-white"
-          aria-label="Stop recording and keep text"
+          aria-label="Send voice message"
         >
-          Done
+          Send
         </button>
       </div>
     </div>
