@@ -409,7 +409,16 @@ interface RawRawOutput {
   video_download_url?: string | null;
   transcript_json_download_url?: string | null;
   transcript_txt_download_url?: string | null;
+  transcript_text_download_url?: string | null;
   error?: unknown;
+}
+
+function normalizeRawOutputStatus(status: RawRawOutput["status"] | null | undefined): RawOutputJobStatus {
+  const normalized = String(status ?? "pending").trim().toLowerCase();
+  if (normalized === "ready" || normalized === "processing" || normalized === "failed" || normalized === "pending") {
+    return normalized;
+  }
+  return normalized as RawOutputJobStatus;
 }
 
 function mapRawOutput(d: RawRawOutput | null | undefined, videoIdFallback: string): RawOutputStatusResponse {
@@ -418,11 +427,11 @@ function mapRawOutput(d: RawRawOutput | null | undefined, videoIdFallback: strin
     rawOutputId: raw.raw_output_id,
     jobId: raw.job_id,
     videoId: raw.video_id ?? videoIdFallback,
-    status: raw.status ?? "pending",
+    status: normalizeRawOutputStatus(raw.status),
     progress: raw.progress,
     videoDownloadUrl: raw.video_download_url,
     transcriptJsonDownloadUrl: raw.transcript_json_download_url,
-    transcriptTxtDownloadUrl: raw.transcript_txt_download_url,
+    transcriptTxtDownloadUrl: raw.transcript_txt_download_url ?? raw.transcript_text_download_url,
     error: raw.error,
   };
 }

@@ -50,7 +50,17 @@ async function withFakeAuriServer(fn) {
     const url = new URL(req.url, "http://localhost");
     if (req.method === "GET" && url.pathname === "/v1/videos/video-smoke-from-auri/raw-output") {
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ success: true, data: { video_id: "video-smoke-from-auri", status: "ready", progress: 1 } }));
+      res.end(JSON.stringify({
+        success: true,
+        data: {
+          video_id: "video-smoke-from-auri",
+          status: "READY",
+          progress: 1,
+          video_download_url: "/v1/videos/video-smoke-from-auri/raw-output/video/download",
+          transcript_json_download_url: "/v1/videos/video-smoke-from-auri/raw-output/transcript/download?format=json",
+          transcript_text_download_url: "/v1/videos/video-smoke-from-auri/raw-output/transcript/download?format=txt",
+        },
+      }));
       return;
     }
 
