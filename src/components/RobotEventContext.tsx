@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { deriveCalendarEventIcon, type CalendarApiEvent } from "@/lib/calendar-api";
 import type { PersonId } from "@/lib/types";
 
 // A "robot event" is a calendar event the parent hands to the Auri Robot: the
@@ -77,22 +78,64 @@ function nowLabel() {
 }
 
 // Pick a warm doodle icon from the event's wording, falling back to the child.
-export function deriveEventIcon(title: string, person: PersonId) {
-  const t = title.toLowerCase();
-  if (/piano|music|song|sing/.test(t)) return "piano";
-  if (/read|book|story/.test(t)) return "book";
-  if (/meal|dinner|lunch|breakfast|eat|cook|snack/.test(t)) return "meal";
-  if (/photo|album|picture|smile/.test(t)) return "camera-note";
-  if (/call|grandma|grandpa|phone/.test(t)) return "phone";
-  if (/soccer|play|sport|run|stretch|jump|exercise|dance|swim/.test(t)) return "soccer";
-  if (/draw|paint|art|write|color/.test(t)) return "pencil";
-  if (person === "mia") return "girl";
-  if (person === "leo") return "boy";
-  if (person === "family") return "family";
-  return "spark";
-}
+export const deriveEventIcon = deriveCalendarEventIcon;
 
 const STORAGE_KEY = "auri.events.v1";
+
+function statusFromApi(status: CalendarApiEvent["status"]): RobotEventStatus {
+  if (status === "recording" || status === "done") return status;
+  return "scheduled";
+}
+
+function eventFromApi(event: CalendarApiEvent): RobotEvent {
+  return {
+    id: event.id,
+    title: event.title,
+    note: event.note ?? event.body,
+    person: event.person,
+    dateLabel: event.dateLabel,
+    timeLabel: event.timeLabel,
+    icon: event.icon,
+    forRobot: event.forRobot,
+    photoUrl: event.photoUrl,
+    voiceUrl: event.voiceUrl,
+    voiceDuration: event.voiceDuration,
+    status: statusFromApi(event.status),
+  };
+}
+
+function mergeEvents(current: RobotEvent[], incoming: RobotEvent[]) {
+  const byId = new Map(current.map((event) => [event.id, event]));
+  for (const event of incoming) byId.set(event.id, event);
+  return [...byId.values()];
+}
+
+function persistEventToCalendarApi(event: RobotEvent) {
+  fetch("/api/calendar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: event.id,
+      title: event.title,
+      note: event.note,
+      person: event.person,
+      dateLabel: event.dateLabel,
+      timeLabel: event.timeLabel,
+      forRobot: event.forRobot,
+      photoUrl: event.photoUrl,
+      voiceUrl: event.voiceUrl,
+      voiceDuration: event.voiceDuration,
+    }),
+  }).catch(() => {
+    // Keep the local demo path usable even if the server API is unavailable.
+  });
+}
+
+function removeEventFromCalendarApi(id: string) {
+  fetch(`/api/calendar?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {
+    // Keep local deletion responsive even if server persistence fails.
+  });
+}
 
 export function RobotEventProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<RobotEvent[]>([]);
@@ -103,17 +146,34 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
   // Hydrate created events from localStorage so they survive reloads and the
   // full-page navigation to /calendar (which is a separate route).
   useEffect(() => {
+    let localEvents: RobotEvent[] = [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
       if (Array.isArray(parsed) && parsed.length) {
         // Any event left "recording" from a previous session never finished.
-        setEvents(parsed.map((e: RobotEvent) => (e.status === "recording" ? { ...e, status: "scheduled" } : e)));
-        completedCount.current = parsed.filter((e: RobotEvent) => e.status === "done").length;
+        localEvents = parsed.map((e: RobotEvent) => (e.status === "recording" ? { ...e, status: "scheduled" } : e));
+        setEvents(localEvents);
+        completedCount.current = localEvents.filter((e: RobotEvent) => e.status === "done").length;
       }
     } catch {
       // ignore malformed storage
     }
+
+    for (const event of localEvents) persistEventToCalendarApi(event);
+
+    fetch("/api/calendar?source=created")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { items?: CalendarApiEvent[] } | null) => {
+        if (!Array.isArray(payload?.items)) return;
+        const apiEvents = payload.items.map(eventFromApi);
+        setEvents((current) => mergeEvents(current, apiEvents));
+        completedCount.current = apiEvents.filter((event) => event.status === "done").length;
+      })
+      .catch(() => {
+        // The localStorage copy remains the fallback source of truth.
+      });
+
     setReady(true);
   }, []);
 
@@ -136,28 +196,28 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
   const addEvent = useCallback((input: NewRobotEventInput) => {
     const id = `revent_${Date.now()}`;
-    setEvents((current) => [
-      ...current,
-      {
-        id,
-        title: input.title,
-        note: input.note,
-        person: input.person,
-        dateLabel: input.dateLabel,
-        timeLabel: input.timeLabel,
-        forRobot: input.forRobot,
-        icon: deriveEventIcon(input.title, input.person),
-        photoUrl: input.photoUrl,
-        voiceUrl: input.voiceUrl,
-        voiceDuration: input.voiceDuration,
-        status: "scheduled",
-      },
-    ]);
+    const event: RobotEvent = {
+      id,
+      title: input.title,
+      note: input.note,
+      person: input.person,
+      dateLabel: input.dateLabel,
+      timeLabel: input.timeLabel,
+      forRobot: input.forRobot,
+      icon: deriveEventIcon(input.title, input.person),
+      photoUrl: input.photoUrl,
+      voiceUrl: input.voiceUrl,
+      voiceDuration: input.voiceDuration,
+      status: "scheduled",
+    };
+    setEvents((current) => [...current, event]);
+    persistEventToCalendarApi(event);
     return id;
   }, []);
 
   const removeEvent = useCallback((id: string) => {
     setEvents((current) => current.filter((event) => event.id !== id));
+    removeEventFromCalendarApi(id);
   }, []);
 
   // Demo: walk an event from Scheduled → Recording → Done, attaching a clip at

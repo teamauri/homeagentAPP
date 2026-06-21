@@ -31,26 +31,26 @@
 | Step | Owner | Status |
 |---|---|---|
 | ① create capture task | Home Agent | ⚠️ calendar events/objects exist; a robot-consumable **capture task** + display is partial / in progress |
-| ② DockKit fetches schedule | Home Agent exposes API · DockKit consumes | ❌ **missing link** — no robot-facing "upcoming capture tasks" endpoint yet |
+| ② DockKit fetches schedule | Home Agent exposes API · DockKit consumes | ⚠️ Home Agent now exposes `GET /api/calendar?robot=true`; DockKit polling/auth/status linkage still not wired |
 | ③ auto-start at event time | DockKit (iOS) | ❌ DockKit-side (out of this repo) |
 | ④ upload raw video → Auri | DockKit · Auri | ✅ robot's existing capture→compose→vlog flow |
 | ⑤ Auri → Home Agent ingest + store | Auri · Home Agent | ✅ `POST /api/ingest/auri-media` (multipart video + highlight images) → stored → Memory. See `DOCKIT_MEMORY_INTEGRATION.md` |
 | ⑥ view in Home Agent | Home Agent | ✅ merges into the Journey timeline + `/memory/[id]` player |
 
-So the **back half (④⑤⑥) works today**; the **front half (①②③) — turning a
-calendar event into a robot-fetchable capture task and auto-triggering — is the
-remaining work.** (Auri Cut — mom picks a phone video to auto-edit — already
+So the **back half (④⑤⑥) works today**; the **front half (①②③) now has a
+Home Agent schedule-read API, but DockKit polling, auto-triggering, auth, and
+task→Memory linkage remain.** (Auri Cut — mom picks a phone video to auto-edit — already
 proves the Home Agent ↔ Auri Editor integration end to end; see
 `MEMORY_AUTO_EDIT_DESIGN.md`.)
 
 ## The missing link (front half)
 
 **Home Agent side (this repo):**
-- Model a **capture task**: a calendar event flagged as a robot capture, with
-  time, subject (which child), optional location/duration.
-- Expose a **robot-facing API** for DockKit to fetch upcoming capture tasks
-  (e.g. `GET /api/robot/tasks`), and to report status / link the resulting Memory
-  back to the task (so the finished film is tied to the event that requested it).
+- Model a **capture task**: currently a created calendar event with `forRobot:
+  true`, time, subject, and optional media hints.
+- Expose a **robot-readable API**: `GET /api/calendar?robot=true` returns created
+  robot capture events from the demo store. Still missing: auth, explicit status
+  report/update API, and task→Memory linkage after the finished film lands.
 
 **DockKit side (`dockkit-demo`, out of this repo):**
 - Poll/fetch the schedule from Home Agent; at event time auto-start tracking;
