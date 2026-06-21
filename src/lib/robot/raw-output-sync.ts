@@ -26,6 +26,8 @@ export interface RawOutputSyncResult {
   metadata?: Record<string, unknown>;
 }
 
+const rawOutputSyncLocks = new Map<string, Promise<RawOutputSyncResult>>();
+
 function statusCodeFor(error: unknown) {
   if (error instanceof AuriError && error.status >= 400 && error.status < 600) return error.status;
   return 502;
@@ -36,6 +38,32 @@ function isRetryableRawOutputLookupError(error: unknown) {
 }
 
 export async function syncRawOutputForTask(taskId: string, client = new AuriClient()): Promise<RawOutputSyncResult> {
+  const existingSync = rawOutputSyncLocks.get(taskId);
+  if (existingSync) return existingSync;
+
+  const sync = syncRawOutputForTaskUnlocked(taskId, client);
+  rawOutputSyncLocks.set(taskId, sync);
+  try {
+    return await sync;
+  } finally {
+    if (rawOutputSyncLocks.get(taskId) === sync) {
+      rawOutputSyncLocks.delete(taskId);
+    }
+  }
+}
+
+function alreadySyncedResult(event: CalendarApiEvent, rawOutput?: RawOutputStatusResponse): RawOutputSyncResult {
+  return {
+    outcome: "already_synced",
+    httpStatus: 200,
+    event,
+    media: [],
+    rawOutput,
+    metadata: { provider: "local-demo-store", alreadySynced: true },
+  };
+}
+
+async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient): Promise<RawOutputSyncResult> {
   const event = getDemoCalendarEvent(taskId);
   if (!event || !event.forRobot) {
     return { outcome: "not_found", httpStatus: 404, error: "Robot capture task not found" };
@@ -48,13 +76,7 @@ export async function syncRawOutputForTask(taskId: string, client = new AuriClie
   }
 
   if (robot?.rawOutputMemoryId && robot.rawOutputVideoUrl) {
-    return {
-      outcome: "already_synced",
-      httpStatus: 200,
-      event,
-      media: [],
-      metadata: { provider: "local-demo-store", alreadySynced: true },
-    };
+    return alreadySyncedResult(event);
   }
 
   try {
@@ -109,6 +131,11 @@ export async function syncRawOutputForTask(taskId: string, client = new AuriClie
       client.downloadRawOutputTranscript(videoId, "json"),
       client.downloadRawOutputTranscript(videoId, "txt"),
     ]);
+
+    const latestEvent = getDemoCalendarEvent(taskId);
+    if (latestEvent?.robot?.rawOutputMemoryId && latestEvent.robot.rawOutputVideoUrl) {
+      return alreadySyncedResult(latestEvent, rawOutput);
+    }
 
     const [storedVideo, storedTranscriptJson, storedTranscriptTxt] = await Promise.all([
       storeBinaryFile(videoBytes, `${videoId}-raw-output.mp4`, videoHead.contentType || "video/mp4"),

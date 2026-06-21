@@ -224,6 +224,40 @@ assert(missingRawOutputStatusResponse.status === 200, "robot status: expected se
   payload: missingRawOutputStatusPayload,
 });
 
+const concurrentSyncResponse = await postJson(calendarRoute, "http://localhost/api/calendar", {
+  id: `${smokeId}_concurrent_raw_output`,
+  title: "Robot raw output concurrent sync",
+  note: "Two sync callers should not create duplicate memories",
+  person: "mia",
+  dateLabel: "Tomorrow",
+  timeLabel: "4:15 PM",
+  forRobot: true,
+});
+const concurrentSyncPayload = await jsonFromResponse(concurrentSyncResponse);
+assert(concurrentSyncResponse.status === 201, "calendar: expected concurrent robot event create 201", {
+  status: concurrentSyncResponse.status,
+  payload: concurrentSyncPayload,
+});
+
+const concurrentSyncStatusResponse = await postJsonWithParams(
+  robotStatusRoute,
+  `http://localhost/api/robot/capture-tasks/${encodeURIComponent(concurrentSyncPayload.event.id)}/status`,
+  {
+    status: "uploading",
+    robotId: "dockkit_living_room",
+    auriVideoId: "video-smoke-from-auri",
+    auriClientVideoUuid: concurrentSyncPayload.event.auriClientVideoUuid,
+    recordingMode: "story_tracking_raw_transcript",
+    startedAt: "2026-06-21T10:10:00Z",
+  },
+  { taskId: concurrentSyncPayload.event.id }
+);
+const concurrentSyncStatusPayload = await jsonFromResponse(concurrentSyncStatusResponse);
+assert(concurrentSyncStatusResponse.status === 200, "robot status: expected concurrent status 200", {
+  status: concurrentSyncStatusResponse.status,
+  payload: concurrentSyncStatusPayload,
+});
+
 await withFakeAuriServer(async () => {
   const rawOutputSyncResponse = await postJsonWithParams(
     rawOutputSyncRoute,
@@ -277,6 +311,52 @@ await withFakeAuriServer(async () => {
     "memory: expected raw output video media to be listed",
     memoryPayload.media
   );
+
+  const [concurrentRawOutputSyncA, concurrentRawOutputSyncB] = await Promise.all([
+    postJsonWithParams(
+      rawOutputSyncRoute,
+      `http://localhost/api/robot/capture-tasks/${encodeURIComponent(concurrentSyncPayload.event.id)}/raw-output/sync`,
+      {},
+      { taskId: concurrentSyncPayload.event.id }
+    ),
+    postJsonWithParams(
+      rawOutputSyncRoute,
+      `http://localhost/api/robot/capture-tasks/${encodeURIComponent(concurrentSyncPayload.event.id)}/raw-output/sync`,
+      {},
+      { taskId: concurrentSyncPayload.event.id }
+    ),
+  ]);
+  const concurrentRawOutputSyncPayloadA = await jsonFromResponse(concurrentRawOutputSyncA);
+  const concurrentRawOutputSyncPayloadB = await jsonFromResponse(concurrentRawOutputSyncB);
+  assert(concurrentRawOutputSyncA.status === 200, "raw output sync: expected first concurrent sync 200", {
+    status: concurrentRawOutputSyncA.status,
+    payload: concurrentRawOutputSyncPayloadA,
+  });
+  assert(concurrentRawOutputSyncB.status === 200, "raw output sync: expected second concurrent sync 200", {
+    status: concurrentRawOutputSyncB.status,
+    payload: concurrentRawOutputSyncPayloadB,
+  });
+
+  const afterConcurrentMemoryResponse = await memoryRoute.GET(new Request("http://localhost/api/memory"));
+  const afterConcurrentMemoryPayload = await jsonFromResponse(afterConcurrentMemoryResponse);
+  const concurrentMedia = afterConcurrentMemoryPayload.media.filter((item) => item.metadata?.captureTaskId === concurrentSyncPayload.event.id);
+  const concurrentMediaIds = new Set(concurrentMedia.map((item) => item.id));
+  const concurrentMemories = afterConcurrentMemoryPayload.items.filter((item) =>
+    Array.isArray(item.mediaIds) && item.mediaIds.some((mediaId) => concurrentMediaIds.has(mediaId))
+  );
+  assert(concurrentMemories.length === 1, "raw output sync: concurrent sync should create exactly one memory", concurrentMemories);
+  assert(concurrentMedia.length === 1, "raw output sync: concurrent sync should create exactly one media item", concurrentMedia);
+});
+
+const deleteConcurrentResponse = await calendarRoute.DELETE(
+  new Request(`http://localhost/api/calendar?id=${encodeURIComponent(concurrentSyncPayload.event.id)}`, {
+    method: "DELETE",
+  })
+);
+const deleteConcurrentPayload = await jsonFromResponse(deleteConcurrentResponse);
+assert(deleteConcurrentResponse.status === 200, "calendar: expected concurrent delete 200", {
+  status: deleteConcurrentResponse.status,
+  payload: deleteConcurrentPayload,
 });
 
 const deleteSecondResponse = await calendarRoute.DELETE(
@@ -299,6 +379,7 @@ const afterDeleteResponse = await calendarRoute.GET(new Request("http://localhos
 const afterDeletePayload = await jsonFromResponse(afterDeleteResponse);
 assert(!afterDeletePayload.items.some((item) => item.id === createPayload.event.id), "calendar: deleted event should not be listed", afterDeletePayload.items);
 assert(!afterDeletePayload.items.some((item) => item.id === missingRawOutputPayload.event.id), "calendar: deleted second event should not be listed", afterDeletePayload.items);
+assert(!afterDeletePayload.items.some((item) => item.id === concurrentSyncPayload.event.id), "calendar: deleted concurrent event should not be listed", afterDeletePayload.items);
 
 console.log(
   JSON.stringify(
