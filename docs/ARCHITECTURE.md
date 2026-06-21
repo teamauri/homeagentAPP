@@ -76,6 +76,11 @@ needs device + `HOME_AGENT_INGEST_URL`).
   instances/restarts. A real DB is the next step for reliable persistence.
 - Vercel needs `BLOB_READ_WRITE_TOKEN` (media storage is read-only otherwise).
 
+## Where this is heading
+`KILLER_DEMO_SPEC.md` — the end goal: mom schedules a capture → robot auto-films at
+that time → Auri edits → film lands here. Flows 3 & 4 above are the back half of it.
+
 ## Detailed design docs
 `MEMORY_AUTO_EDIT_DESIGN.md` (Auri Cut) · `DOCKIT_MEMORY_INTEGRATION.md` (robot ingest)
-· `DATA_MODEL.md` · `DESIGN_SYSTEM.md` / `UI_COPY.md` · `DEPLOY.md` · `PRODUCT_BRIEF.md`.
+· `KILLER_DEMO_SPEC.md` (scheduled capture) · `DATA_MODEL.md` · `DESIGN_SYSTEM.md` /
+`UI_COPY.md` · `DEPLOY.md` · `PRODUCT_BRIEF.md`.
