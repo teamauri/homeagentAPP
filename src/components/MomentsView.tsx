@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DayGroup, GrowthData, MilestoneSession, OrganizedMedia } from "@/lib/album/types";
 import { useChildren, useFamilyMember } from "./FamilyContext";
+import { RobotEvent, useRobotEvents } from "./RobotEventContext";
 
 // Fixed gradient classes for seed/placeholder tones (kept literal so Tailwind
 // includes them). Real photos (phone organize) and ingested robot Stories
@@ -82,6 +83,9 @@ async function fileToPayload(file: File) {
 
 export function MomentsView() {
   const children = useChildren();
+  const { completions } = useRobotEvents();
+  // Clips the robot captured this session (events + highlights) — playable here.
+  const robotClips = completions.filter((event) => event.result);
   const [growth, setGrowth] = useState<GrowthData | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
@@ -316,7 +320,67 @@ export function MomentsView() {
         </div>
       ) : null}
 
+      {robotClips.length ? <RobotKeepsakes events={robotClips} /> : null}
+
       <Feed days={days} />
+    </div>
+  );
+}
+
+// Clips Auri Robot captured this session, surfaced in Memory and playable inline.
+function RobotKeepsakes({ events }: { events: RobotEvent[] }) {
+  return (
+    <section className="mt-4">
+      <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-muted">
+        <span aria-hidden="true">🤖</span>
+        <span>From Auri Robot</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        {events.map((event) => (
+          <RobotClipTile key={event.id} event={event} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RobotClipTile({ event }: { event: RobotEvent }) {
+  const result = event.result!;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-[12px] border border-line bg-white shadow-[0_2px_8px_rgba(8,8,8,0.04)]">
+      <div className="relative aspect-video bg-[#17181b]">
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video
+          ref={videoRef}
+          src={result.videoUrl}
+          poster={result.poster}
+          playsInline
+          controls={playing}
+          onEnded={() => setPlaying(false)}
+          onPause={() => setPlaying(false)}
+          className="h-full w-full object-cover"
+        />
+        {!playing ? (
+          <button
+            type="button"
+            onClick={() => {
+              videoRef.current?.play();
+              setPlaying(true);
+            }}
+            className="absolute inset-0 grid place-items-center"
+            aria-label="Play clip"
+          >
+            <span className="grid h-9 w-9 place-items-center rounded-full bg-white/90 pl-0.5 text-[12px] text-ink">▶</span>
+            <span className="absolute bottom-1.5 right-1.5 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">{result.duration}</span>
+          </button>
+        ) : null}
+      </div>
+      <div className="px-2.5 py-1.5">
+        <div className="truncate text-[12.5px] font-semibold text-ink">{event.title}</div>
+        {event.completedAtLabel ? <div className="text-[11px] text-muted">{event.completedAtLabel}</div> : null}
+      </div>
     </div>
   );
 }

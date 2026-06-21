@@ -58,6 +58,7 @@ type RobotEventContextValue = {
   events: RobotEvent[];
   completions: RobotEvent[];
   addEvent: (input: NewRobotEventInput) => string;
+  removeEvent: (id: string) => void;
   runEvent: (id: string) => void;
   startHighlight: (opts?: { title?: string; person?: PersonId; clipTarget?: number; photoTarget?: number }) => string;
 };
@@ -155,6 +156,10 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     return id;
   }, []);
 
+  const removeEvent = useCallback((id: string) => {
+    setEvents((current) => current.filter((event) => event.id !== id));
+  }, []);
+
   // Demo: walk an event from Scheduled → Recording → Done, attaching a clip at
   // the end so Chat can surface the keepsake.
   const runEvent = useCallback((id: string) => {
@@ -224,7 +229,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
   const completions = useMemo(() => events.filter((event) => event.status === "done"), [events]);
 
-  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, runEvent, startHighlight }), [events, completions, addEvent, runEvent, startHighlight]);
+  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, removeEvent, runEvent, startHighlight }), [events, completions, addEvent, removeEvent, runEvent, startHighlight]);
 
   return <RobotEventContext.Provider value={value}>{children}</RobotEventContext.Provider>;
 }

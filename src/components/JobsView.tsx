@@ -121,14 +121,14 @@ function UpcomingRow({ job, first }: { job: UpcomingJob; first: boolean }) {
         <DoodleIcon name={jobIcon[job.type]} className="h-8 w-8" />
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="text-[15px] font-semibold leading-[19px] text-ink">{job.title}</h3>
+        <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{job.title}</h3>
         <div className="mt-0.5 flex items-center gap-1.5">
           {job.source === "gcal" ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#2e7dd1]/10 px-1.5 py-0.5 text-[10.5px] font-semibold leading-3 text-[#2e7dd1]">
               <DoodleIcon name="calendar" className="h-3 w-3" /> Google
             </span>
           ) : null}
-          <span className="text-[12.5px] leading-4 text-muted">{job.subtitle}</span>
+          <span className="text-[12.5px] leading-[18px] tracking-[0] text-muted">{job.subtitle}</span>
         </div>
       </div>
       <span className="text-[26px] font-light leading-none text-ink/40">›</span>
@@ -144,8 +144,8 @@ function StandingRow({ job, first, onToggle, onEdit, onRun }: { job: StandingJob
         <DoodleIcon name={jobIcon[job.type]} className="h-8 w-8" />
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="text-[15px] font-semibold leading-[19px] text-ink">{job.title}</h3>
-        <div className="mt-0.5 flex items-center gap-2 text-[12.5px] leading-[17px] text-muted">
+        <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{job.title}</h3>
+        <div className="mt-0.5 flex items-center gap-2 text-[12.5px] leading-[18px] tracking-[0] text-muted">
           <span><span className="font-semibold text-ink/75">{agent?.name}</span> · {job.trigger}</span>
           {onRun && job.enabled ? (
             <button

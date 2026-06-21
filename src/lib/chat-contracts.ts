@@ -41,6 +41,10 @@ interface ChatCardBase {
   // the card renders a checklist that updates in place instead of a flat card.
   subtasks?: Subtask[];
   progressLabel?: string;
+  // When present, the card plays the clip inline (no separate "Watch" screen).
+  videoUrl?: string;
+  poster?: string;
+  durationLabel?: string;
 }
 
 export interface CalendarDraftChatCard extends ChatCardBase {

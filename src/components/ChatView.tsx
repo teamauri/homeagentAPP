@@ -119,15 +119,15 @@ function HighlightProgressRow({ event }: { event: RobotEvent }) {
           <span className="text-[15px] font-semibold leading-5 text-ink">Iris</span>
           <span className="text-[13px] text-muted">{event.timeLabel}</span>
         </div>
-        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px] text-ink">Catching the highlights — eyes up.</p>
+        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">Catching the highlights — eyes up.</p>
         <div className="mt-2 w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
           <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
             <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
               <DoodleIcon name="camera-note" className="h-8 w-8" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] leading-4 text-muted">Highlight</div>
-              <div className="truncate text-[15px] font-semibold leading-5 text-ink">{event.title}</div>
+              <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">Highlight</div>
+              <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{event.title}</div>
             </div>
             <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#C0492C]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#C0492C]">
               <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-[#C0492C]" aria-hidden="true" />
@@ -173,8 +173,8 @@ function RobotCompletionRow({ event }: { event: RobotEvent }) {
           <span className="text-[15px] font-semibold leading-5 text-ink">Vita</span>
           <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
         </div>
-        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px] text-ink">
-          {who} finished “{event.title}.” Saved the moment for you.
+        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">
+          {who} finished "{event.title}." Saved the moment for you.
         </p>
         {event.result ? <VideoResultCard event={event} /> : null}
       </div>
@@ -240,7 +240,7 @@ function ChatTurnRow({ turn }: { turn: ChatTurn }) {
           <span className="text-[15px] font-semibold leading-5 text-ink">{turn.sender}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
-        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px] text-ink">{turn.text}</p>
+        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">{turn.text}</p>
         {turn.cards ? (
           <div className="mt-2">
             <ChatCardList cards={turn.cards} />
@@ -291,7 +291,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
           </div>
         ) : null}
         {turn.text ? (
-          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[12.5px] leading-[18px]", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0]", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
         ) : null}
         {turn.cards?.length ? (
           <div className="mt-2 space-y-2">
@@ -354,9 +354,9 @@ function ApiResponseCard({ card }: { card: ChatTurnCard }) {
         <DoodleIcon name={iconForApiCard(card.type)} className="h-8 w-8" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[13px] leading-4 text-muted">{labelForApiCard(card.type)}</div>
-        <div className="text-[15px] font-semibold leading-5 text-ink">{card.title}</div>
-        {card.subtitle ? <div className="mt-0.5 text-[13px] leading-5 text-muted">{card.subtitle}</div> : null}
+        <div className="text-[12px] leading-4 tracking-[0] text-muted">{labelForApiCard(card.type)}</div>
+        <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{card.title}</div>
+        {card.subtitle ? <div className="mt-0.5 text-[13px] leading-[18px] tracking-[0] text-muted">{card.subtitle}</div> : null}
       </div>
       {card.cta ? <span className="shrink-0 rounded-full border border-line px-3 py-1.5 text-[13px] font-medium text-ink">{card.cta}</span> : null}
     </button>
@@ -428,10 +428,10 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
           <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-8 w-8" />
         </div>
         <div className="min-w-0 flex-1 pb-1">
-          <div className="text-[13px] leading-4 text-muted">{isReminder ? "Reminder" : "Calendar event"}</div>
-          <div className="text-[15px] font-semibold leading-5 text-ink">{draft.title}</div>
-          {whenLine ? <div className="mt-0.5 text-[13px] leading-4 text-muted">{whenLine}</div> : null}
-          {draft.note ? <div className="mt-1 line-clamp-2 text-[13px] leading-[17px] text-ink/70">“{draft.note}”</div> : null}
+          <div className="text-[12px] leading-4 tracking-[0] text-muted">{isReminder ? "Reminder" : "Calendar event"}</div>
+          <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{draft.title}</div>
+          {whenLine ? <div className="mt-0.5 text-[12.5px] leading-4 tracking-[0] text-muted">{whenLine}</div> : null}
+          {draft.note ? <div className="mt-1 line-clamp-2 text-[13px] leading-[18px] tracking-[0] text-ink/70">"{draft.note}"</div> : null}
         </div>
       </div>
 
