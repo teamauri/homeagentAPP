@@ -83,7 +83,8 @@ export const deriveEventIcon = deriveCalendarEventIcon;
 const STORAGE_KEY = "auri.events.v1";
 
 function statusFromApi(status: CalendarApiEvent["status"]): RobotEventStatus {
-  if (status === "recording" || status === "done") return status;
+  if (status === "recording" || status === "uploading" || status === "uploaded") return "recording";
+  if (status === "done") return "done";
   return "scheduled";
 }
 
