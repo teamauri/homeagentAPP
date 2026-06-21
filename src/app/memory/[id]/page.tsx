@@ -118,7 +118,9 @@ function DetailBody({ detail }: { detail: Detail }) {
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <video
             className="aspect-[4/5] w-full bg-black object-cover"
-            src={video.url}
+            // #t=0.1 makes Safari decode + show the ~first frame as the poster
+            // (instead of a black box) when there's no thumbnail image.
+            src={video.thumbnailUrl ? video.url : `${video.url}#t=0.1`}
             poster={video.thumbnailUrl}
             controls
             playsInline
