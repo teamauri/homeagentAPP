@@ -478,7 +478,9 @@ function AuriCutEditing({ step }: { step: number }) {
     <div className="mt-4 rounded-[16px] border border-line bg-white p-4 text-center shadow-[0_2px_10px_rgba(8,8,8,0.04)]">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#ffe6dd] text-[22px]">🎬</div>
       <p className="mt-2 font-display text-[18px] text-ink">Auri is cutting your film…</p>
-      <p className="mt-1 text-[12px] text-muted">Keeping the best moments · trimming to a 30s short</p>
+      <p className="mt-1 text-[12px] text-muted">
+        {step === 0 ? "Loading the editor (first run downloads ~30MB) — hang tight" : "Keeping the best moments · trimming to a 30s short"}
+      </p>
       <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
         {AURI_STEPS.map((label, i) => (
           <span key={label} className="flex items-center gap-1.5">
