@@ -1,11 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { MEDIA_DIR } from "@/lib/demo/data-dir";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MEDIA_DIR = path.join(process.cwd(), "public", "demo-media");
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   ".json": "application/json",
@@ -50,7 +49,13 @@ function parseRange(rangeHeader: string | null, totalSize: number) {
   return { start, end: Math.min(end, totalSize - 1) };
 }
 
-async function serveLocalMedia(request: Request, name: string, head = false) {
+// Streams a stored media file from disk (Render Persistent Disk in production,
+// public/demo-media in dev) with HTTP Range support — Safari's <video> requires
+// 206 Partial Content to play.
+async function serveMedia(request: Request, name: string, head = false) {
+  if (!name || name.includes("/") || name.includes("..")) {
+    return NextResponse.json({ error: "Invalid media name" }, { status: 400 });
+  }
   const filePath = safeLocalPath(name);
   if (!filePath) return NextResponse.json({ error: "Invalid media name" }, { status: 400 });
 
@@ -84,41 +89,10 @@ async function serveLocalMedia(request: Request, name: string, head = false) {
   return new Response(head ? null : data, { status: 200, headers });
 }
 
-// Resolves a privately-stored media file to its short-lived signed CDN URL and
-// 307-redirects there. The browser then streams bytes DIRECTLY from Vercel Blob's
-// CDN, which serves them fast and with native HTTP Range support (Safari's
-// <video> requires Range). Previously we buffered the whole blob through this
-// function on every range request, which made video load take ~8s.
-export async function GET(_request: Request, { params }: { params: { name: string } }) {
-  const name = params.name;
-  if (!name || name.includes("/") || name.includes("..")) {
-    return NextResponse.json({ error: "Invalid media name" }, { status: 400 });
-  }
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return serveLocalMedia(_request, name);
-  }
-
-  try {
-    const { get } = await import("@vercel/blob");
-    const res = await get(`demo-media/${name}`, { access: "private", useCache: true });
-    if (!res?.blob?.downloadUrl) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    // Resolve metadata only — don't pull the body through this function.
-    try { await (res.stream as ReadableStream | null)?.cancel?.(); } catch { /* nothing to cancel */ }
-    // Media elements ignore the downloadUrl's Content-Disposition; they just
-    // range-fetch the bytes — so inline <video> playback works.
-    return NextResponse.redirect(res.blob.downloadUrl, 307);
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to read media" }, { status: 500 });
-  }
+export async function GET(request: Request, { params }: { params: { name: string } }) {
+  return serveMedia(request, params.name);
 }
 
 export async function HEAD(request: Request, { params }: { params: { name: string } }) {
-  const name = params.name;
-  if (!name || name.includes("/") || name.includes("..")) {
-    return NextResponse.json({ error: "Invalid media name" }, { status: 400 });
-  }
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return serveLocalMedia(request, name, true);
-  }
-  return GET(request, { params });
+  return serveMedia(request, params.name, true);
 }

@@ -11,8 +11,9 @@
 ## What this is
 
 `home-agent-app` — "Auri", a family **Memory/Journey** web app (mobile-first
-Next.js, deployed on Vercel). A chat-first assistant + a growing timeline of a
-child's moments (photos, videos, robot Stories, auto-edited shorts).
+Next.js, deployed on **Render** at `homeagentapp.onrender.com`). A chat-first
+assistant + a growing timeline of a child's moments (photos, videos, robot
+Stories, auto-edited shorts).
 
 ## Stack
 
@@ -20,7 +21,7 @@ child's moments (photos, videos, robot Stories, auto-edited shorts).
 - **External services** (keys in `.env.local`, see `DEPLOY.md`):
   - **DeepSeek** / **Gemini** — chat brain + photo-vision organize (`GEMINI_API_KEY`, `DEEPSEEK_API_KEY`).
   - **auri-editor** (`AURI_HOST` / `NEXT_PUBLIC_AURI_HOST`, app-id `homeagent-memory`) — video editing backend (a separate repo, deployed at `auriedit.onrender.com`).
-  - **Vercel Blob** (`BLOB_READ_WRITE_TOKEN`) — media storage on Vercel (else local `public/demo-media`).
+  - **Render Persistent Disk** (`DATA_DIR`, e.g. `/var/data`) — durable storage for uploaded/rendered media + store snapshots. Unset (dev) → media in `public/demo-media`, snapshots in `.data`.
 - **Sibling repos** (not in this app; read-only contract): `dockkit-demo` (robot iOS app, the inbound Story source), `auri-editor` (the video backend). See memory `auri-project-topology`.
 
 ## Surfaces (routes)
@@ -74,14 +75,16 @@ tasks with `GET /api/calendar?robot=true`. Deletion uses `DELETE /api/calendar?i
   Gemini-organized photos, **merged with** demo-store items so robot Stories,
   phone uploads, and Auri Cut films all show in one feed. Read via `GET /api/memory/growth` (`MomentsView`).
 - **demo store** (`src/lib/demo/demo-store.ts`) — media + Memory + objects + created calendar records. Read via `GET /api/memory`, `/api/memory/[id]`, and `GET /api/calendar`.
-- **media-storage** (`src/lib/demo/media-storage.ts`) — `storeUploadedFile()` → Vercel Blob (private, served via `/api/media/blob/[name]`) or local `public/demo-media`.
-- **persistence** (`src/lib/demo/persistence.ts`) — hydrate/persist stores (Blob or local `.data`), `reloadStore()` for serverless freshness.
+- **media-storage** (`src/lib/demo/media-storage.ts`) — `storeUploadedFile()` writes under `MEDIA_DIR` (`src/lib/demo/data-dir.ts`: Render disk via `DATA_DIR`, else `public/demo-media`); always served via `/api/media/blob/[name]` (HTTP Range, for `<video>`).
+- **persistence** (`src/lib/demo/persistence.ts`) — one JSON snapshot per store under `SNAPSHOT_DIR` (Render disk via `DATA_DIR`, else `.data`); `reloadStore()` re-reads for freshness.
 
 ## Known limitations
-- **Stores are demo-grade** — in-memory + Blob/local snapshot; ephemeral per
-  serverless instance. Files persist (Blob); records may not survive across
-  instances/restarts. A real DB is the next step for reliable persistence.
-- Vercel needs `BLOB_READ_WRITE_TOKEN` (media storage is read-only otherwise).
+- **Stores are demo-grade** — in-memory, snapshotted to a single JSON file per
+  store. With a Render Persistent Disk (`DATA_DIR`) media + records survive
+  restarts/redeploys; pin to one instance (a disk can't be shared). A real DB is
+  the next step for multi-instance consistency.
+- Without `DATA_DIR` set, the container FS is ephemeral — uploads/records are lost
+  on restart/redeploy/spin-down. Production must mount a disk and set `DATA_DIR`.
 
 ## Where this is heading
 `KILLER_DEMO_SPEC.md` — the end goal: mom schedules a capture → robot auto-films at
