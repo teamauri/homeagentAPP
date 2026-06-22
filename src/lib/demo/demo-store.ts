@@ -168,6 +168,19 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
       createdAt: new Date().toISOString(),
     };
     currentStore.__auriDemoObjects?.push(created);
+
+    // Reminder/calendar drafts created by AI chat should also land in the robot
+    // calendar so the DockKit app can pick them up.
+    if (object.type === "reminder_draft" || object.type === "calendar_draft") {
+      const p = object.payload as Record<string, unknown>;
+      const title = typeof p.title === "string" && p.title ? p.title : "Reminder";
+      const person = typeof p.person === "string" ? p.person : "family";
+      const dateLabel = typeof p.dateLabel === "string" && p.dateLabel ? p.dateLabel : "Today";
+      const timeLabel = typeof p.timeLabel === "string" && p.timeLabel ? p.timeLabel : "now";
+      const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
+      upsertDemoCalendarEvent({ title, person, dateLabel, timeLabel, note, forRobot: true });
+    }
+
     return { id: created.id, type: created.type, route: created.route, status: created.status };
   });
 }

@@ -26,11 +26,8 @@ export function ChatCardRenderer({ card, compact = false }: { card: ChatCard; co
     );
   }
 
-  // A calendar draft opens the calendar directly.
-  const onClick = card.kind === "calendar_draft" ? () => { window.location.href = "/calendar"; } : undefined;
-
   return (
-    <button onClick={onClick} className="grid min-h-[72px] w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-[15px] border border-line bg-white px-2.5 py-2.5 text-left shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
+    <button className="grid min-h-[72px] w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-[15px] border border-line bg-white px-2.5 py-2.5 text-left shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
       <div className="grid h-6 w-6 shrink-0 place-items-center">
         <DoodleIcon name={card.icon} className="h-6 w-6" />
       </div>

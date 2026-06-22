@@ -48,23 +48,38 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
 
   // 2) Actionable → Auri frames + a helper takes the task (second voice).
   if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {
+    // Detect "now / 现在" — use the current time rather than the hardcoded 2 PM slot.
+    const isNow = input.includes("now") || input.includes("现在") || input.includes("立刻") || input.includes("马上");
+    let timeLabel: string;
+    let auriReply: string;
+    if (isNow) {
+      const h = new Date().getHours();
+      const m = new Date().getMinutes();
+      const period = h >= 12 ? "PM" : "AM";
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      timeLabel = `${h12}:${String(m).padStart(2, "0")} ${period}`;
+      auriReply = `好的，我来帮Mia设置吃药提醒。她正在完成10天的疗程，现在该吃${timeLabel}的药了。`;
+    } else {
+      timeLabel = "2:00 PM";
+      auriReply = "Of course — I'll have Vita keep this on the radar.";
+    }
     const helper: ChatHelperSegment = {
       teamMemberId: "vita",
       name: "Vita the keeper",
-      reply: "Done — I set the reminder. When it's time, whoever's home can film a quick video receipt.",
+      reply: `已为您创建提醒：Mia${isNow ? "现在" : "下午2点"}吃药。`,
       cards: [
         {
           type: "reminder",
-          title: "Mia's 2pm medicine",
-          subtitle: "Daily · 2:00 PM · video receipt",
-          body: "Reminder draft ready for review.",
+          title: "Mia吃药",
+          subtitle: `Today · ${timeLabel} · Mia`,
+          body: "Mia正在完成10天疗程",
           cta: "Edit",
-          metadata: { due: "2:00 PM", person: "mia", wantsReceipt: true },
+          metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "mia", wantsReceipt: true },
         },
       ],
-      objectsToCreate: [{ type: "reminder_draft", payload: { title: "Mia's 2pm medicine", dueLabel: "Daily · 2:00 PM", person: "mia", wantsReceipt: true } }],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title: "Mia吃药", timeLabel, dateLabel: "Today", person: "mia", note: "Mia正在完成10天疗程", wantsReceipt: true } }],
     };
-    return auri("Of course — I'll have Vita keep this on the radar.", { intent: "reminder", helper, suggestedFollowups: ["Move it earlier", "Who should film it?"] });
+    return auri(auriReply, { intent: "reminder", helper, suggestedFollowups: ["改成其他时间", "谁来拍视频确认?"] });
   }
 
   if (input.includes("calendar") || input.includes("appointment") || input.includes("basketball") || input.includes("checkup") || input.includes("5:30")) {

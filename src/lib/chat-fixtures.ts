@@ -40,19 +40,12 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
   },
   {
     id: "checkup-calendar",
-    kind: "calendar_draft",
+    kind: "job",
     icon: "calendar",
-    typeLabel: "Calendar draft",
+    typeLabel: "Calendar event",
     title: "Leo’s checkup",
-    body: "Added to the family calendar — confirm the time.",
     metadata: ["Tomorrow", "9:30 AM", "Leo"],
     action: { label: "Review event", intent: "review" },
-    event: {
-      person: "leo",
-      dateLabel: "Tomorrow",
-      timeLabel: "9:30 AM",
-      location: "Clinic",
-    },
   },
   {
     id: "morning-routine",
