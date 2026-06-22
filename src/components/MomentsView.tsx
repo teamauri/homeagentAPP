@@ -90,7 +90,7 @@ export function MomentsView() {
   const children = useChildren();
   const { completions } = useRobotEvents();
   // Clips the robot captured this session (events + highlights) — playable here.
-  const robotClips = completions.filter((event) => event.result);
+  const robotClips = completions.filter((event) => event.result && event.kept);
   const [growth, setGrowth] = useState<GrowthData | null>(() => {
     try {
       const raw = sessionStorage.getItem("auri.growth.v1");

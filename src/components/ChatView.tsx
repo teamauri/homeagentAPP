@@ -175,7 +175,7 @@ function RobotCompletionRow({ event }: { event: RobotEvent }) {
           <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
         </div>
         <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">
-          {who} finished "{event.title}." Saved the moment for you.
+          {who} finished "{event.title}." Tap Keep to save it to Journey.
         </p>
         {event.result ? <VideoResultCard event={event} /> : null}
       </div>
@@ -184,6 +184,7 @@ function RobotCompletionRow({ event }: { event: RobotEvent }) {
 }
 
 function VideoResultCard({ event }: { event: RobotEvent }) {
+  const { keepEvent } = useRobotEvents();
   const result = event.result!;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -226,7 +227,13 @@ function VideoResultCard({ event }: { event: RobotEvent }) {
           </svg>
         </span>
         <span className="flex-1 truncate text-[13px] font-semibold text-ink">Event complete · {event.title}</span>
-        <span className="shrink-0 text-[12px] font-medium text-gold">Keep ♡</span>
+        {event.kept ? (
+          <span className="shrink-0 text-[12px] font-medium text-gold">💗 Kept</span>
+        ) : (
+          <button onClick={() => keepEvent(event.id)} className="shrink-0 text-[12px] font-medium text-gold active:opacity-60">
+            Keep 💗
+          </button>
+        )}
       </div>
     </div>
   );
