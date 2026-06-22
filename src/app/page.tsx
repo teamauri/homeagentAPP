@@ -36,8 +36,8 @@ function HomeInner() {
   // to exactly where they left off.
   useEffect(() => {
     try {
-      const savedTab = sessionStorage.getItem("auri.tab.v1") as TabKey | null;
-      if (savedTab && ["today", "chat", "memory"].includes(savedTab)) setTab(savedTab);
+      // Always default to chat on load — don't restore the last tab.
+      sessionStorage.removeItem("auri.tab.v1");
     } catch { /* ignore */ }
     try {
       const raw = sessionStorage.getItem("auri.liveTurns.v1");
@@ -65,7 +65,9 @@ function HomeInner() {
       try {
         const savedScroll = sessionStorage.getItem("auri.scrollTop.v1");
         sessionStorage.removeItem("auri.scrollTop.v1");
-        if (savedScroll !== null) {
+        // Only restore positive offsets; zero means either the user hadn't
+        // scrolled or the page was refreshed at top — both should go to bottom.
+        if (savedScroll !== null && Number(savedScroll) > 0) {
           el.scrollTop = Number(savedScroll);
         } else {
           el.scrollTop = el.scrollHeight;
