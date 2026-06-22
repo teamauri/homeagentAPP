@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
@@ -69,6 +69,7 @@ const avatarStyles = {
 };
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
+  const bottomRef = useRef<HTMLDivElement>(null);
   const { completions, events } = useRobotEvents();
   // Highlight jobs that are mid-capture: Iris shows a live counter card that
   // climbs as the run catches real clips/photos, then hands off to the keepsake.
@@ -94,6 +95,12 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
     })),
   ].sort((a, b) => a.at - b.at);
 
+  // Scroll to the bottom sentinel whenever the message list changes, so the
+  // latest message is always visible on first load and after new messages arrive.
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "instant" });
+  }, [liveTurns.length, stream.length]);
+
   return (
     <div className="pb-4">
       <div className="space-y-5">
@@ -102,6 +109,7 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
         ))}
         {stream.map((item) => item.node)}
       </div>
+      <div ref={bottomRef} />
     </div>
   );
 }
@@ -498,7 +506,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
           <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-6 w-6" />
         </div>
         <button
-          onClick={() => { window.location.href = "/calendar"; }}
+          onClick={() => setEditing(true)}
           className="min-w-0 text-left"
         >
           <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">
@@ -520,7 +528,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
             onClick={() => { window.location.href = "/calendar"; }}
             className="shrink-0 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]"
           >
-            View
+            View in Calendar
           </button>
         </div>
       </div>

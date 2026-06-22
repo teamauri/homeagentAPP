@@ -157,6 +157,31 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
   const currentStore = store();
 
   return objectsToCreate.map((object) => {
+    // For reminder/calendar drafts, deduplicate against existing pending events.
+    // If a matching event already exists, return it without creating a second entry.
+    if (object.type === "reminder_draft" || object.type === "calendar_draft") {
+      const p = object.payload as Record<string, unknown>;
+      const title = typeof p.title === "string" && p.title ? p.title : "Reminder";
+      const personRaw = p.person ?? p.childId ?? p.recipient ?? p.assignee ?? "family";
+      const person = toPersonId(typeof personRaw === "string" ? personRaw : "family");
+      const normalizedTitle = title.trim().toLowerCase();
+
+      const existingEvent = (currentStore.__auriDemoCalendarEvents ?? []).find(
+        (e) => e.forRobot && e.status !== "done" && e.person === person &&
+               e.title.trim().toLowerCase() === normalizedTitle
+      );
+      if (existingEvent) {
+        const existingObj = (currentStore.__auriDemoObjects ?? []).find(
+          (o) => (o.type === "reminder_draft" || o.type === "calendar_draft") &&
+                 typeof o.payload.title === "string" &&
+                 o.payload.title.trim().toLowerCase() === normalizedTitle
+        );
+        if (existingObj) {
+          return { id: existingObj.id, type: existingObj.type, route: existingObj.route, status: existingObj.status };
+        }
+      }
+    }
+
     // Use a timestamp-based ID so IDs never repeat across server restarts.
     // Counter-based IDs (reminder_draft_0004) recycled on every Render restart,
     // causing previously dismissed cards to appear dismissed again.
