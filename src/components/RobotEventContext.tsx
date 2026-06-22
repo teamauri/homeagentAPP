@@ -47,6 +47,7 @@ export interface RobotEvent {
   kind?: "highlight";
   highlight?: { clipTarget: number; photoTarget: number };
   highlightProgress?: { clips: number; photos: number };
+  kept?: boolean;
 }
 
 export interface NewRobotEventInput {
@@ -67,6 +68,7 @@ type RobotEventContextValue = {
   completions: RobotEvent[];
   addEvent: (input: NewRobotEventInput) => string;
   updateEvent: (id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "dateLabel" | "timeLabel">>) => void;
+  keepEvent: (id: string) => void;
   removeEvent: (id: string) => void;
   runEvent: (id: string) => void;
   startHighlight: (opts?: { title?: string; person?: PersonId; clipTarget?: number; photoTarget?: number }) => string;
@@ -309,6 +311,26 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const keepEvent = useCallback((id: string) => {
+    // Optimistically mark as kept in local state, then persist to server.
+    setEvents((current) => current.map((event) => (event.id === id ? { ...event, kept: true } : event)));
+    fetch(`/api/robot/capture-tasks/${encodeURIComponent(id)}/keep`, { method: "POST" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.memoryUrl) {
+          setEvents((current) =>
+            current.map((event) =>
+              event.id === id && event.result
+                ? { ...event, result: { ...event.result, memoryUrl: data.memoryUrl } }
+                : event
+            )
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+
   const removeEvent = useCallback((id: string) => {
     setEvents((current) => current.filter((event) => event.id !== id));
     removeEventFromCalendarApi(id);
@@ -384,7 +406,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
   const completions = useMemo(() => events.filter((event) => event.status === "done"), [events]);
 
-  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, updateEvent, removeEvent, runEvent, startHighlight }), [events, completions, addEvent, updateEvent, removeEvent, runEvent, startHighlight]);
+  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent, startHighlight }), [events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent, startHighlight]);
 
   return <RobotEventContext.Provider value={value}>{children}</RobotEventContext.Provider>;
 }

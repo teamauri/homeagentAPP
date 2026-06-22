@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { PersonId } from "@/lib/types";
 import { type JobType, type StandingJob } from "@/lib/jobs";
 import { teamAgentById, type TeamAgentId } from "@/lib/team";
-import { personLabels } from "./calendar-ui";
+import { useChildren, useParents } from "./FamilyContext";
 import { TeamBadge } from "./TeamBadge";
 
 // The "+ New" (and edit) page: pick what Auri should do, then a minimal config —
@@ -26,8 +26,6 @@ const TEMPLATES: Template[] = [
 // like duplicate cards. Each job card leads with its own distinct job icon.
 const AGENT_ORDER: TeamAgentId[] = ["iris", "lumi", "vita", "nova"];
 const TEMPLATE_GROUPS = AGENT_ORDER.map((agent) => ({ agent, items: TEMPLATES.filter((t) => t.agent === agent) })).filter((g) => g.items.length);
-
-const PEOPLE: PersonId[] = ["family", "mia", "leo", "grandma", "mom", "dad"];
 
 function fmtTime(hhmm: string) {
   if (!hhmm) return "";
@@ -51,6 +49,13 @@ export function NewJobView({
   onDelete?: (id: string) => void;
 }) {
   const isEdit = !!editJob;
+  const children = useChildren();
+  const parents = useParents();
+  const people = useMemo(() => [
+    { id: "family", label: "Family" },
+    ...children.map((c) => ({ id: c.id, label: c.name })),
+    ...parents.map((p) => ({ id: p.id, label: p.name })),
+  ], [children, parents]);
   const [type, setType] = useState<JobType | null>(editJob?.type ?? null);
   const [title, setTitle] = useState(editJob?.title ?? "");
   const [person, setPerson] = useState<PersonId>("family");
@@ -70,7 +75,7 @@ export function NewJobView({
 
   const submit = () => {
     if (!tpl) return;
-    const personLabel = personLabels[person];
+    const personLabel = people.find((p) => p.id === person)?.label ?? person;
     if (repeat === "once") {
       // Full weekday name so it maps onto the calendar's day strip.
       const d = onceDate ? new Date(`${onceDate}T00:00:00`) : null;
@@ -174,13 +179,13 @@ export function NewJobView({
 
           <Field label="For">
             <div className="flex flex-wrap gap-2">
-              {PEOPLE.map((p) => (
+              {people.map((p) => (
                 <button
-                  key={p}
-                  onClick={() => setPerson(p)}
-                  className={`rounded-full border px-3.5 py-1.5 text-[13px] ${person === p ? "border-ink bg-ink font-semibold text-white" : "border-line text-muted"}`}
+                  key={p.id}
+                  onClick={() => setPerson(p.id)}
+                  className={`rounded-full border px-3.5 py-1.5 text-[13px] ${person === p.id ? "border-ink bg-ink font-semibold text-white" : "border-line text-muted"}`}
                 >
-                  {personLabels[p]}
+                  {p.label}
                 </button>
               ))}
             </div>

@@ -38,7 +38,7 @@ const titles: Record<TabKey, string> = {
 
 const subtitles: Record<TabKey, string> = {
   today: "What Auri’s set to do for you.",
-  chat: "Mom, Dad · Cameraman, Companion, Housekeeper",
+  chat: "The Auri team is here to take jobs",
   memory: "Watch your family grow, together.",
 };
 

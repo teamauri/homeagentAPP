@@ -27,7 +27,7 @@ export function EventDetailSheet({ detail, onDelete, onClose }: { detail: EventD
             <DoodleIcon name={detail.icon} className="h-9 w-9" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-medium text-muted">Auri Robot event</div>
+            <div className="text-[12px] font-medium text-muted">Auri Robot job</div>
             <div className="truncate text-[18px] font-semibold text-ink">{detail.title}</div>
             <div className="mt-0.5 text-[13px] text-muted">{detail.whenLine}</div>
           </div>
@@ -50,7 +50,7 @@ export function EventDetailSheet({ detail, onDelete, onClose }: { detail: EventD
         <div className="mt-5 flex gap-2.5">
           {onDelete ? (
             <button onClick={onDelete} className="flex-1 rounded-full bg-[#d93025] py-2.5 text-[14px] font-semibold text-white">
-              Delete event
+              Delete job
             </button>
           ) : null}
           <button onClick={onClose} className={`${onDelete ? "" : "flex-1 "}rounded-full border border-line px-5 py-2.5 text-[14px] font-medium text-ink`}>

@@ -59,3 +59,8 @@ export function useChildren(): FamilyMemberProfile[] {
     .filter((m) => m.role === "child" || m.role === "baby")
     .sort((a, b) => (a.birthday ?? "9999") < (b.birthday ?? "9999") ? -1 : 1);
 }
+
+export function useParents(): FamilyMemberProfile[] {
+  const byId = useContext(FamilyContext);
+  return Object.values(byId).filter((m) => m.role === "parent");
+}

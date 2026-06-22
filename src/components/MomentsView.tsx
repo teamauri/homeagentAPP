@@ -90,7 +90,7 @@ export function MomentsView() {
   const children = useChildren();
   const { completions } = useRobotEvents();
   // Clips the robot captured this session (events + highlights) — playable here.
-  const robotClips = completions.filter((event) => event.result);
+  const robotClips = completions.filter((event) => event.result && event.kept);
   const [growth, setGrowth] = useState<GrowthData | null>(() => {
     try {
       const raw = sessionStorage.getItem("auri.growth.v1");
@@ -385,7 +385,7 @@ export function MomentsView() {
 
   return (
     <div className="pb-4">
-      <div className="no-scrollbar mt-1 flex gap-2 overflow-x-auto">
+      <div className="no-scrollbar mt-1 flex items-center gap-2 overflow-x-auto">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -398,31 +398,19 @@ export function MomentsView() {
             {t.label}
           </button>
         ))}
-      </div>
-
-      {activeSession ? <SessionCard session={activeSession} /> : null}
-
-      <div className="sticky -top-2 z-10 flex items-center justify-between bg-paper pb-1.5 pt-3">
-        <span className="text-[12px] text-muted">
-          By day · kept by Iris{growth.skippedCount ? ` · ${growth.skippedCount} skipped` : ""}
-        </span>
-        <div className="flex shrink-0 gap-2">
+        <div className="ml-auto shrink-0">
           <button
             onClick={() => setAuriPhase("intro")}
             className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-semibold text-white shadow-[0_2px_8px_rgba(8,8,8,0.06)]"
           >
-            ✨ Auri Cut
-          </button>
-          <button
-            onClick={() => inputRef.current?.click()}
-            className="rounded-full border border-line bg-white px-3 py-1.5 text-[12.5px] font-semibold text-ink shadow-[0_2px_8px_rgba(8,8,8,0.04)]"
-          >
-            ＋ Organize
+            ✨ Cut
           </button>
         </div>
         <input ref={inputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
         <input ref={auriInputRef} type="file" accept="video/*" hidden onChange={(e) => onAuriVideo(e.target.files)} />
       </div>
+
+      {activeSession ? <SessionCard session={activeSession} /> : null}
 
       {organizing ? <OrganizingPanel count={organizing.count} /> : null}
 

@@ -1,18 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { needs, upcoming } from "@/lib/mock-data";
+import { useMemo, useState } from "react";
+import { getMockNeeds, getMockUpcoming } from "@/lib/mock-data";
 import { teamAgents, teamAgentByName } from "@/lib/team";
-import type { CalendarEvent } from "@/lib/types";
-import { personLabels, StatusPill } from "./calendar-ui";
+import type { CalendarEvent, NeedItem } from "@/lib/types";
+import { StatusPill } from "./calendar-ui";
 import { DoodleIcon } from "./Icons";
 import { TeamBadge } from "./TeamBadge";
 import { RobotEventComposer } from "./RobotEventComposer";
 import { RobotEvent, useRobotEvents } from "./RobotEventContext";
+import { useChildren } from "./FamilyContext";
 
 export function TodayView() {
   const { events, addEvent, runEvent } = useRobotEvents();
   const [composerOpen, setComposerOpen] = useState(false);
+  const children = useChildren();
+  const needs = useMemo(() => getMockNeeds(children), [children]);
+  const upcoming = useMemo(() => getMockUpcoming(children), [children]);
+  const personLabel = useMemo(() => {
+    const m: Record<string, string> = { family: "Family" };
+    children.forEach((c) => { m[c.id] = c.name; });
+    return (id: string) => m[id] ?? id;
+  }, [children]);
 
   const robotOnly = events.filter((event) => event.forRobot);
   const liveEvents = robotOnly.filter((event) => event.status !== "done");
@@ -104,6 +113,8 @@ const robotStatusMeta: Record<RobotEvent["status"], { label: string; className: 
 };
 
 function RobotEventRow({ event, onRun }: { event: RobotEvent; onRun: () => void }) {
+  const rowChildren = useChildren();
+  const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   const meta = robotStatusMeta[event.status];
   return (
     <article className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-line/85 bg-white px-3.5 py-2.5 shadow-[0_1px_4px_rgba(8,8,8,0.03)]">
@@ -113,7 +124,7 @@ function RobotEventRow({ event, onRun }: { event: RobotEvent; onRun: () => void 
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-[15px] font-semibold leading-[17px] text-ink">{event.title}</h3>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 truncate text-[13px] leading-[16px] text-muted">
-          <span>{personLabels[event.person] ?? event.person}</span>
+          <span>{personLabel(event.person)}</span>
           <span>·</span>
           <span>{event.dateLabel} · {event.timeLabel}</span>
           {event.photoUrl ? <PhotoDot /> : null}
@@ -154,7 +165,7 @@ function VoiceDot() {
   );
 }
 
-function NeedRow({ item }: { item: (typeof needs)[number] }) {
+function NeedRow({ item }: { item: NeedItem }) {
   const helper = teamAgentByName[item.helper];
   return (
     <article className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-line/85 bg-white px-3.5 py-2.5 shadow-[0_1px_4px_rgba(8,8,8,0.03)]">
@@ -172,6 +183,8 @@ function NeedRow({ item }: { item: (typeof needs)[number] }) {
 }
 
 function EventRow({ event }: { event: CalendarEvent }) {
+  const rowChildren = useChildren();
+  const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   return (
     <button className="flex w-full items-center gap-3 py-1 text-left">
       <div className="grid h-[40px] w-[40px] shrink-0 place-items-center">
@@ -183,7 +196,7 @@ function EventRow({ event }: { event: CalendarEvent }) {
           <StatusPill status={event.status} label={event.statusLabel} />
         </div>
         <p className="mt-0.5 truncate text-[13px] leading-5 text-muted">
-          {personLabels[event.person] ?? event.person} · {event.dateLabel} · {event.timeLabel}
+          {personLabel(event.person)} · {event.dateLabel} · {event.timeLabel}
         </p>
       </div>
       <span className="text-[28px] font-light leading-none text-ink/40">›</span>

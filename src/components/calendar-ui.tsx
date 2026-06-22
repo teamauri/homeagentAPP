@@ -1,14 +1,4 @@
-import type { PersonId, Status } from "@/lib/types";
-
-export const personLabels: Record<PersonId, string> = {
-  mia: "Mia",
-  leo: "Leo",
-  baby: "Baby",
-  mom: "Mom",
-  dad: "Dad",
-  grandma: "Grandma",
-  family: "Family",
-};
+import type { Status } from "@/lib/types";
 
 // Status → pill color. Tinted fills (no border) using the design accent palette.
 // Note: Tailwind only generates standard opacity steps (10, 20, …), so non-standard
