@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DoodleIcon } from "@/components/Icons";
 import type { FamilyMemberProfile, FamilyRole } from "@/lib/family/profile";
+import { saveFamilyToStorage, loadFamilyFromStorage } from "@/components/FamilyContext";
 
 async function fileToAvatarUrl(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
@@ -26,6 +27,9 @@ export default function FamilySettingsPage() {
   const [resetDone, setResetDone] = useState(false);
 
   useEffect(() => {
+    // Load from localStorage immediately (survives redeploys)
+    const local = loadFamilyFromStorage();
+    if (local) { setMembers(local); return; }
     fetch("/api/family")
       .then((r) => r.json())
       .then((d) => setMembers(d.members ?? []))
@@ -54,11 +58,14 @@ export default function FamilySettingsPage() {
     if (!members) return;
     setSaving(true);
     setSaved(false);
+    const toSave = members.filter((m) => m.name.trim());
     try {
+      // Always persist to localStorage first (survives server restarts/redeploys)
+      saveFamilyToStorage(toSave);
       const res = await fetch("/api/family", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ members: members.filter((m) => m.name.trim()) }),
+        body: JSON.stringify({ members: toSave }),
       });
       const d = await res.json();
       if (d.members) setMembers(d.members);
@@ -81,56 +88,54 @@ export default function FamilySettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f1eb] px-3 py-4 md:grid md:place-items-center md:px-10">
-      <div className="phone-shell mx-auto w-full max-w-[430px] overflow-hidden bg-paper">
-        <div className="relative flex h-[min(900px,calc(100dvh-2rem))] min-h-[760px] flex-col overflow-hidden bg-paper">
-          <div className="relative shrink-0 px-[26px] pt-[18px]">
-            <div className="pointer-events-none absolute left-1/2 top-[12px] h-[30px] w-[112px] -translate-x-1/2 rounded-full bg-black" />
-            <a href="/" className="inline-flex items-center gap-1 pt-2 text-[13px] text-muted">
-              ‹ Home
-            </a>
-            <h1 className="mt-2 font-display text-[30px] tracking-[-0.02em] text-ink">Family</h1>
-            <p className="mt-1 text-[13px] text-muted">Names, birthdays &amp; photos — used across the app and to sort memories by age.</p>
-          </div>
+    <main className="min-h-screen bg-[#f5f1eb]">
+      <div className="mx-auto w-full max-w-[430px] bg-paper min-h-screen flex flex-col">
+        <div className="relative shrink-0 px-[26px] pt-[18px]">
+          <a href="/" className="inline-flex items-center gap-1 pt-2 text-[13px] text-muted">
+            ‹ Home
+          </a>
+          <h1 className="mt-2 font-display text-[30px] tracking-[-0.02em] text-ink">Family</h1>
+          <p className="mt-1 text-[13px] text-muted">Names, birthdays &amp; photos — used across the app and to sort memories by age.</p>
+        </div>
 
-          <div className="no-scrollbar flex-1 overflow-y-auto px-[26px] pb-32 pt-4">
-            {members === null ? (
-              <p className="pt-8 text-center text-[14px] text-muted">Loading…</p>
-            ) : (
-              <div className="space-y-3">
-                {members.map((m) => (
-                  <MemberRow key={m.id} member={m} onChange={(p) => update(m.id, p)} onRemove={() => remove(m.id)} />
-                ))}
-                <button onClick={addChild} className="w-full rounded-[16px] border border-dashed border-line py-3 text-[14px] font-semibold text-muted">
-                  ＋ Add a child
+        <div className="flex-1 px-[26px] pb-4 pt-4">
+          {members === null ? (
+            <p className="pt-8 text-center text-[14px] text-muted">Loading…</p>
+          ) : (
+            <div className="space-y-3">
+              {members.map((m) => (
+                <MemberRow key={m.id} member={m} onChange={(p) => update(m.id, p)} onRemove={() => remove(m.id)} />
+              ))}
+              <button onClick={addChild} className="w-full rounded-[16px] border border-dashed border-line py-3 text-[14px] font-semibold text-muted">
+                ＋ Add a child
+              </button>
+
+              <div className="mt-6 border-t border-line pt-5">
+                <p className="text-[13px] font-semibold text-ink">Demo data</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                  Clear photos, videos and Stories added while testing, returning Memory to its starting state. Your family settings are kept.
+                </p>
+                <button
+                  onClick={resetDemo}
+                  disabled={resetting}
+                  className="mt-3 w-full rounded-full border border-[#e3b7ab] py-3 text-[14px] font-semibold text-[#b5503a] disabled:opacity-40"
+                >
+                  {resetting ? "Clearing…" : resetDone ? "Cleared ✓ — reopen Memory" : "Reset demo data"}
                 </button>
-
-                <div className="mt-6 border-t border-line pt-5">
-                  <p className="text-[13px] font-semibold text-ink">Demo data</p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                    Clear photos, videos and Stories added while testing, returning Memory to its starting state. Your family settings are kept.
-                  </p>
-                  <button
-                    onClick={resetDemo}
-                    disabled={resetting}
-                    className="mt-3 w-full rounded-full border border-[#e3b7ab] py-3 text-[14px] font-semibold text-[#b5503a] disabled:opacity-40"
-                  >
-                    {resetting ? "Clearing…" : resetDone ? "Cleared ✓ — reopen Memory" : "Reset demo data"}
-                  </button>
-                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
-          <div className="shrink-0 border-t border-line bg-paper px-[26px] pb-8 pt-3">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="w-full rounded-full bg-ink py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
-            >
-              {saving ? "Saving…" : saved ? "Saved ✓" : "Save family"}
-            </button>
-          </div>
+        {/* Save button — always visible, sticks to bottom of content */}
+        <div className="sticky bottom-0 border-t border-line bg-paper px-[26px] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="w-full rounded-full bg-ink py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
+          >
+            {saving ? "Saving…" : saved ? "Saved ✓" : "Save family"}
+          </button>
         </div>
       </div>
     </main>

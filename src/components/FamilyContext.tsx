@@ -9,16 +9,37 @@ import type { FamilyMemberProfile } from "@/lib/family/profile";
 // picks up a fresh save.
 const FamilyContext = createContext<Record<string, FamilyMemberProfile>>({});
 
+const LS_KEY = "auri.family.v1";
+
+export function loadFamilyFromStorage(): FamilyMemberProfile[] | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+
+export function saveFamilyToStorage(members: FamilyMemberProfile[]) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(members)); } catch { /* quota */ }
+}
+
 export function FamilyProvider({ children }: { children: React.ReactNode }) {
-  const [byId, setById] = useState<Record<string, FamilyMemberProfile>>({});
+  const [byId, setById] = useState<Record<string, FamilyMemberProfile>>(() => {
+    // Seed immediately from localStorage so UI doesn't flash seed names
+    const local = typeof window !== "undefined" ? loadFamilyFromStorage() : null;
+    return local ? Object.fromEntries(local.map((m) => [m.id, m])) : {};
+  });
 
   useEffect(() => {
     fetch("/api/family", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data.members)) {
-          setById(Object.fromEntries((data.members as FamilyMemberProfile[]).map((m) => [m.id, m])));
-        }
+        if (!Array.isArray(data.members)) return;
+        const local = loadFamilyFromStorage();
+        // Prefer localStorage (user edits) over server seed; merge avatarUrls from server
+        const merged = local ?? data.members;
+        setById(Object.fromEntries((merged as FamilyMemberProfile[]).map((m) => [m.id, m])));
       })
       .catch(() => {});
   }, []);
