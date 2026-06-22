@@ -1,11 +1,19 @@
 import { seedObservations } from "@/lib/family/profile";
 import { getChildren } from "@/lib/family/store";
+import { listDemoCalendarEvents } from "@/lib/demo/demo-store";
 
 // Rich context for the chat model: the static family/team + each child's
 // interests, routines, health notes, and recent observations. This is what lets
 // Auri answer "why is my child upset?" with something only a family agent could
 // know — never generic advice.
 export function buildFamilyContext() {
+  // Existing robot reminders — used for deduplication: if the user asks to
+  // create the same reminder again, the AI can say it is already set.
+  const existingReminders = listDemoCalendarEvents()
+    .filter((e) => e.forRobot && e.status !== "done")
+    .slice(-20)
+    .map((e) => ({ title: e.title, person: e.person, dateLabel: e.dateLabel, timeLabel: e.timeLabel }));
+
   return {
     ...demoFamilyContext,
     children: getChildren()
@@ -23,6 +31,7 @@ export function buildFamilyContext() {
       source: o.source,
       observedAt: o.observedAt,
     })),
+    existingReminders,
   };
 }
 
@@ -39,22 +48,22 @@ export const demoFamilyContext = {
   teamMembers: [
     {
       id: "iris",
-      name: "Iris the eye",
+      name: "Cameraman",
       handles: ["films firsts", "robot clips", "family album", "photo highlights", "video receipts"],
     },
     {
       id: "lumi",
-      name: "Lumi the companion",
+      name: "Companion",
       handles: ["reading", "books", "questions", "reading moments"],
     },
     {
       id: "vita",
-      name: "Vita the keeper",
+      name: "Housekeeper",
       handles: ["calendar", "reminders", "school emails", "logs", "meds", "naps", "appointments", "family logistics"],
     },
     {
       id: "nova",
-      name: "Nova the coach",
+      name: "Coach",
       handles: ["home workout", "quick sets", "form", "reps"],
     },
   ],

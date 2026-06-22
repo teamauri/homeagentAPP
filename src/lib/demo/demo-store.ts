@@ -157,8 +157,10 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
   const currentStore = store();
 
   return objectsToCreate.map((object) => {
-    currentStore.__auriDemoCounter = (currentStore.__auriDemoCounter ?? 0) + 1;
-    const id = `${object.type}_${currentStore.__auriDemoCounter.toString().padStart(4, "0")}`;
+    // Use a timestamp-based ID so IDs never repeat across server restarts.
+    // Counter-based IDs (reminder_draft_0004) recycled on every Render restart,
+    // causing previously dismissed cards to appear dismissed again.
+    const id = `${object.type}_${Date.now()}`;
     const created: StoredObject = {
       id,
       type: object.type,
@@ -174,9 +176,13 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
     if (object.type === "reminder_draft" || object.type === "calendar_draft") {
       const p = object.payload as Record<string, unknown>;
       const title = typeof p.title === "string" && p.title ? p.title : "Reminder";
-      const person = toPersonId(typeof p.person === "string" ? p.person : "family");
+      // Accept childId/recipient/assignee as aliases for person (model is inconsistent)
+      const personRaw = p.person ?? p.childId ?? p.recipient ?? p.assignee ?? "family";
+      const person = toPersonId(typeof personRaw === "string" ? personRaw : "family");
       const dateLabel = typeof p.dateLabel === "string" && p.dateLabel ? p.dateLabel : "Today";
-      const timeLabel = typeof p.timeLabel === "string" && p.timeLabel ? p.timeLabel : "now";
+      // Accept time as alias for timeLabel
+      const timeLabel = (typeof p.timeLabel === "string" && p.timeLabel) ? p.timeLabel :
+                        (typeof p.time === "string" && p.time) ? p.time : "now";
       const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
       upsertDemoCalendarEvent({ title, person, dateLabel, timeLabel, note, forRobot: true });
     }
