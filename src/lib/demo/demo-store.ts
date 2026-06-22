@@ -158,7 +158,7 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
 
   return objectsToCreate.map((object) => {
     // For reminder/calendar drafts, deduplicate against existing pending events.
-    // If a matching event already exists, return it without creating a second entry.
+    // If a matching calendar event already exists, never create a second one.
     if (object.type === "reminder_draft" || object.type === "calendar_draft") {
       const p = object.payload as Record<string, unknown>;
       const title = typeof p.title === "string" && p.title ? p.title : "Reminder";
@@ -171,6 +171,13 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
                e.title.trim().toLowerCase() === normalizedTitle
       );
       if (existingEvent) {
+        // Fix stale "now" timeLabel in-place so DockKit sees the actual time.
+        if (existingEvent.timeLabel.trim().toLowerCase() === "now") {
+          existingEvent.timeLabel = new Intl.DateTimeFormat("en-US", {
+            hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai",
+          }).format(new Date(Date.now() + 60_000));
+          existingEvent.updatedAt = new Date().toISOString();
+        }
         const existingObj = (currentStore.__auriDemoObjects ?? []).find(
           (o) => (o.type === "reminder_draft" || o.type === "calendar_draft") &&
                  typeof o.payload.title === "string" &&
@@ -179,6 +186,16 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
         if (existingObj) {
           return { id: existingObj.id, type: existingObj.type, route: existingObj.route, status: existingObj.status };
         }
+        // Object was lost (Render restart). Create a new object but skip the calendar
+        // event — the existing one is the source of truth for DockKit.
+        const id = `${object.type}_${Date.now()}`;
+        const created: StoredObject = {
+          id, type: object.type, route: `/objects/${id}`,
+          status: statusFor(object.type), payload: object.payload,
+          createdAt: new Date().toISOString(),
+        };
+        currentStore.__auriDemoObjects?.push(created);
+        return { id: created.id, type: created.type, route: created.route, status: created.status };
       }
     }
 
@@ -261,7 +278,7 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
     person: input.person,
     dateLabel: input.dateLabel,
     timeLabel: input.timeLabel,
-    icon: existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
+    icon: input.icon ?? existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
     source: "created",
     forRobot,
     auriClientVideoUuid: forRobot ? (existing?.auriClientVideoUuid ?? randomUUID()) : undefined,
