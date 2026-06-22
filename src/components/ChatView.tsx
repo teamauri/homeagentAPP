@@ -70,7 +70,6 @@ const avatarStyles = {
 };
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
   const { completions, events } = useRobotEvents();
   // Highlight jobs that are mid-capture: Iris shows a live counter card that
   // climbs as the run catches real clips/photos, then hands off to the keepsake.
@@ -96,12 +95,6 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
     })),
   ].sort((a, b) => a.at - b.at);
 
-  // Scroll to the bottom sentinel whenever the message list changes, so the
-  // latest message is always visible on first load and after new messages arrive.
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "instant" });
-  }, [liveTurns.length, stream.length]);
-
   return (
     <div className="pb-4">
       <div className="space-y-5">
@@ -110,7 +103,6 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
         ))}
         {stream.map((item) => item.node)}
       </div>
-      <div ref={bottomRef} />
     </div>
   );
 }
@@ -540,32 +532,28 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
     }
 
     return (
-      <div className="grid min-h-[72px] w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-[15px] border border-line bg-white px-2.5 py-2.5 shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
-        <div className="grid h-6 w-6 shrink-0 place-items-center">
-          <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-6 w-6" />
-        </div>
+      <div className="w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
         <button
           onClick={() => setEditing(true)}
-          className="min-w-0 text-left"
+          className="flex w-full items-start gap-2.5 px-3 py-3 text-left"
         >
-          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">
-            {isReminder ? "Reminder" : "Calendar event"}
+          <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center">
+            <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-6 w-6" />
           </div>
-          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">
-            {liveTitle}
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] leading-4 text-muted">
+              {isReminder ? "Reminder" : "Calendar event"}
+            </div>
+            <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">
+              {liveTitle}
+            </div>
+            <div className="mt-0.5 text-[12.5px] leading-[18px] text-muted">{whenLine}</div>
           </div>
-          <div className="mt-0.5 truncate text-[12.5px] leading-4 tracking-[0] text-muted">{whenLine}</div>
         </button>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={() => setEditing(true)}
-            className="text-[12.5px] font-medium text-ink/50"
-          >
-            Edit
-          </button>
+        <div className="border-t border-line px-3 py-2">
           <button
             onClick={() => { window.location.href = "/calendar"; }}
-            className="shrink-0 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]"
+            className="w-full rounded-full border border-line py-1.5 text-[12.5px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]"
           >
             View in Calendar
           </button>

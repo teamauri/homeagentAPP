@@ -58,6 +58,7 @@ export interface CalendarEventInput {
   dateLabel: string;
   timeLabel: string;
   forRobot?: boolean;
+  icon?: string;
   photoUrl?: string;
   voiceUrl?: string;
   voiceDuration?: number;
@@ -69,7 +70,7 @@ export function deriveCalendarEventIcon(title: string, _person: PersonId) {
   if (/read|book|story/.test(t)) return "book";
   if (/meal|dinner|lunch|breakfast|eat|cook|snack|吃饭/.test(t)) return "meal";
   if (/photo|album|picture|smile/.test(t)) return "camera-note";
-  if (/record|recording|film|video|clip|e2e/.test(t)) return "camera-note";
+  if (/record|recording|film|video|clip|e2e|highlight/.test(t)) return "camera-note";
   if (/call|grandma|grandpa|phone/.test(t)) return "video-heart";
   if (/soccer|play|sport|run|stretch|jump|exercise|dance|swim/.test(t)) return "soccer";
   if (/draw|paint|art|write|color/.test(t)) return "pencil";
