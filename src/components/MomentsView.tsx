@@ -81,6 +81,11 @@ async function fileToPayload(file: File) {
   };
 }
 
+// The Auri Cut render runs on auri-editor, but the orchestration + progress live
+// in this browser tab. Persist the ids once the render is queued so a page refresh
+// can resume polling instead of losing the whole job.
+const JOB_KEY = "auri.job.v1";
+
 export function MomentsView() {
   const children = useChildren();
   const { completions } = useRobotEvents();
@@ -109,6 +114,35 @@ export function MomentsView() {
     refresh().catch(() => {});
   }, []);
 
+  // Resume an Auri Cut render that was in flight when the tab was refreshed. The
+  // render keeps going on auri-editor; we just need to re-attach and poll it.
+  useEffect(() => {
+    let saved: { videoId?: string; vlogId?: string } | null = null;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(JOB_KEY) || "null");
+    } catch {
+      saved = null;
+    }
+    if (saved?.videoId && saved?.vlogId) {
+      setAuriPhase("editing");
+      setEditStep(3);
+      resumeAuriCut(saved.videoId, saved.vlogId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Warn before navigating away while an edit is running — leaving drops the
+  // browser-side orchestration (the resume above only covers a render in flight).
+  useEffect(() => {
+    if (auriPhase !== "editing") return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [auriPhase]);
+
   // Auri Cut: preprocess the video in the browser (ffmpeg.wasm) + drive the Auri
   // backend directly, then land the rendered short as a Memory. No server job.
   async function onAuriVideo(files: FileList | null) {
@@ -122,60 +156,28 @@ export function MomentsView() {
     setAuriPhase("editing");
     try {
       const { editToShortInBrowser } = await import("@/lib/auri/browser/pipeline");
-      const result = await editToShortInBrowser(file, ({ stage, progress }) => {
-        setEditStep(stage === "uploading" ? (progress > 0.2 ? 1 : 0) : stage === "analyzing" ? 2 : 3);
-      });
-      // The phone just hands the ids to the server, which downloads the rendered
-      // mp4 from auri-editor, stores it, and creates the Memory. No big upload here.
-      const res = await fetch("/api/edit/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          videoId: result.videoId,
-          vlogId: result.vlogId,
-          durationSeconds: result.durationSeconds,
-          person: growth?.child.id ?? "family",
-        }),
-      });
-      if (!res.ok) throw new Error(`Couldn't save the film (${res.status})`);
-      const data = await res.json();
-      setAuriResult({ memoryId: data.memoryId, durationSeconds: data.durationSeconds, mediaUrl: data.mediaUrl });
-      setAuriPhase("done");
-      await refresh().catch(() => {});
-      // Show the new film in the timeline immediately — even if the server store
-      // hasn't propagated across serverless instances yet (it'll be there on the
-      // next load). Skip if a refresh already surfaced it.
-      if (data.mediaUrl) {
-        setGrowth((prev) => {
-          if (!prev) return prev;
-          const present = prev.days.some(
-            (d) => (data.memoryId && d.memoryId === data.memoryId) || d.media.some((m) => m.url === data.mediaUrl),
-          );
-          if (present) return prev;
-          const now = new Date();
-          const newDay: DayGroup = {
-            dateISO: now.toISOString(),
-            dateLabel: `Today · ${now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
-            caption: "A short film from your video, made by Auri Cut.",
-            isFirstDay: false,
-            memoryId: data.memoryId,
-            media: [
-              {
-                id: data.memoryId ?? `auri-${now.getTime()}`,
-                kind: "video",
-                source: "auri",
-                url: data.mediaUrl,
-                durationLabel: data.durationSeconds ? secLabel(data.durationSeconds) : undefined,
-                capturedAtISO: now.toISOString(),
-                isFirst: false,
-              },
-            ],
-          };
-          return { ...prev, days: [newDay, ...prev.days] };
-        });
-      }
+      const result = await editToShortInBrowser(
+        file,
+        ({ stage, progress }) => {
+          setEditStep(stage === "uploading" ? (progress > 0.2 ? 1 : 0) : stage === "analyzing" ? 2 : 3);
+        },
+        // Render queued — persist the ids so a refresh can resume polling.
+        (cp) => {
+          try {
+            sessionStorage.setItem(JOB_KEY, JSON.stringify(cp));
+          } catch {
+            /* private mode / quota — resume just won't be available */
+          }
+        },
+      );
+      await finishAndShow(result.videoId, result.vlogId, result.durationSeconds);
     } catch (e) {
       setAuriPhase("idle");
+      try {
+        sessionStorage.removeItem(JOB_KEY);
+      } catch {
+        /* ignore */
+      }
       // A stale deploy (the app updated while this tab stayed open) makes a
       // code-split chunk 404. Recover by reloading to the fresh build.
       const msg = e instanceof Error ? e.message : String(e);
@@ -185,6 +187,77 @@ export function MomentsView() {
         return;
       }
       setError(msg || "Editing failed — please try again.");
+    }
+  }
+
+  // Hand the rendered vlog's ids to the server (it downloads the mp4 from
+  // auri-editor, stores it, creates the Memory), then surface the film. Shared by
+  // a fresh edit and by a refresh-resumed one.
+  async function finishAndShow(videoId: string, vlogId: string, durationSeconds?: number) {
+    const res = await fetch("/api/edit/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoId, vlogId, durationSeconds, person: growth?.child.id ?? "family" }),
+    });
+    if (!res.ok) throw new Error(`Couldn't save the film (${res.status})`);
+    const data = await res.json();
+    try {
+      sessionStorage.removeItem(JOB_KEY);
+    } catch {
+      /* ignore */
+    }
+    setAuriResult({ memoryId: data.memoryId, durationSeconds: data.durationSeconds, mediaUrl: data.mediaUrl });
+    setAuriPhase("done");
+    await refresh().catch(() => {});
+    // Show the new film in the timeline immediately — even if the server store
+    // hasn't propagated across serverless instances yet (it'll be there on the
+    // next load). Skip if a refresh already surfaced it.
+    if (data.mediaUrl) {
+      setGrowth((prev) => {
+        if (!prev) return prev;
+        const present = prev.days.some(
+          (d) => (data.memoryId && d.memoryId === data.memoryId) || d.media.some((m) => m.url === data.mediaUrl),
+        );
+        if (present) return prev;
+        const now = new Date();
+        const newDay: DayGroup = {
+          dateISO: now.toISOString(),
+          dateLabel: `Today · ${now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
+          caption: "A short film from your video, made by Auri Cut.",
+          isFirstDay: false,
+          memoryId: data.memoryId,
+          media: [
+            {
+              id: data.memoryId ?? `auri-${now.getTime()}`,
+              kind: "video",
+              source: "auri",
+              url: data.mediaUrl,
+              durationLabel: data.durationSeconds ? secLabel(data.durationSeconds) : undefined,
+              capturedAtISO: now.toISOString(),
+              isFirst: false,
+            },
+          ],
+        };
+        return { ...prev, days: [newDay, ...prev.days] };
+      });
+    }
+  }
+
+  // After a page refresh mid-render, pick the job back up: the render is still
+  // running on auri-editor, so just re-poll by its ids and ingest when ready.
+  async function resumeAuriCut(videoId: string, vlogId: string) {
+    try {
+      const { AuriClient } = await import("@/lib/auri/client");
+      const done = await new AuriClient().pollUntilVlogFinished(videoId, vlogId);
+      await finishAndShow(videoId, vlogId, done.storyBudgetSeconds);
+    } catch {
+      setAuriPhase("idle");
+      try {
+        sessionStorage.removeItem(JOB_KEY);
+      } catch {
+        /* ignore */
+      }
+      setError("Your film was interrupted — please start Auri Cut again.");
     }
   }
 
