@@ -28,12 +28,23 @@ const responseContract = {
   suggestedFollowups: ["string"],
 };
 
+function currentTimeLabel(): string {
+  const now = new Date();
+  const h = now.getHours();
+  const m = now.getMinutes();
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 function buildMessages(request: ChatRequestBody) {
+  const nowLabel = currentTimeLabel();
   return [
     {
       role: "system",
       content: [
         AURI_SYSTEM_PROMPT,
+        `IMPORTANT — Current time: ${nowLabel}. When the user says "now", "现在", "立刻", or "马上", always use exactly "${nowLabel}" as the reminder/event time. Never infer a time from routine descriptions — use the current time literally.`,
         "Return ONLY valid JSON. No markdown, no code fences, no explanation.",
         "The JSON must match this TypeScript-like contract:",
         JSON.stringify(responseContract),
@@ -43,6 +54,7 @@ function buildMessages(request: ChatRequestBody) {
       role: "user",
       content: JSON.stringify({
         familyContext: buildFamilyContext(),
+        currentTime: nowLabel,
         request,
       }),
     },

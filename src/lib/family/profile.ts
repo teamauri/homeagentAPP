@@ -93,7 +93,7 @@ export const seedFamilyMembers: FamilyMemberProfile[] = [
     birthday: "2023-02-10",
     avatar: "girl",
     interests: ["dinosaurs", "picture books"],
-    routines: ["Bedtime story around 8pm", "2pm medicine"],
+    routines: ["Bedtime story around 8pm", "daily medicine (time varies)"],
     health: ["Finishing a 10-day course of medicine"],
   },
   {
