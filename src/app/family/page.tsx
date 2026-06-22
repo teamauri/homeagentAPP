@@ -152,8 +152,8 @@ export default function FamilySettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f1eb]">
-      <div className="mx-auto w-full max-w-[430px] bg-paper min-h-screen flex flex-col">
+    <main className="h-[100dvh] bg-[#f5f1eb]">
+      <div className="mx-auto w-full max-w-[430px] bg-paper h-full flex flex-col">
         <div className="relative shrink-0 px-[26px] pt-[18px]">
           <a href="/" className="inline-flex items-center gap-1 pt-2 text-[13px] text-muted">
             ‹ Home
@@ -162,7 +162,7 @@ export default function FamilySettingsPage() {
           <p className="mt-1 text-[13px] text-muted">Names, birthdays &amp; photos — used across the app and to sort memories by age.</p>
         </div>
 
-        <div className="flex-1 px-[26px] pb-4 pt-4">
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-[26px] pb-4 pt-4">
           {members === null ? (
             <p className="pt-8 text-center text-[14px] text-muted">Loading…</p>
           ) : (
