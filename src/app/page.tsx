@@ -7,7 +7,7 @@ import { ChatView, LiveChatTurn } from "@/components/ChatView";
 import { MomentsView } from "@/components/MomentsView";
 import { ChatApiResponse, TeamMemberId } from "@/lib/chat-server/types";
 import { teamAgentById } from "@/lib/team";
-import { FamilyProvider } from "@/components/FamilyContext";
+import { FamilyProvider, useFamilyMember } from "@/components/FamilyContext";
 import { enrichCards } from "@/lib/chat-draft";
 
 function nowLabel() {
@@ -22,7 +22,9 @@ function displayHelperName(name: string) {
   return name.split(" the ")[0] || name;
 }
 
-export default function Home() {
+function HomeInner() {
+  const mom = useFamilyMember("mom");
+  const senderName = mom?.name ?? "Mom";
   const [tab, setTab] = useState<TabKey>("chat");
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
   const [liveLoaded, setLiveLoaded] = useState(false);
@@ -73,7 +75,7 @@ export default function Home() {
       ...current,
       {
         id: `user-${sentAt}`,
-        sender: "Mom",
+        sender: senderName,
         time: nowLabel(),
         avatar: "mom",
         text: outgoing,
@@ -162,8 +164,7 @@ export default function Home() {
   };
 
   return (
-    <FamilyProvider>
-      <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage}>
+    <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage}>
         {/*
           Keep every tab mounted and just toggle visibility. Conditional rendering
           (`tab === x && <View/>`) unmounts the inactive views, which made Memory
@@ -180,6 +181,13 @@ export default function Home() {
           <MomentsView />
         </div>
       </AppShell>
+  );
+}
+
+export default function Home() {
+  return (
+    <FamilyProvider>
+      <HomeInner />
     </FamilyProvider>
   );
 }

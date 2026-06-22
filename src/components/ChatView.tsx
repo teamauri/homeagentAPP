@@ -231,13 +231,19 @@ function VideoResultCard({ event }: { event: RobotEvent }) {
   );
 }
 
+function useParentDisplayName(avatar: string, fallback: string): string {
+  const member = useFamilyMember(avatar === "mom" || avatar === "dad" ? avatar : undefined);
+  return member?.name || fallback;
+}
+
 function ChatTurnRow({ turn }: { turn: ChatTurn }) {
+  const displayName = useParentDisplayName(turn.avatar, turn.sender);
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
       <Avatar avatar={turn.avatar} />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{turn.sender}</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
         <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">{turn.text}</p>
@@ -276,12 +282,13 @@ function Avatar({ avatar }: { avatar: ChatTurn["avatar"] }) {
 }
 
 function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
+  const displayName = useParentDisplayName(turn.avatar, turn.sender);
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
       <LiveAvatar avatar={turn.avatar} sender={turn.sender} />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{turn.sender}</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
         {turn.imageUrl ? (
@@ -364,6 +371,14 @@ function ApiResponseCard({ card }: { card: ChatTurnCard }) {
 }
 
 type DraftState = "confirmed" | "dismissed";
+
+const PERSON_OPTIONS = [
+  { id: "mia", label: "Mia" },
+  { id: "leo", label: "Leo" },
+  { id: "mom", label: "Mom" },
+  { id: "dad", label: "Dad" },
+  { id: "family", label: "Family" },
+];
 const DRAFT_STATE_KEY = "auri.draftStates.v1";
 
 // A stable key per draft so its confirmed/dismissed state survives a full-page
@@ -396,21 +411,32 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const { addEvent } = useRobotEvents();
   const key = draftKey(draft);
   const [state, setState] = useState<"draft" | "confirmed" | "dismissed">(() => readDraftStates()[key] ?? "draft");
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(draft.title);
+  const [editTime, setEditTime] = useState(draft.timeLabel);
+  const [editPerson, setEditPerson] = useState<DraftInfo["person"]>(draft.person);
 
   const isReminder = draft.kind === "reminder";
-  const whenLine = [draft.dateLabel, draft.timeLabel, draft.personLabel].filter(Boolean).join(" · ");
+
+  // Use live edits when confirmed so the confirmed card shows what was saved.
+  const liveTitle = editTitle || draft.title;
+  const liveTime = editTime || draft.timeLabel;
+  const livePerson = editPerson || draft.person;
+  const livePersonLabel = PERSON_OPTIONS.find((p) => p.id === livePerson)?.label ?? livePerson;
+  const whenLine = [draft.dateLabel, liveTime, livePersonLabel].filter(Boolean).join(" · ");
 
   const confirm = () => {
     addEvent({
-      title: draft.title,
+      title: liveTitle,
       note: draft.note,
-      person: draft.person,
+      person: livePerson,
       dateLabel: draft.dateLabel,
-      timeLabel: draft.timeLabel,
+      timeLabel: liveTime,
       forRobot: false,
     });
     writeDraftState(key, "confirmed");
     setState("confirmed");
+    setEditing(false);
   };
 
   const dismiss = () => {
@@ -423,37 +449,76 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
 
   return (
     <div className="max-w-[98%] overflow-hidden rounded-[16px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
-      <div className="flex items-start gap-3 px-3.5 pt-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center">
-          <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-8 w-8" />
-        </div>
-        <div className="min-w-0 flex-1 pb-1">
-          <div className="text-[12px] leading-4 tracking-[0] text-muted">{isReminder ? "Reminder" : "Calendar event"}</div>
-          <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{draft.title}</div>
-          {whenLine ? <div className="mt-0.5 text-[12.5px] leading-4 tracking-[0] text-muted">{whenLine}</div> : null}
-          {draft.note ? <div className="mt-1 line-clamp-2 text-[13px] leading-[18px] tracking-[0] text-ink/70">"{draft.note}"</div> : null}
-        </div>
-      </div>
-
-      {confirmed ? (
-        <div className="mt-2 flex items-center justify-between border-t border-line/80 px-4 py-2.5">
-          <span className="flex items-center gap-1.5 text-[13px] font-medium text-mint">
-            <svg viewBox="0 0 24 24" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m5 12 4.5 4.5L19 7" />
-            </svg>
-            {isReminder ? "Reminder set" : "Added to your calendar"}
-          </span>
-          <a href="/calendar" className="text-[13px] font-semibold text-ink">View calendar</a>
+      {editing ? (
+        <div className="px-3.5 py-3 space-y-2">
+          <div className="text-[12px] font-medium text-muted mb-1">{isReminder ? "Edit reminder" : "Edit event"}</div>
+          <input
+            className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            placeholder="Title"
+          />
+          <input
+            className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
+            value={editTime}
+            onChange={(e) => setEditTime(e.target.value)}
+            placeholder="Time (e.g. 1:30 PM)"
+          />
+          <select
+            className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
+            value={editPerson}
+            onChange={(e) => setEditPerson(e.target.value as DraftInfo["person"])}
+          >
+            {PERSON_OPTIONS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => setEditing(false)} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
+              Done
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="mt-2 flex gap-2 border-t border-line/80 px-3 py-2.5">
-          <button onClick={confirm} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
-            {isReminder ? "Add reminder" : "Add to calendar"}
-          </button>
-          <button onClick={dismiss} className="rounded-full border border-line px-4 py-2 text-[14px] font-medium text-muted">
-            Dismiss
-          </button>
-        </div>
+        <>
+          <div className="flex items-start gap-3 px-3.5 pt-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center">
+              <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-8 w-8" />
+            </div>
+            <div className="min-w-0 flex-1 pb-1">
+              <div className="text-[12px] leading-4 tracking-[0] text-muted">{isReminder ? "Reminder" : "Calendar event"}</div>
+              <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{liveTitle}</div>
+              {whenLine ? <div className="mt-0.5 text-[12.5px] leading-4 tracking-[0] text-muted">{whenLine}</div> : null}
+              {draft.note ? <div className="mt-1 line-clamp-2 text-[13px] leading-[18px] tracking-[0] text-ink/70">"{draft.note}"</div> : null}
+            </div>
+            {!confirmed && (
+              <button onClick={() => setEditing(true)} className="mt-0.5 shrink-0 text-[12px] font-medium text-ink/50 hover:text-ink">
+                Edit
+              </button>
+            )}
+          </div>
+
+          {confirmed ? (
+            <div className="mt-2 flex items-center justify-between border-t border-line/80 px-4 py-2.5">
+              <span className="flex items-center gap-1.5 text-[13px] font-medium text-mint">
+                <svg viewBox="0 0 24 24" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m5 12 4.5 4.5L19 7" />
+                </svg>
+                {isReminder ? "Reminder set" : "Added to your calendar"}
+              </span>
+              <a href="/calendar" className="text-[13px] font-semibold text-ink">View calendar</a>
+            </div>
+          ) : (
+            <div className="mt-2 flex gap-2 border-t border-line/80 px-3 py-2.5">
+              <button onClick={confirm} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
+                {isReminder ? "Add reminder" : "Add to calendar"}
+              </button>
+              <button onClick={dismiss} className="rounded-full border border-line px-4 py-2 text-[14px] font-medium text-muted">
+                Dismiss
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
