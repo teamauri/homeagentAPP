@@ -1,19 +1,13 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { put } from "@vercel/blob";
+import { MEDIA_DIR } from "./data-dir";
 
-// Media storage for ingested DockKit/Auri media.
-//
-// - On Vercel (BLOB_READ_WRITE_TOKEN present) files go to Vercel Blob with
-//   PRIVATE access (the store is private) and are served back through
-//   /api/media/blob/<file>, which streams the blob — required because Vercel's
-//   filesystem is read-only/ephemeral and private blob URLs aren't directly
-//   embeddable in <img>/<video>.
-// - Locally (no token) files fall back to public/demo-media and are served
-//   through the same /api/media/blob/<file> route, so deployed hosts that do not
-//   expose runtime-written public files still return playable media URLs.
-const MEDIA_DIR = path.join(process.cwd(), "public", "demo-media");
+// Media storage for ingested DockKit/Auri media. Files are written under
+// MEDIA_DIR (a Render Persistent Disk in production via DATA_DIR, else
+// public/demo-media in dev) and served back through /api/media/blob/<file> —
+// runtime-written files outside the build aren't reliably served as static
+// assets, so the route streams them with HTTP Range for <video> playback.
 
 const EXTENSION_BY_MIME: Record<string, string> = {
   "video/mp4": "mp4",
@@ -37,23 +31,13 @@ export interface StoredFile {
   fileName: string;
   mimeType: string;
   size: number;
-  storage: "blob" | "local";
+  storage: "disk";
 }
 
 async function storeBuffer(buffer: Buffer, fileName: string, mimeType: string): Promise<StoredFile> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    await put(`demo-media/${fileName}`, buffer, {
-      access: "private",
-      contentType: mimeType,
-      addRandomSuffix: false,
-    });
-    // Private blobs aren't directly embeddable — serve them through our route.
-    return { url: `/api/media/blob/${fileName}`, fileName, mimeType, size: buffer.byteLength, storage: "blob" };
-  }
-
   await mkdir(MEDIA_DIR, { recursive: true });
   await writeFile(path.join(MEDIA_DIR, fileName), buffer);
-  return { url: `/api/media/blob/${fileName}`, fileName, mimeType, size: buffer.byteLength, storage: "local" };
+  return { url: `/api/media/blob/${fileName}`, fileName, mimeType, size: buffer.byteLength, storage: "disk" };
 }
 
 /** Persists an uploaded File and returns its publicly servable URL. */
@@ -78,14 +62,7 @@ export function isFile(value: FormDataEntryValue | null): value is File {
   return typeof value === "object" && value !== null && "arrayBuffer" in value && "size" in value;
 }
 
-/** Delete every stored uploaded media file (Blob on Vercel / local folder). */
+/** Delete every stored uploaded media file. */
 export async function deleteAllUploadedMedia(): Promise<void> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { list, del } = await import("@vercel/blob");
-    const { blobs } = await list({ prefix: "demo-media/" });
-    if (blobs.length) await del(blobs.map((b) => b.url));
-    return;
-  }
-  const { rm } = await import("node:fs/promises");
   await rm(MEDIA_DIR, { recursive: true, force: true }).catch(() => {});
 }

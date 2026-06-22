@@ -1,18 +1,17 @@
 // Persistence for the in-memory demo stores so ingested robot Stories, phone
-// uploads, and organized album structure survive server restarts / new
-// serverless cold starts.
+// uploads, and organized album structure survive server restarts / cold starts.
 //
-// Backend (pluggable, zero forced setup — mirrors media-storage.ts):
-//   - Vercel Blob (BLOB_READ_WRITE_TOKEN present): one public JSON snapshot per
-//     store key. Works on Vercel where the filesystem is read-only/ephemeral.
-//   - Local file `.data/<key>.json` (dev): survives `next dev` restarts.
-//   - Neither: no-op (pure in-memory, original behaviour).
+// One JSON snapshot per store key, written under SNAPSHOT_DIR — a Render
+// Persistent Disk in production (via DATA_DIR), else local `.data/` in dev. The
+// disk survives restarts/redeploys; without it, persistence is per-instance only.
 //
 // Each store registers a snapshot()/restore() pair; reads stay synchronous, and
 // routes call `ensureHydrated()` (once per cold start, per store) before reading
 // and `persistStore(key)` after mutating. For strict cross-instance consistency
-// under concurrency, provision Vercel KV later and swap the adapter — the store
-// API does not change.
+// under concurrency, move to a shared DB and swap the adapter — the store API
+// does not change.
+
+import { SNAPSHOT_DIR } from "./data-dir";
 
 type Snapshot = Record<string, unknown>;
 
@@ -28,29 +27,11 @@ export function registerStore(registration: StoreRegistration) {
   registry.set(registration.key, registration);
 }
 
-const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
-// The Blob store is PRIVATE, so snapshots are written with private access and
-// read back with get({ useCache: false }) — which fetches straight from origin
-// storage, bypassing the CDN. That avoids both the "public access on a private
-// store" error and the stale-CDN reads that were making organized photos vanish.
-const blobPathname = (key: string) => `demo-store/${key}.json`;
-
 async function loadSnapshot(key: string): Promise<Snapshot | null> {
-  if (useBlob) {
-    const { get } = await import("@vercel/blob");
-    const res = await get(blobPathname(key), { access: "private", useCache: false }).catch(() => null);
-    if (!res || !res.stream) return null;
-    try {
-      return (await new Response(res.stream as ReadableStream).json()) as Snapshot;
-    } catch {
-      return null;
-    }
-  }
-
   const { readFile } = await import("node:fs/promises");
   const { join } = await import("node:path");
   try {
-    const raw = await readFile(join(process.cwd(), ".data", `${key}.json`), "utf8");
+    const raw = await readFile(join(SNAPSHOT_DIR, `${key}.json`), "utf8");
     return JSON.parse(raw) as Snapshot;
   } catch {
     return null;
@@ -59,22 +40,10 @@ async function loadSnapshot(key: string): Promise<Snapshot | null> {
 
 async function saveSnapshot(key: string, data: Snapshot): Promise<void> {
   const json = JSON.stringify(data);
-  if (useBlob) {
-    const { put } = await import("@vercel/blob");
-    await put(blobPathname(key), json, {
-      access: "private",
-      contentType: "application/json",
-      addRandomSuffix: false,
-      allowOverwrite: true,
-    });
-    return;
-  }
-
   const { mkdir, writeFile } = await import("node:fs/promises");
   const { join } = await import("node:path");
-  const dir = join(process.cwd(), ".data");
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, `${key}.json`), json);
+  await mkdir(SNAPSHOT_DIR, { recursive: true });
+  await writeFile(join(SNAPSHOT_DIR, `${key}.json`), json);
 }
 
 const hydratedKeys = new Set<string>();

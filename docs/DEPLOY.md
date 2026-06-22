@@ -13,25 +13,34 @@ Next.js 14 (App Router). Deployed as a single long-running Node service on
 | `AURI_HOST` | Robot raw-output sync | Default is `https://auriedit.onrender.com`; set explicitly in production. |
 | `AURI_APP_ID` | Auri Editor auth | Default is `homeagent-memory`; use the allowlisted app id for the deployed backend. |
 | `AURI_AUTH_TOKEN` | Auri Editor auth | Optional bearer token if required by the deployed Auri Editor. |
-| `BLOB_READ_WRITE_TOKEN` | Durable robot media | Optional. If set, uploaded/ingested media is stored in a Vercel Blob store (usable from any host, incl. Render); otherwise media falls back to `public/demo-media` / the in-memory store. |
+| `DATA_DIR` | **Durable media + records** | Path to a mounted Render Persistent Disk (e.g. `/var/data`). Media and store snapshots are written here and survive restarts/redeploys. Unset → ephemeral (`public/demo-media` + `.data`), lost on restart. |
 
 Secrets live on the platform / your shell — never commit them (`.env*` is gitignored).
 For a local real-AI run: put them in `.env.local`, then `npm run dev`.
 
 ## Persistence note
 
-`src/lib/demo/demo-store.ts` is an **in-memory** store (globalThis). On Render
-— a single long-running instance — it survives for the instance's lifetime, so
-organized albums and ingested robot Stories persist during the demo. Seed
-content (chat, growth feed, detail pages) always renders regardless. For media
-that must survive restarts/redeploys, set `BLOB_READ_WRITE_TOKEN` (above).
+`src/lib/demo/demo-store.ts` is an **in-memory** store (globalThis), snapshotted
+to one JSON file per store (`SNAPSHOT_DIR`) and mirrored by media files
+(`MEDIA_DIR`) — both rooted at `DATA_DIR` when set (see `src/lib/demo/data-dir.ts`).
+
+- **With a Persistent Disk** (`DATA_DIR=/var/data`): organized albums, ingested
+  robot Stories, phone uploads, and Auri Cut films survive restarts/redeploys.
+- **Without it**: the container FS is ephemeral — those are lost on restart /
+  redeploy / free-tier spin-down (seed content always renders regardless).
+
+A disk pins the service to a single instance (it can't be shared) — fine for the
+demo. Multi-instance consistency needs a shared DB later.
 
 ## Deploy on Render
 
 1. New Web Service → connect `teamauri/homeagentAPP` → branch `main`.
 2. Build: `npm install && npm run build` · Start: `npm start`
-3. Add env vars from the table above.
-4. Render auto-deploys on every push to `main`. Open the live root on a phone:
+3. **Add a Persistent Disk** (service → Disks): mount path e.g. `/var/data`,
+   size a few GB. Then set env `DATA_DIR=/var/data`. *(Requires a paid instance;
+   the disk pins the service to one instance.)*
+4. Add the other env vars from the table above.
+5. Render auto-deploys on every push to `main`. Open the live root on a phone:
    `https://homeagentapp.onrender.com/`.
 
 Slow model calls set their own timeout via route segment config
