@@ -32,6 +32,24 @@ type UpcomingItem = {
 };
 
 // Every calendar event is a robot task, so the Auri Robot badge shows on all of them.
+// A "Today" job whose scheduled time has passed is expired and removed from
+// Upcoming. "now" jobs are always considered past (they should have run instantly).
+function isExpired(dateLabel: string, timeLabel: string): boolean {
+  if (dateLabel !== "Today") return false;
+  const lower = timeLabel.toLowerCase().trim();
+  if (lower === "now") return true;
+  const m = timeLabel.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return false;
+  let hour = parseInt(m[1]);
+  const min = parseInt(m[2]);
+  const period = m[3].toUpperCase();
+  if (period === "PM" && hour !== 12) hour += 12;
+  if (period === "AM" && hour === 12) hour = 0;
+  const scheduled = new Date();
+  scheduled.setHours(hour, min, 0, 0);
+  return Date.now() > scheduled.getTime();
+}
+
 const SHORT_DAY: Record<string, string> = {
   Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun", Tomorrow: "Tmrw",
 };
@@ -50,7 +68,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   // they also appear on the calendar) + the mock seed. "Done" events clear out.
   const upcomingItems: UpcomingItem[] = [
     ...events
-      .filter((e) => !e.kind && e.status !== "done")
+      .filter((e) => !e.kind && e.status !== "done" && !isExpired(e.dateLabel, e.timeLabel))
       .map<UpcomingItem>((e) => ({
         id: e.id,
         eventId: e.id,
