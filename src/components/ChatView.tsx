@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
+import { teamAgentById } from "@/lib/team";
 import { TeamBadge } from "./TeamBadge";
 import { useFamilyMember } from "./FamilyContext";
 import { chatFixtureMessages } from "@/lib/chat-fixtures";
@@ -124,7 +125,7 @@ function HighlightProgressRow({ event }: { event: RobotEvent }) {
       <TeamBadge agentId="iris" size="sm" />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">Iris</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{teamAgentById["iris"].name}</span>
           <span className="text-[13px] text-muted">{event.timeLabel}</span>
         </div>
         <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">Catching the highlights — eyes up.</p>
@@ -178,7 +179,7 @@ function RobotCompletionRow({ event }: { event: RobotEvent }) {
       <TeamBadge agentId="vita" size="sm" />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">Vita</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{teamAgentById["vita"].name}</span>
           <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
         </div>
         <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">
@@ -421,13 +422,35 @@ function writeDraftState(key: string, value: DraftState) {
 // settled state — no navigating away, so the thread stays intact. The settled
 // state is persisted so it stays confirmed/dismissed after a page nav.
 function DraftActionCard({ draft }: { draft: DraftInfo }) {
-  const { addEvent } = useRobotEvents();
+  const { addEvent, updateEvent, events } = useRobotEvents();
   const key = draftKey(draft);
-  const [state, setState] = useState<"draft" | "confirmed" | "dismissed">(() => readDraftStates()[key] ?? "draft");
+
+  // Client-side dedup: find a pending event that matches this draft by title.
+  // This catches duplicates even when the server-side store was wiped (Render restart).
+  const matchingEvent = events.find(
+    (e) => e.forRobot && e.status !== "done" &&
+           e.title.trim().toLowerCase() === draft.title.trim().toLowerCase()
+  );
+
+  const [state, setState] = useState<"draft" | "confirmed" | "dismissed">(() => {
+    if (matchingEvent) return "confirmed";
+    return readDraftStates()[key] ?? "draft";
+  });
+  // Track which event this card owns so Save updates it instead of adding a new one.
+  const [confirmedEventId, setConfirmedEventId] = useState<string | null>(matchingEvent?.id ?? null);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(draft.title);
   const [editTime, setEditTime] = useState(draft.timeLabel);
   const [editPerson, setEditPerson] = useState<DraftInfo["person"]>(draft.person);
+
+  // Handle events loading asynchronously (localStorage hydration happens after first render).
+  useEffect(() => {
+    if (matchingEvent && state === "draft") {
+      setState("confirmed");
+      setConfirmedEventId(matchingEvent.id);
+      writeDraftState(key, "confirmed");
+    }
+  }, [matchingEvent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isReminder = draft.kind === "reminder";
 
@@ -439,14 +462,25 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const whenLine = [draft.dateLabel, liveTime, livePersonLabel].filter(Boolean).join(" · ");
 
   const confirm = () => {
-    addEvent({
-      title: liveTitle,
-      note: draft.note,
-      person: livePerson,
-      dateLabel: draft.dateLabel,
-      timeLabel: liveTime,
-      forRobot: true,
-    });
+    if (confirmedEventId) {
+      // Update the existing event — don't create a second calendar entry.
+      updateEvent(confirmedEventId, {
+        title: liveTitle,
+        person: livePerson,
+        dateLabel: draft.dateLabel,
+        timeLabel: liveTime,
+      });
+    } else {
+      const id = addEvent({
+        title: liveTitle,
+        note: draft.note,
+        person: livePerson,
+        dateLabel: draft.dateLabel,
+        timeLabel: liveTime,
+        forRobot: true,
+      });
+      setConfirmedEventId(id);
+    }
     writeDraftState(key, "confirmed");
     setState("confirmed");
     setEditing(false);

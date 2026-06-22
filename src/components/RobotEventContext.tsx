@@ -3,6 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deriveCalendarEventIcon, type CalendarApiEvent } from "@/lib/calendar-api";
 import type { PersonId } from "@/lib/types";
+import type { TeamAgentId } from "@/lib/team";
 
 // A "robot event" is a calendar event the parent hands to the Auri Robot: the
 // robot shows a reminder at the set time, captures the moment, then sends the
@@ -29,6 +30,7 @@ export interface RobotEvent {
   dateLabel: string;
   timeLabel: string;
   icon: string;
+  agent?: TeamAgentId;
   // When true the robot shows a reminder + captures it; when false it's just a
   // plain calendar event the family planned (still shown on the calendar).
   forRobot: boolean;
@@ -54,6 +56,7 @@ export interface NewRobotEventInput {
   dateLabel: string;
   timeLabel: string;
   forRobot: boolean;
+  agent?: TeamAgentId;
   photoUrl?: string;
   voiceUrl?: string;
   voiceDuration?: number;
@@ -63,6 +66,7 @@ type RobotEventContextValue = {
   events: RobotEvent[];
   completions: RobotEvent[];
   addEvent: (input: NewRobotEventInput) => string;
+  updateEvent: (id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "dateLabel" | "timeLabel">>) => void;
   removeEvent: (id: string) => void;
   runEvent: (id: string) => void;
   startHighlight: (opts?: { title?: string; person?: PersonId; clipTarget?: number; photoTarget?: number }) => string;
@@ -98,8 +102,15 @@ function labelFromIso(value: string) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(date);
 }
 
+function agentFromIcon(icon: string): TeamAgentId {
+  if (icon === "camera-note") return "iris";
+  if (icon === "book") return "lumi";
+  return "vita";
+}
+
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
   const rawVideoUrl = event.robot?.rawOutputVideoUrl;
+  const icon = (event.icon && event.icon !== "spark") ? event.icon : deriveCalendarEventIcon(event.title, event.person);
   return {
     id: event.id,
     title: event.title,
@@ -107,7 +118,8 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     person: event.person,
     dateLabel: event.dateLabel,
     timeLabel: event.timeLabel,
-    icon: event.icon,
+    icon,
+    agent: agentFromIcon(icon),
     forRobot: event.forRobot,
     photoUrl: event.photoUrl,
     voiceUrl: event.voiceUrl,
@@ -145,6 +157,8 @@ function persistEventToCalendarApi(event: RobotEvent) {
       dateLabel: event.dateLabel,
       timeLabel: event.timeLabel,
       forRobot: event.forRobot,
+      icon: event.icon,
+      agent: event.agent,
       photoUrl: event.photoUrl,
       voiceUrl: event.voiceUrl,
       voiceDuration: event.voiceDuration,
@@ -275,6 +289,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       timeLabel: input.timeLabel,
       forRobot: input.forRobot,
       icon: deriveEventIcon(input.title, input.person),
+      agent: input.agent ?? "vita",
       photoUrl: input.photoUrl,
       voiceUrl: input.voiceUrl,
       voiceDuration: input.voiceDuration,
@@ -283,6 +298,15 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     setEvents((current) => [...current, event]);
     persistEventToCalendarApi(event);
     return id;
+  }, []);
+
+  const updateEvent = useCallback((id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "dateLabel" | "timeLabel">>) => {
+    setEvents((current) => current.map((event) => {
+      if (event.id !== id) return event;
+      const updated = { ...event, ...updates };
+      persistEventToCalendarApi(updated);
+      return updated;
+    }));
   }, []);
 
   const removeEvent = useCallback((id: string) => {
@@ -325,6 +349,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
         dateLabel: "Today",
         timeLabel: nowLabel(),
         icon: "camera-note",
+        agent: "iris" as TeamAgentId,
         forRobot: true,
         kind: "highlight",
         highlight: { clipTarget, photoTarget },
@@ -359,7 +384,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
   const completions = useMemo(() => events.filter((event) => event.status === "done"), [events]);
 
-  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, removeEvent, runEvent, startHighlight }), [events, completions, addEvent, removeEvent, runEvent, startHighlight]);
+  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, updateEvent, removeEvent, runEvent, startHighlight }), [events, completions, addEvent, updateEvent, removeEvent, runEvent, startHighlight]);
 
   return <RobotEventContext.Provider value={value}>{children}</RobotEventContext.Provider>;
 }
