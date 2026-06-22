@@ -37,16 +37,15 @@ async function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
 // the client can render the draft confirmation UI.
 function synthesizeCardsFromObjects(objects: ObjectToCreate[] | undefined): ChatResponseCard[] {
   if (!objects?.length) return [];
-  return objects
-    .map((obj) => {
-      const p = (obj.payload ?? {}) as Record<string, unknown>;
-      const title = typeof p.title === "string" && p.title ? p.title : undefined;
-      if (!title) return null;
-      if (obj.type === "reminder_draft") return { type: "reminder" as const, title };
-      if (obj.type === "calendar_draft") return { type: "calendar_draft" as const, title };
-      return null;
-    })
-    .filter((x): x is ChatResponseCard => x !== null);
+  const out: ChatResponseCard[] = [];
+  for (const obj of objects) {
+    const p = (obj.payload ?? {}) as Record<string, unknown>;
+    const title = typeof p.title === "string" && p.title ? p.title : undefined;
+    if (!title) continue;
+    if (obj.type === "reminder_draft") out.push({ type: "reminder", title });
+    else if (obj.type === "calendar_draft") out.push({ type: "calendar_draft", title });
+  }
+  return out;
 }
 
 function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"]) {
