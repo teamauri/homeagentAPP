@@ -29,12 +29,13 @@ const responseContract = {
 };
 
 function currentTimeLabel(): string {
+  // Add 1 minute so "now" reminders fire shortly after creation rather than immediately.
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
     timeZone: "Asia/Shanghai",
-  }).format(new Date());
+  }).format(new Date(Date.now() + 60_000));
 }
 
 function buildMessages(request: ChatRequestBody) {
@@ -44,7 +45,8 @@ function buildMessages(request: ChatRequestBody) {
       role: "system",
       content: [
         AURI_SYSTEM_PROMPT,
-        `IMPORTANT — Current time: ${nowLabel}. When the user says "now", "现在", "立刻", or "马上", always use exactly "${nowLabel}" as the reminder/event time. Never infer a time from routine descriptions — use the current time literally.`,
+        `IMPORTANT — Current time (already 1 minute from now, use as-is for "now"/"现在"/"立刻"/"马上" reminders): ${nowLabel}. Always use exactly "${nowLabel}" when the user means right now. Never infer a time from routine descriptions.`,
+        `IMPORTANT — Deduplication: familyContext.existingReminders lists reminders already created today. If the user requests a reminder for the same person with a very similar title on the same day, do NOT create a new one. Instead reply that it is already set and return helper.cards with the existing reminder data (type "reminder", same title/metadata) but helper.objectsToCreate must be empty [].`,
         "Return ONLY valid JSON. No markdown, no code fences, no explanation.",
         "The JSON must match this TypeScript-like contract:",
         JSON.stringify(responseContract),
