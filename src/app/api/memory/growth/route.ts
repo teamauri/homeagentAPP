@@ -5,11 +5,21 @@ import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Cache blob reloads on warm instances: skip the round-trip if we reloaded
+// within the last 30 s. Writes (organize, ingest) call reloadStore directly
+// and reset this, so freshness is preserved after mutations.
+let lastReloadAt = 0;
+function invalidateGrowthCache(): void {
+  lastReloadAt = 0;
+}
+
 // Current growth album for Memory: seed + organized photos + ingested Stories.
 export async function GET() {
   await ensureHydrated();
-  // Always reflect the newest organized photos (growth) and robot/phone uploads
-  // (demo) even when this request hits a warm instance that hydrated earlier.
-  await Promise.all([reloadStore("growth"), reloadStore("demo")]);
+  const now = Date.now();
+  if (now - lastReloadAt > 30_000) {
+    await Promise.all([reloadStore("growth"), reloadStore("demo")]);
+    lastReloadAt = now;
+  }
   return NextResponse.json({ growth: getGrowth() });
 }

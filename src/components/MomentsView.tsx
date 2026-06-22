@@ -86,7 +86,14 @@ export function MomentsView() {
   const { completions } = useRobotEvents();
   // Clips the robot captured this session (events + highlights) — playable here.
   const robotClips = completions.filter((event) => event.result);
-  const [growth, setGrowth] = useState<GrowthData | null>(null);
+  const [growth, setGrowth] = useState<GrowthData | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("auri.growth.v1");
+      return raw ? (JSON.parse(raw) as GrowthData) : null;
+    } catch {
+      return null;
+    }
+  });
   const [filter, setFilter] = useState<string>("all");
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +109,10 @@ export function MomentsView() {
   async function refresh() {
     const res = await fetch("/api/memory/growth", { cache: "no-store" });
     const data = await res.json();
-    if (data.growth) setGrowth(data.growth);
+    if (data.growth) {
+      setGrowth(data.growth);
+      try { sessionStorage.setItem("auri.growth.v1", JSON.stringify(data.growth)); } catch { /* ignore */ }
+    }
   }
 
   useEffect(() => {
@@ -287,7 +297,7 @@ export function MomentsView() {
 
       {activeSession ? <SessionCard session={activeSession} /> : null}
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="sticky -top-2 z-10 flex items-center justify-between bg-paper pb-1.5 pt-3">
         <span className="text-[12px] text-muted">
           By day · kept by Iris{growth.skippedCount ? ` · ${growth.skippedCount} skipped` : ""}
         </span>
