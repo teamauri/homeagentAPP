@@ -51,19 +51,27 @@ function HomeInner() {
     setLiveLoaded(true);
   }, []);
 
-  // Restore the scroll position saved before a full-page navigation (e.g.
-  // calendar or family settings), and save it again when the user leaves.
+  // On load: restore the scroll position saved before a full-page navigation
+  // (back from /calendar, /family, etc.) or, if none saved, jump to the bottom
+  // of chat so the latest message is always visible. Also save position on leave.
   useEffect(() => {
     if (!liveLoaded) return;
     const el = scrollContainerRef.current;
     if (!el) return;
-    try {
-      const savedScroll = sessionStorage.getItem("auri.scrollTop.v1");
-      if (savedScroll !== null) {
-        el.scrollTop = Number(savedScroll);
+
+    // rAF lets the browser finish painting all content before we scroll, so
+    // scrollHeight is accurate for both restore and scroll-to-bottom.
+    requestAnimationFrame(() => {
+      try {
+        const savedScroll = sessionStorage.getItem("auri.scrollTop.v1");
         sessionStorage.removeItem("auri.scrollTop.v1");
-      }
-    } catch { /* ignore */ }
+        if (savedScroll !== null) {
+          el.scrollTop = Number(savedScroll);
+        } else {
+          el.scrollTop = el.scrollHeight;
+        }
+      } catch { /* ignore */ }
+    });
 
     const saveScroll = () => {
       try {
@@ -73,6 +81,14 @@ function HomeInner() {
     window.addEventListener("beforeunload", saveScroll);
     return () => window.removeEventListener("beforeunload", saveScroll);
   }, [liveLoaded]);
+
+  // Scroll to bottom whenever a new live turn arrives (user sent or Auri replied).
+  useEffect(() => {
+    if (!liveLoaded) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }, [liveTurns.length, liveLoaded]);
 
   useEffect(() => {
     if (!liveLoaded) return;
