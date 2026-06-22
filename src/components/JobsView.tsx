@@ -32,11 +32,12 @@ type UpcomingItem = {
 };
 
 // Every calendar event is a robot task, so the Auri Robot badge shows on all of them.
-// A "Today" job whose scheduled time is more than 30 minutes in the past is
-// treated as expired and removed from Upcoming (it ran but never got a "done"
-// callback, or the user ignored it).
+// A "Today" job whose scheduled time has passed is expired and removed from
+// Upcoming. "now" jobs are always considered past (they should have run instantly).
 function isExpired(dateLabel: string, timeLabel: string): boolean {
   if (dateLabel !== "Today") return false;
+  const lower = timeLabel.toLowerCase().trim();
+  if (lower === "now") return true;
   const m = timeLabel.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!m) return false;
   let hour = parseInt(m[1]);
