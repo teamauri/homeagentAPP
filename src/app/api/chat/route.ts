@@ -4,7 +4,7 @@ import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
-import { ChatAIResponse, ChatApiResponse, ChatRequestBody } from "@/lib/chat-server/types";
+import { ChatAIResponse, ChatApiResponse, ChatRequestBody, ChatResponseCard, ObjectToCreate } from "@/lib/chat-server/types";
 
 export const runtime = "nodejs";
 // Real model calls (DeepSeek/Gemini) can exceed the 10s default; raise it
@@ -33,6 +33,22 @@ async function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
   );
 }
 
+// When the AI omits cards but did create objects, synthesize minimal cards so
+// the client can render the draft confirmation UI.
+function synthesizeCardsFromObjects(objects: ObjectToCreate[] | undefined): ChatResponseCard[] {
+  if (!objects?.length) return [];
+  return objects
+    .map((obj) => {
+      const p = (obj.payload ?? {}) as Record<string, unknown>;
+      const title = typeof p.title === "string" && p.title ? p.title : undefined;
+      if (!title) return null;
+      if (obj.type === "reminder_draft") return { type: "reminder" as const, title };
+      if (obj.type === "calendar_draft") return { type: "calendar_draft" as const, title };
+      return null;
+    })
+    .filter((x): x is ChatResponseCard => x !== null);
+}
+
 function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"]) {
   const created = createDemoObjects(objects);
   const withRoutes = cards.map((card, index) => (created[index] ? { ...card, targetRoute: created[index].route } : card));
@@ -51,7 +67,9 @@ async function withCreatedObjects(response: ChatAIResponse, metadata: ChatApiRes
   let helper = response.helper;
   let helperCreated: typeof top.created = [];
   if (helper) {
-    const h = attachRoutes(helper.cards, helper.objectsToCreate);
+    // Synthesize cards if the AI forgot to include them but did create objects.
+    const helperCards = helper.cards?.length ? helper.cards : synthesizeCardsFromObjects(helper.objectsToCreate);
+    const h = attachRoutes(helperCards, helper.objectsToCreate);
     helperCreated = h.created;
     helper = { ...helper, cards: h.cards };
   }

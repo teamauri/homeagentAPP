@@ -29,12 +29,12 @@ const responseContract = {
 };
 
 function currentTimeLabel(): string {
-  const now = new Date();
-  const h = now.getHours();
-  const m = now.getMinutes();
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Shanghai",
+  }).format(new Date());
 }
 
 function buildMessages(request: ChatRequestBody) {
