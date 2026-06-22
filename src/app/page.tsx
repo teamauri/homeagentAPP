@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell, TabKey } from "@/components/AppShell";
 import { JobsView } from "@/components/JobsView";
 import { ChatView, LiveChatTurn } from "@/components/ChatView";
@@ -29,6 +29,7 @@ function HomeInner() {
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Persist both the active tab and the chat thread so full-page navigations
   // (e.g. tapping "View calendar" or opening a memory detail) return the user
@@ -49,6 +50,29 @@ function HomeInner() {
     }
     setLiveLoaded(true);
   }, []);
+
+  // Restore the scroll position saved before a full-page navigation (e.g.
+  // calendar or family settings), and save it again when the user leaves.
+  useEffect(() => {
+    if (!liveLoaded) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    try {
+      const savedScroll = sessionStorage.getItem("auri.scrollTop.v1");
+      if (savedScroll !== null) {
+        el.scrollTop = Number(savedScroll);
+        sessionStorage.removeItem("auri.scrollTop.v1");
+      }
+    } catch { /* ignore */ }
+
+    const saveScroll = () => {
+      try {
+        sessionStorage.setItem("auri.scrollTop.v1", String(el.scrollTop));
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("beforeunload", saveScroll);
+    return () => window.removeEventListener("beforeunload", saveScroll);
+  }, [liveLoaded]);
 
   useEffect(() => {
     if (!liveLoaded) return;
@@ -164,7 +188,7 @@ function HomeInner() {
   };
 
   return (
-    <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage}>
+    <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage} scrollContainerRef={scrollContainerRef}>
         {/*
           Keep every tab mounted and just toggle visibility. Conditional rendering
           (`tab === x && <View/>`) unmounts the inactive views, which made Memory

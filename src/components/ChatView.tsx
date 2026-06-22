@@ -478,15 +478,20 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
               onChange={(e) => setEditTime(e.target.value)}
               placeholder="Time (e.g. 1:30 PM)"
             />
-            <select
-              className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
-              value={editPerson}
-              onChange={(e) => setEditPerson(e.target.value as DraftInfo["person"])}
-            >
+            <div className="flex flex-wrap gap-1.5">
               {PERSON_OPTIONS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
+                <button
+                  key={p.id}
+                  onClick={() => setEditPerson(p.id as DraftInfo["person"])}
+                  className={clsx(
+                    "rounded-full px-3 py-1 text-[13px] font-medium",
+                    editPerson === p.id ? "bg-ink text-white" : "border border-line bg-white text-ink"
+                  )}
+                >
+                  {p.label}
+                </button>
               ))}
-            </select>
+            </div>
             <div className="flex gap-2 pt-1">
               <button onClick={confirm} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
                 Save
@@ -552,15 +557,20 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
             onChange={(e) => setEditTime(e.target.value)}
             placeholder="Time (e.g. 1:30 PM)"
           />
-          <select
-            className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
-            value={editPerson}
-            onChange={(e) => setEditPerson(e.target.value as DraftInfo["person"])}
-          >
+          <div className="flex flex-wrap gap-1.5">
             {PERSON_OPTIONS.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
+              <button
+                key={p.id}
+                onClick={() => setEditPerson(p.id as DraftInfo["person"])}
+                className={clsx(
+                  "rounded-full px-3 py-1 text-[13px] font-medium",
+                  editPerson === p.id ? "bg-ink text-white" : "border border-line bg-white text-ink"
+                )}
+              >
+                {p.label}
+              </button>
             ))}
-          </select>
+          </div>
           <div className="flex gap-2 pt-1">
             <button onClick={() => setEditing(false)} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
               Done

@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { ChangeEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { ChangeEvent, ReactNode, RefObject, useEffect, useRef, useState } from "react";
 import { TabKey } from "@/lib/types";
 import { DoodleIcon } from "./Icons";
 
@@ -38,7 +38,7 @@ const titles: Record<TabKey, string> = {
 
 const subtitles: Record<TabKey, string> = {
   today: "What Auri’s set to do for you.",
-  chat: "Mom, Dad · Iris, Lumi, Vita",
+  chat: "Mom, Dad · Cameraman, Companion, Housekeeper",
   memory: "Watch your family grow, together.",
 };
 
@@ -48,19 +48,21 @@ export function AppShell({
   onTabChange,
   onComposerSubmit,
   hideHeader = false,
+  scrollContainerRef,
 }: {
   children: ReactNode;
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   onComposerSubmit?: (message: string, imageUrl?: string) => Promise<void> | void;
   hideHeader?: boolean;
+  scrollContainerRef?: RefObject<HTMLDivElement>;
 }) {
   return (
     <main className="min-h-[100dvh] bg-paper md:grid md:min-h-screen md:place-items-center md:bg-[#f5f1eb] md:px-10 md:py-8">
       <div className="mx-auto w-full overflow-hidden bg-paper md:max-w-[430px]">
         <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-paper md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
           {hideHeader ? <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]" /> : <ShellHeader activeTab={activeTab} />}
-          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[26px] pb-3 pt-2">{children}</div>
+          <div ref={scrollContainerRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[26px] pb-3 pt-2">{children}</div>
           <ShellBottom activeTab={activeTab} onTabChange={onTabChange} onComposerSubmit={onComposerSubmit} />
         </div>
       </div>
