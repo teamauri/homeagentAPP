@@ -28,6 +28,7 @@ child's moments (photos, videos, robot Stories, auto-edited shorts).
 | Route | What |
 |---|---|
 | `/` (`AppShell`) | Tabbed shell: **Chat** (`ChatView`), **Inbox** (`JobsView`/`TodayView`), **Journey/Memory** (`MomentsView`). Plus `/calendar`, `/family`. |
+| `/calendar` | In-app calendar view: seeded family events plus user-created events mirrored through `GET/POST/DELETE /api/calendar`. |
 | `/memory/[id]` | Memory detail — inline video player + photos. |
 | `/objects/[id]` | A created object (calendar draft, reminder, baby log, story…) + actions. |
 
@@ -61,12 +62,18 @@ JSON `{clips:[{url,…}]}` path (used by Auri Cut ingest + mock). **Design:
 `DOCKIT_MEMORY_INTEGRATION.md`.** Robot-side trigger lives in `dockkit-demo` (iOS,
 needs device + `HOME_AGENT_INGEST_URL`).
 
+### 5. Calendar / robot schedule read API
+`/calendar` renders seeded events plus created events from `RobotEventContext`.
+Created events are mirrored into the demo store via `POST /api/calendar`; external
+clients can read the same store with `GET /api/calendar` or robot-only capture
+tasks with `GET /api/calendar?robot=true`. Deletion uses `DELETE /api/calendar?id=...`.
+
 ## Data & storage
 
 - **growth store** (`src/lib/album/store.ts`) — the Memory timeline = seed +
   Gemini-organized photos, **merged with** demo-store items so robot Stories,
   phone uploads, and Auri Cut films all show in one feed. Read via `GET /api/memory/growth` (`MomentsView`).
-- **demo store** (`src/lib/demo/demo-store.ts`) — media + Memory + objects records. Read via `GET /api/memory`, `/api/memory/[id]`.
+- **demo store** (`src/lib/demo/demo-store.ts`) — media + Memory + objects + created calendar records. Read via `GET /api/memory`, `/api/memory/[id]`, and `GET /api/calendar`.
 - **media-storage** (`src/lib/demo/media-storage.ts`) — `storeUploadedFile()` → Vercel Blob (private, served via `/api/media/blob/[name]`) or local `public/demo-media`.
 - **persistence** (`src/lib/demo/persistence.ts`) — hydrate/persist stores (Blob or local `.data`), `reloadStore()` for serverless freshness.
 

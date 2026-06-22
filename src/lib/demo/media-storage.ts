@@ -10,10 +10,10 @@ import { put } from "@vercel/blob";
 //   /api/media/blob/<file>, which streams the blob — required because Vercel's
 //   filesystem is read-only/ephemeral and private blob URLs aren't directly
 //   embeddable in <img>/<video>.
-// - Locally (no token) files fall back to public/demo-media, served by Next.js
-//   at /demo-media/<file>, so the endpoint stays testable without a Blob store.
+// - Locally (no token) files fall back to public/demo-media and are served
+//   through the same /api/media/blob/<file> route, so deployed hosts that do not
+//   expose runtime-written public files still return playable media URLs.
 const MEDIA_DIR = path.join(process.cwd(), "public", "demo-media");
-const PUBLIC_PREFIX = "/demo-media";
 
 const EXTENSION_BY_MIME: Record<string, string> = {
   "video/mp4": "mp4",
@@ -40,13 +40,7 @@ export interface StoredFile {
   storage: "blob" | "local";
 }
 
-/** Persists an uploaded File and returns its publicly servable URL. */
-export async function storeUploadedFile(file: File): Promise<StoredFile> {
-  const ext = extensionFor(file);
-  const fileName = `${randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || "application/octet-stream";
-
+async function storeBuffer(buffer: Buffer, fileName: string, mimeType: string): Promise<StoredFile> {
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     await put(`demo-media/${fileName}`, buffer, {
       access: "private",
@@ -59,7 +53,25 @@ export async function storeUploadedFile(file: File): Promise<StoredFile> {
 
   await mkdir(MEDIA_DIR, { recursive: true });
   await writeFile(path.join(MEDIA_DIR, fileName), buffer);
-  return { url: `${PUBLIC_PREFIX}/${fileName}`, fileName, mimeType, size: buffer.byteLength, storage: "local" };
+  return { url: `/api/media/blob/${fileName}`, fileName, mimeType, size: buffer.byteLength, storage: "local" };
+}
+
+/** Persists an uploaded File and returns its publicly servable URL. */
+export async function storeUploadedFile(file: File): Promise<StoredFile> {
+  const ext = extensionFor(file);
+  const fileName = `${randomUUID()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const mimeType = file.type || "application/octet-stream";
+
+  return storeBuffer(buffer, fileName, mimeType);
+}
+
+/** Persists downloaded bytes from an upstream service and returns a servable URL. */
+export async function storeBinaryFile(bytes: Uint8Array, originalName: string, mimeType: string): Promise<StoredFile> {
+  const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, "-") || `${randomUUID()}.bin`;
+  const ext = path.extname(safeName);
+  const fileName = ext ? `${randomUUID()}${ext}` : `${randomUUID()}.bin`;
+  return storeBuffer(Buffer.from(bytes), fileName, mimeType || "application/octet-stream");
 }
 
 export function isFile(value: FormDataEntryValue | null): value is File {

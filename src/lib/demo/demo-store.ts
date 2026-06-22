@@ -1,4 +1,12 @@
+import { randomUUID } from "node:crypto";
 import { CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
+import {
+  CalendarApiEvent,
+  CalendarEventInput,
+  CalendarRawOutputStatus,
+  CalendarRobotCaptureStatus,
+  deriveCalendarEventIcon,
+} from "@/lib/calendar-api";
 import { moments } from "@/lib/mock-data";
 import { PersonId, SourceType, Status } from "@/lib/types";
 import { persistStore, registerStore } from "./persistence";
@@ -62,18 +70,22 @@ const globalStore = globalThis as typeof globalThis & {
   __auriDemoObjects?: StoredObject[];
   __auriDemoMedia?: DemoMediaItem[];
   __auriDemoMemory?: DemoMemoryItem[];
+  __auriDemoCalendarEvents?: CalendarApiEvent[];
   __auriDemoCounter?: number;
   __auriDemoMediaCounter?: number;
   __auriDemoMemoryCounter?: number;
+  __auriDemoCalendarCounter?: number;
 };
 
 function store() {
   globalStore.__auriDemoObjects ??= [];
   globalStore.__auriDemoMedia ??= [];
   globalStore.__auriDemoMemory ??= [];
+  globalStore.__auriDemoCalendarEvents ??= [];
   globalStore.__auriDemoCounter ??= 0;
   globalStore.__auriDemoMediaCounter ??= 0;
   globalStore.__auriDemoMemoryCounter ??= 0;
+  globalStore.__auriDemoCalendarCounter ??= 0;
   return globalStore;
 }
 
@@ -85,9 +97,11 @@ registerStore({
       objects: current.__auriDemoObjects,
       media: current.__auriDemoMedia,
       memory: current.__auriDemoMemory,
+      calendarEvents: current.__auriDemoCalendarEvents,
       counter: current.__auriDemoCounter,
       mediaCounter: current.__auriDemoMediaCounter,
       memoryCounter: current.__auriDemoMemoryCounter,
+      calendarCounter: current.__auriDemoCalendarCounter,
     };
   },
   restore: (data) => {
@@ -95,9 +109,11 @@ registerStore({
     if (Array.isArray(data.objects)) current.__auriDemoObjects = data.objects as StoredObject[];
     if (Array.isArray(data.media)) current.__auriDemoMedia = data.media as DemoMediaItem[];
     if (Array.isArray(data.memory)) current.__auriDemoMemory = data.memory as DemoMemoryItem[];
+    if (Array.isArray(data.calendarEvents)) current.__auriDemoCalendarEvents = data.calendarEvents as CalendarApiEvent[];
     if (typeof data.counter === "number") current.__auriDemoCounter = data.counter;
     if (typeof data.mediaCounter === "number") current.__auriDemoMediaCounter = data.mediaCounter;
     if (typeof data.memoryCounter === "number") current.__auriDemoMemoryCounter = data.memoryCounter;
+    if (typeof data.calendarCounter === "number") current.__auriDemoCalendarCounter = data.calendarCounter;
   },
 });
 
@@ -106,15 +122,28 @@ export function persistDemoStore() {
   return persistStore("demo");
 }
 
+/** Delete one Memory and the media it owns. Returns true if it existed. */
+export function removeDemoMemory(id: string): boolean {
+  const current = store();
+  const memory = (current.__auriDemoMemory ?? []).find((m) => m.id === id);
+  if (!memory) return false;
+  const ownedIds = new Set(memory.mediaIds);
+  current.__auriDemoMemory = (current.__auriDemoMemory ?? []).filter((m) => m.id !== id);
+  current.__auriDemoMedia = (current.__auriDemoMedia ?? []).filter((m) => !ownedIds.has(m.id));
+  return true;
+}
+
 /** Wipe all demo content (uploaded/ingested media, Stories, created objects). */
 export function resetDemoStore() {
   const current = store();
   current.__auriDemoObjects = [];
   current.__auriDemoMedia = [];
   current.__auriDemoMemory = [];
+  current.__auriDemoCalendarEvents = [];
   current.__auriDemoCounter = 0;
   current.__auriDemoMediaCounter = 0;
   current.__auriDemoMemoryCounter = 0;
+  current.__auriDemoCalendarCounter = 0;
 }
 
 function statusFor(type: ObjectToCreate["type"]): CreatedLocalObject["status"] {
@@ -162,6 +191,135 @@ export function applyDemoObjectAction(id: string, action: DemoObjectAction) {
     updatedAt: new Date().toISOString(),
   };
   return object;
+}
+
+function nextCalendarId(inputId?: string) {
+  if (inputId) return inputId;
+  const currentStore = store();
+  currentStore.__auriDemoCalendarCounter = (currentStore.__auriDemoCalendarCounter ?? 0) + 1;
+  return `revent_${Date.now()}_${currentStore.__auriDemoCalendarCounter}`;
+}
+
+export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiEvent {
+  const currentStore = store();
+  const now = new Date().toISOString();
+  const existing = input.id ? currentStore.__auriDemoCalendarEvents?.find((event) => event.id === input.id) : undefined;
+  const forRobot = Boolean(input.forRobot);
+  const event: CalendarApiEvent = {
+    ...existing,
+    id: nextCalendarId(input.id),
+    title: input.title,
+    note: input.note,
+    body: input.body ?? input.note,
+    person: input.person,
+    dateLabel: input.dateLabel,
+    timeLabel: input.timeLabel,
+    icon: existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
+    source: "created",
+    forRobot,
+    auriClientVideoUuid: forRobot ? (existing?.auriClientVideoUuid ?? randomUUID()) : undefined,
+    robot: forRobot ? existing?.robot : undefined,
+    photoUrl: input.photoUrl,
+    voiceUrl: input.voiceUrl,
+    voiceDuration: input.voiceDuration,
+    status: existing?.status ?? "scheduled",
+    statusLabel: existing?.statusLabel ?? "Scheduled",
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  currentStore.__auriDemoCalendarEvents = (currentStore.__auriDemoCalendarEvents ?? []).filter((current) => current.id !== event.id);
+  currentStore.__auriDemoCalendarEvents.push(event);
+  return event;
+}
+
+export function listDemoCalendarEvents() {
+  return [...(store().__auriDemoCalendarEvents ?? [])];
+}
+
+export function getDemoCalendarEvent(id: string) {
+  return store().__auriDemoCalendarEvents?.find((event) => event.id === id);
+}
+
+export interface DemoRobotCaptureStatusInput {
+  status: CalendarRobotCaptureStatus;
+  robotId?: string;
+  auriVideoId?: string;
+  auriClientVideoUuid?: string;
+  recordingMode?: string;
+  startedAt?: string;
+  uploadedAt?: string;
+  failedAt?: string;
+  error?: string;
+  rawOutputStatus?: CalendarRawOutputStatus;
+  rawOutputMemoryId?: string;
+  rawOutputVideoUrl?: string;
+  transcriptJsonUrl?: string;
+  transcriptTxtUrl?: string;
+  rawOutputReadyAt?: string;
+  rawOutputSyncedAt?: string;
+  rawOutputError?: string;
+}
+
+function statusLabelFromRobotStatus(status: CalendarRobotCaptureStatus) {
+  if (status === "recording") return "Recording";
+  if (status === "uploading") return "Uploading";
+  if (status === "uploaded") return "Uploaded";
+  if (status === "done") return "Done";
+  if (status === "failed") return "Failed";
+  return "Scheduled";
+}
+
+function rawOutputStatusFor(input: DemoRobotCaptureStatusInput, existing?: CalendarApiEvent["robot"]): CalendarRawOutputStatus | undefined {
+  if (input.rawOutputStatus) return input.rawOutputStatus;
+  if (input.status === "failed") return "failed";
+  if (input.auriVideoId && input.auriVideoId !== existing?.auriVideoId) return "pending";
+  if (existing?.rawOutputStatus) return existing.rawOutputStatus;
+  if (input.auriVideoId) return "pending";
+  return undefined;
+}
+
+export function updateDemoCalendarRobotStatus(taskId: string, input: DemoRobotCaptureStatusInput): CalendarApiEvent | undefined {
+  const currentStore = store();
+  const events = currentStore.__auriDemoCalendarEvents ?? [];
+  const event = events.find((current) => current.id === taskId);
+  if (!event || !event.forRobot) return undefined;
+
+  const now = new Date().toISOString();
+  const auriClientVideoUuid = input.auriClientVideoUuid ?? event.auriClientVideoUuid ?? event.robot?.auriClientVideoUuid ?? randomUUID();
+  event.auriClientVideoUuid = auriClientVideoUuid;
+  event.robot = {
+    ...event.robot,
+    status: input.status,
+    robotId: input.robotId ?? event.robot?.robotId,
+    auriVideoId: input.auriVideoId ?? event.robot?.auriVideoId,
+    auriClientVideoUuid,
+    recordingMode: input.recordingMode ?? event.robot?.recordingMode,
+    rawOutputStatus: rawOutputStatusFor(input, event.robot),
+    rawOutputMemoryId: input.rawOutputMemoryId ?? event.robot?.rawOutputMemoryId,
+    rawOutputVideoUrl: input.rawOutputVideoUrl ?? event.robot?.rawOutputVideoUrl,
+    transcriptJsonUrl: input.transcriptJsonUrl ?? event.robot?.transcriptJsonUrl,
+    transcriptTxtUrl: input.transcriptTxtUrl ?? event.robot?.transcriptTxtUrl,
+    rawOutputReadyAt: input.rawOutputReadyAt ?? event.robot?.rawOutputReadyAt,
+    rawOutputSyncedAt: input.rawOutputSyncedAt ?? event.robot?.rawOutputSyncedAt,
+    rawOutputError: input.rawOutputError ?? event.robot?.rawOutputError,
+    startedAt: input.startedAt ?? event.robot?.startedAt,
+    uploadedAt: input.uploadedAt ?? (input.status === "uploaded" ? now : event.robot?.uploadedAt),
+    failedAt: input.failedAt ?? (input.status === "failed" ? now : event.robot?.failedAt),
+    error: input.error ?? event.robot?.error,
+    updatedAt: now,
+  };
+  event.status = input.status;
+  event.statusLabel = statusLabelFromRobotStatus(input.status);
+  event.updatedAt = now;
+  return event;
+}
+
+export function removeDemoCalendarEvent(id: string) {
+  const currentStore = store();
+  const before = currentStore.__auriDemoCalendarEvents?.length ?? 0;
+  currentStore.__auriDemoCalendarEvents = (currentStore.__auriDemoCalendarEvents ?? []).filter((event) => event.id !== id);
+  return (currentStore.__auriDemoCalendarEvents?.length ?? 0) !== before;
 }
 
 function nextId(prefix: string, key: "__auriDemoMediaCounter" | "__auriDemoMemoryCounter") {

@@ -12,7 +12,7 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   onresult: (event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
   onend: () => void;
-  onerror: () => void;
+  onerror: (event: { error?: string }) => void;
   start: () => void;
   stop: () => void;
 };
@@ -143,10 +143,19 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   // Snapshot of the text box from before recording started, so Cancel can
   // restore it (dropping only what this dictation session added).
   const baseTextRef = useRef("");
+  // The Web Speech API auto-ends each utterance after a pause. We keep dictation
+  // alive until the user taps Done/Cancel by restarting on every onend while this
+  // flag is set. finalizedRef holds transcript locked in from prior sessions
+  // (each restart begins a fresh results buffer); sessionTextRef is the current
+  // session's interim/final text.
+  const keepListeningRef = useRef(false);
+  const finalizedRef = useRef("");
+  const sessionTextRef = useRef("");
 
   // Stop recognition AND detach its handlers, so a final onresult fired by
   // stop() can't write the transcript back into the box after we've cleared it.
   const stopRecognition = () => {
+    keepListeningRef.current = false;
     const rec = recognitionRef.current;
     if (rec) {
       rec.onresult = () => {};
@@ -190,6 +199,13 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     }
   };
 
+  // Finish dictation: send straight away if anything was captured (submit() stops
+  // recognition itself); otherwise just close the panel.
+  const finishVoice = () => {
+    if (value.trim() || image) submit();
+    else stopRecognition();
+  };
+
   const pickImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = ""; // allow re-selecting the same file
@@ -214,20 +230,47 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
+    recognition.lang = "zh-CN"; // Chinese model; tolerates mixed Chinese/English
     recognition.interimResults = true;
-    recognition.continuous = false;
+    recognition.continuous = true;
     const base = value.trim() ? `${value.trim()} ` : "";
     baseTextRef.current = base;
+    finalizedRef.current = base;
+    sessionTextRef.current = "";
+    keepListeningRef.current = true;
+
     recognition.onresult = (event) => {
       let transcript = "";
       for (let i = 0; i < event.results.length; i += 1) {
         transcript += event.results[i][0].transcript;
       }
-      setValue((base + transcript).replace(/\s+/g, " ").trimStart());
+      sessionTextRef.current = transcript;
+      setValue((finalizedRef.current + transcript).replace(/\s+/g, " ").trimStart());
     };
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    // A pause ends the session; while the user hasn't tapped Done/Cancel, fold
+    // what we heard into the running transcript and restart so it feels continuous.
+    recognition.onend = () => {
+      if (!keepListeningRef.current) {
+        setListening(false);
+        return;
+      }
+      const merged = (finalizedRef.current + sessionTextRef.current).replace(/\s+/g, " ").trimStart();
+      finalizedRef.current = merged ? `${merged} ` : "";
+      sessionTextRef.current = "";
+      try {
+        recognition.start();
+      } catch {
+        setListening(false);
+      }
+    };
+    recognition.onerror = (event) => {
+      // Permission/hardware failures are terminal — stop retrying. Transient ones
+      // (e.g. "no-speech") fall through to onend, which restarts.
+      if (event.error === "not-allowed" || event.error === "service-not-allowed" || event.error === "audio-capture") {
+        keepListeningRef.current = false;
+        setListening(false);
+      }
+    };
 
     recognitionRef.current = recognition;
     setListening(true);
@@ -254,7 +297,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
         </div>
       ) : null}
       {listening ? (
-        <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={stopRecognition} />
+        <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={finishVoice} />
       ) : (
         <div className="flex h-[54px] items-center gap-2.5 rounded-full border border-ink/15 bg-white px-2.5 shadow-[0_10px_30px_rgba(8,8,8,0.1)]">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} className="hidden" />
@@ -309,7 +352,7 @@ function formatElapsed(seconds: number) {
 
 // A calm "listening" panel that rises in place of the composer while dictation
 // is active: a mic with soft breathing halos, a timer, the full live transcript
-// (wraps freely — never truncated), and two clear actions (Cancel / Done).
+// (wraps freely — never truncated), and two clear actions (Cancel / Send).
 function RecordingPanel({
   transcript,
   elapsed,
@@ -358,9 +401,9 @@ function RecordingPanel({
           type="button"
           onClick={onStop}
           className="h-11 flex-1 rounded-full bg-mint text-[15px] font-medium text-white"
-          aria-label="Stop recording and keep text"
+          aria-label="Send voice message"
         >
-          Done
+          Send
         </button>
       </div>
     </div>

@@ -127,6 +127,26 @@ export interface VlogStatusResponse {
   error?: unknown;
 }
 
+export type RawOutputTranscriptFormat = "json" | "txt";
+export type RawOutputJobStatus = "pending" | "processing" | "ready" | "failed" | (string & {});
+
+export interface RawOutputStatusResponse {
+  rawOutputId?: string;
+  jobId?: string;
+  videoId: string;
+  status: RawOutputJobStatus;
+  progress?: number;
+  videoDownloadUrl?: string | null;
+  transcriptJsonDownloadUrl?: string | null;
+  transcriptTxtDownloadUrl?: string | null;
+  error?: unknown;
+}
+
+export interface AuriDownloadHeadResponse {
+  contentType?: string;
+  contentLength?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -247,6 +267,47 @@ export class AuriClient {
     return { videoId: data.video_id, status: data.status, progress: data.progress };
   }
 
+  // --- Raw + Transcript output --------------------------------------------
+
+  /** GET /v1/videos/{id}/raw-output */
+  async fetchRawOutputStatus(videoId: string): Promise<RawOutputStatusResponse> {
+    return mapRawOutput(await this.requestJSON<RawRawOutput>("GET", this.v1(`/videos/${videoId}/raw-output`)), videoId);
+  }
+
+  private async headDownload(fullUrl: string): Promise<AuriDownloadHeadResponse> {
+    const res = await fetch(fullUrl, { method: "HEAD", headers: this.baseHeaders() });
+    if (!res.ok) throw this.toError(res.status, "");
+    const length = Number(res.headers.get("content-length") || "");
+    return {
+      contentType: res.headers.get("content-type") || undefined,
+      contentLength: Number.isFinite(length) ? length : undefined,
+    };
+  }
+
+  /** HEAD /v1/videos/{id}/raw-output/video/download */
+  async headRawOutputVideo(videoId: string): Promise<AuriDownloadHeadResponse> {
+    return this.headDownload(this.v1(`/videos/${videoId}/raw-output/video/download`));
+  }
+
+  /** HEAD /v1/videos/{id}/raw-output/transcript/download?format=json|txt */
+  async headRawOutputTranscript(videoId: string, format: RawOutputTranscriptFormat): Promise<AuriDownloadHeadResponse> {
+    return this.headDownload(this.v1(`/videos/${videoId}/raw-output/transcript/download`, { format }));
+  }
+
+  /** GET /v1/videos/{id}/raw-output/video/download → source mp4 bytes */
+  async downloadRawOutputVideo(videoId: string): Promise<Uint8Array> {
+    const res = await fetch(this.v1(`/videos/${videoId}/raw-output/video/download`), { method: "GET", headers: this.baseHeaders() });
+    if (!res.ok) throw this.toError(res.status, await res.text());
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  /** GET /v1/videos/{id}/raw-output/transcript/download?format=json|txt */
+  async downloadRawOutputTranscript(videoId: string, format: RawOutputTranscriptFormat = "json"): Promise<Uint8Array> {
+    const res = await fetch(this.v1(`/videos/${videoId}/raw-output/transcript/download`, { format }), { method: "GET", headers: this.baseHeaders() });
+    if (!res.ok) throw this.toError(res.status, await res.text());
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
   // --- Phase 2: create + render the story (full_video) ----------------------
 
   /**
@@ -337,6 +398,42 @@ interface RawVlog {
   upload_contracts?: Array<{ segment_index: number; start_time_original: number; end_time_original: number; max_size_bytes: number }>;
   download_url?: string | null;
   error?: unknown;
+}
+
+interface RawRawOutput {
+  raw_output_id?: string;
+  job_id?: string;
+  video_id?: string;
+  status?: RawOutputJobStatus;
+  progress?: number;
+  video_download_url?: string | null;
+  transcript_json_download_url?: string | null;
+  transcript_txt_download_url?: string | null;
+  transcript_text_download_url?: string | null;
+  error?: unknown;
+}
+
+function normalizeRawOutputStatus(status: RawRawOutput["status"] | null | undefined): RawOutputJobStatus {
+  const normalized = String(status ?? "pending").trim().toLowerCase();
+  if (normalized === "ready" || normalized === "processing" || normalized === "failed" || normalized === "pending") {
+    return normalized;
+  }
+  return normalized as RawOutputJobStatus;
+}
+
+function mapRawOutput(d: RawRawOutput | null | undefined, videoIdFallback: string): RawOutputStatusResponse {
+  const raw = d ?? {};
+  return {
+    rawOutputId: raw.raw_output_id,
+    jobId: raw.job_id,
+    videoId: raw.video_id ?? videoIdFallback,
+    status: normalizeRawOutputStatus(raw.status),
+    progress: raw.progress,
+    videoDownloadUrl: raw.video_download_url,
+    transcriptJsonDownloadUrl: raw.transcript_json_download_url,
+    transcriptTxtDownloadUrl: raw.transcript_txt_download_url ?? raw.transcript_text_download_url,
+    error: raw.error,
+  };
 }
 
 function mapVlog(d: RawVlog): VlogStatusResponse {
