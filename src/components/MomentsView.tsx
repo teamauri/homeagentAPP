@@ -156,6 +156,13 @@ export function MomentsView() {
     }
   }
 
+  async function deleteAuriFilm(memoryId?: string) {
+    setAuriPhase("idle");
+    if (!memoryId) return;
+    try { await fetch(`/api/memory/${memoryId}`, { method: "DELETE" }); } catch { /* best effort */ }
+    refresh().catch(() => {});
+  }
+
   async function onFiles(files: FileList | null) {
     if (!files || !files.length) return;
     const all = [...files];
@@ -308,7 +315,7 @@ export function MomentsView() {
         <AuriCutIntro onPick={() => auriInputRef.current?.click()} onDismiss={() => setAuriPhase("idle")} />
       ) : null}
       {auriPhase === "editing" ? <AuriCutEditing step={editStep} /> : null}
-      {auriPhase === "done" ? <AuriCutResult result={auriResult} onDismiss={() => setAuriPhase("idle")} onPlay={setLightbox} /> : null}
+      {auriPhase === "done" ? <AuriCutResult result={auriResult} onDismiss={() => setAuriPhase("idle")} onPlay={setLightbox} onDelete={() => deleteAuriFilm(auriResult?.memoryId)} /> : null}
 
       {error ? (
         <div className="mt-3 flex items-start gap-2 rounded-[12px] border border-[#f0d4cc] bg-[#fdf3f0] px-3 py-2.5 text-[12.5px] text-[#9a4a36]">
@@ -500,32 +507,61 @@ function AuriCutEditing({ step }: { step: number }) {
   );
 }
 
-function AuriCutResult({ result, onDismiss, onPlay }: { result: { memoryId?: string; durationSeconds?: number; mediaUrl?: string } | null; onDismiss: () => void; onPlay: (url: string) => void }) {
+function AuriCutResult({ result, onDismiss, onPlay, onDelete }: { result: { memoryId?: string; durationSeconds?: number; mediaUrl?: string } | null; onDismiss: () => void; onPlay: (url: string) => void; onDelete: () => void }) {
   const meta = [result?.durationSeconds ? secLabel(result.durationSeconds) : null, "made by Auri Cut"].filter(Boolean).join(" · ");
+  const [saving, setSaving] = useState(false);
+
+  // Save the film to the phone's Photos via the native share sheet ("Save Video"),
+  // falling back to opening the file so the user can save it manually.
+  async function saveToPhotos() {
+    if (!result?.mediaUrl) return;
+    setSaving(true);
+    try {
+      const blob = await (await fetch(result.mediaUrl)).blob();
+      const file = new File([blob], "auri-cut.mp4", { type: "video/mp4" });
+      const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+      if (nav.canShare?.({ files: [file] })) {
+        await nav.share({ files: [file], title: "Auri Cut film" });
+      } else {
+        window.open(result.mediaUrl, "_blank");
+      }
+      onDismiss();
+    } catch {
+      /* user cancelled the share sheet — leave the card up */
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="mt-4 rounded-[16px] border border-[#eccfa0] bg-[#fbf3e3] p-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.04em] text-[#b9772a]">
-          <span>✨</span> Your film is ready
-        </div>
-        <button onClick={onDismiss} aria-label="Dismiss" className="text-[#c0b9ad]">
-          ✕
-        </button>
+      <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.04em] text-[#b9772a]">
+        <span>✨</span> Your film is ready
       </div>
       {result?.mediaUrl ? (
-        // eslint-disable-next-line jsx-a11y/media-has-caption
-        <video src={`${result.mediaUrl}#t=0.1`} controls playsInline preload="metadata" className="mt-2 aspect-video w-full rounded-[12px] bg-black object-cover" />
+        <button type="button" onClick={() => onPlay(result.mediaUrl as string)} className="relative mt-2 block w-full overflow-hidden rounded-[12px] bg-black" aria-label="Play film">
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video src={`${result.mediaUrl}#t=0.1`} muted playsInline preload="metadata" className="aspect-video w-full bg-black object-cover" />
+          <span className="absolute inset-0 grid place-items-center">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/85 pl-0.5 text-[18px] text-ink">▶</span>
+          </span>
+        </button>
       ) : null}
-      <div className="mt-2 flex items-center justify-between">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="font-display text-[15px] text-ink">Auri Cut film</p>
           <p className="text-[11.5px] text-muted">{meta}</p>
         </div>
-        {result?.mediaUrl ? (
-          <button onClick={() => onPlay(result.mediaUrl as string)} className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-white">
-            Enlarge
+        <div className="flex shrink-0 gap-2">
+          <button onClick={onDelete} className="rounded-full border border-line bg-white px-3.5 py-2 text-[12.5px] font-semibold text-[#9a4a36]">
+            Delete
           </button>
-        ) : null}
+          {result?.mediaUrl ? (
+            <button onClick={saveToPhotos} disabled={saving} className="rounded-full bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-white disabled:opacity-50">
+              {saving ? "Saving…" : "Save to Photos"}
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

@@ -122,6 +122,17 @@ export function persistDemoStore() {
   return persistStore("demo");
 }
 
+/** Delete one Memory and the media it owns. Returns true if it existed. */
+export function removeDemoMemory(id: string): boolean {
+  const current = store();
+  const memory = (current.__auriDemoMemory ?? []).find((m) => m.id === id);
+  if (!memory) return false;
+  const ownedIds = new Set(memory.mediaIds);
+  current.__auriDemoMemory = (current.__auriDemoMemory ?? []).filter((m) => m.id !== id);
+  current.__auriDemoMedia = (current.__auriDemoMedia ?? []).filter((m) => !ownedIds.has(m.id));
+  return true;
+}
+
 /** Wipe all demo content (uploaded/ingested media, Stories, created objects). */
 export function resetDemoStore() {
   const current = store();
