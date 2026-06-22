@@ -53,7 +53,13 @@ async function createVlogWhenReady(client: AuriClient, videoId: string, attempts
   throw new AuriError("timeline never became ready", 504, "TIMELINE_NOT_READY", true);
 }
 
-export async function editToShortInBrowser(file: File, onProgress?: BrowserEditProgress): Promise<BrowserEditResult> {
+export async function editToShortInBrowser(
+  file: File,
+  onProgress?: BrowserEditProgress,
+  // Called once the render is queued — the work now lives on auri-editor, so the
+  // caller can persist these ids and resume polling after a page refresh.
+  onCheckpoint?: (cp: { videoId: string; vlogId: string }) => void,
+): Promise<BrowserEditResult> {
   const client = new AuriClient();
 
   onProgress?.({ stage: "uploading", progress: 0.02 });
@@ -99,6 +105,7 @@ export async function editToShortInBrowser(file: File, onProgress?: BrowserEditP
   onProgress?.({ stage: "rendering", progress: 0.62 });
 
   await client.renderVlog(video.videoId, vlog.vlogId);
+  onCheckpoint?.({ videoId: video.videoId, vlogId: vlog.vlogId }); // render queued — resumable from here
   const done = await client.pollUntilVlogFinished(video.videoId, vlog.vlogId, (s) =>
     onProgress?.({ stage: "rendering", progress: Math.min(0.95, 0.62 + (s.progress ?? 0) * 0.33) }),
   );
