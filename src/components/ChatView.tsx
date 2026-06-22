@@ -348,6 +348,11 @@ function ApiResponseCard({ card }: { card: ChatTurnCard }) {
   if (card.draft) return <DraftActionCard draft={card.draft} />;
 
   const handleClick = () => {
+    // Reminder cards belong in the calendar, not the object detail page.
+    if (card.type === "reminder") {
+      window.location.href = "/calendar";
+      return;
+    }
     if (card.targetRoute) {
       window.location.href = card.targetRoute;
       return;

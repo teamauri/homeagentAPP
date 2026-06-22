@@ -113,22 +113,9 @@ function HomeInner() {
       const auriId = `auri-${sentAt}`;
 
       setLiveTurns((current) => {
-        // Replace the pending bubble with Auri's voice (the primary answer).
-        const next = current.map((turn) =>
-          turn.id === pendingId
-            ? {
-                id: auriId,
-                sender: teamAgentById[payload.handledByTeamMemberId]?.name ?? displayHelperName(payload.handledByName),
-                time: nowLabel(),
-                avatar: payload.handledByTeamMemberId,
-                text: payload.reply,
-                cards: enrichCards(payload.cards, payload.objectsToCreate, payload.createdLocalObjects, 0),
-                createdAt: sentAt,
-              }
-            : turn
-        );
-
-        // If a helper took the task, add it as a second bubble right after Auri.
+        // When a helper took the task, skip Auri's framing sentence entirely and
+        // show only the helper's bubble. Auri only appears for advice/questions
+        // where there is no helper.
         if (payload.helper) {
           const helper = payload.helper;
           const helperTurn: LiveChatTurn = {
@@ -138,12 +125,25 @@ function HomeInner() {
             avatar: helper.teamMemberId,
             text: helper.reply,
             cards: enrichCards(helper.cards, helper.objectsToCreate, payload.createdLocalObjects, payload.objectsToCreate?.length ?? 0),
-            createdAt: sentAt + 1,
+            createdAt: sentAt,
           };
-          const idx = next.findIndex((turn) => turn.id === auriId);
-          return [...next.slice(0, idx + 1), helperTurn, ...next.slice(idx + 1)];
+          return current.map((turn) => turn.id === pendingId ? helperTurn : turn);
         }
-        return next;
+
+        // No helper → Auri is the sole voice (advice / general question).
+        return current.map((turn) =>
+          turn.id === pendingId
+            ? {
+                id: `auri-${sentAt}`,
+                sender: teamAgentById[payload.handledByTeamMemberId]?.name ?? displayHelperName(payload.handledByName),
+                time: nowLabel(),
+                avatar: payload.handledByTeamMemberId,
+                text: payload.reply,
+                cards: enrichCards(payload.cards, payload.objectsToCreate, payload.createdLocalObjects, 0),
+                createdAt: sentAt,
+              }
+            : turn
+        );
       });
     } catch {
       setLiveTurns((current) =>
