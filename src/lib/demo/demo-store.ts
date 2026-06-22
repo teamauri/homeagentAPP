@@ -205,9 +205,12 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
       const personRaw = p.person ?? p.childId ?? p.recipient ?? p.assignee ?? "family";
       const person = toPersonId(typeof personRaw === "string" ? personRaw : "family");
       const dateLabel = typeof p.dateLabel === "string" && p.dateLabel ? p.dateLabel : "Today";
-      // Accept time as alias for timeLabel
-      const timeLabel = (typeof p.timeLabel === "string" && p.timeLabel) ? p.timeLabel :
-                        (typeof p.time === "string" && p.time) ? p.time : "now";
+      // Accept time as alias for timeLabel; if AI returns "now" substitute actual time.
+      const rawTimeLabel = (typeof p.timeLabel === "string" && p.timeLabel) ? p.timeLabel :
+                           (typeof p.time === "string" && p.time) ? p.time : "now";
+      const timeLabel = rawTimeLabel.trim().toLowerCase() === "now"
+        ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai" }).format(new Date(Date.now() + 60_000))
+        : rawTimeLabel;
       const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
       upsertDemoCalendarEvent({ title, person, dateLabel, timeLabel, note, forRobot: true });
     }

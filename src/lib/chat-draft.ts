@@ -69,9 +69,14 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_24_RE = /^(\d{1,2}):(\d{2})$/;
 
 // "17:30" → "5:30 PM"; leaves already-friendly labels ("5:30 PM", "Friday") alone.
+// "now" → actual current time + 1 minute (AI sometimes returns the word "now" instead of the time).
 function formatTimeField(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const v = value.trim();
+  if (v.toLowerCase() === "now") {
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+      .format(new Date(Date.now() + 60_000));
+  }
   if (TIME_RE.test(v)) return v.match(TIME_RE)![0];
   const m = v.match(TIME_24_RE);
   if (m) {
