@@ -46,7 +46,7 @@ function isExpired(dateLabel: string, timeLabel: string): boolean {
   if (period === "AM" && hour === 12) hour = 0;
   const scheduled = new Date();
   scheduled.setHours(hour, min, 0, 0);
-  return Date.now() - scheduled.getTime() > 30 * 60 * 1000;
+  return Date.now() > scheduled.getTime();
 }
 
 const SHORT_DAY: Record<string, string> = {
