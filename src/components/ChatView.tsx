@@ -432,7 +432,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
       person: livePerson,
       dateLabel: draft.dateLabel,
       timeLabel: liveTime,
-      forRobot: false,
+      forRobot: true,
     });
     writeDraftState(key, "confirmed");
     setState("confirmed");
@@ -446,6 +446,34 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
 
   if (state === "dismissed") return null;
   const confirmed = state === "confirmed";
+
+  if (confirmed) {
+    return (
+      <button
+        onClick={() => {
+          sessionStorage.setItem("auri.tab.v1", "today");
+          window.location.href = "/";
+        }}
+        className="grid min-h-[72px] w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-[15px] border border-line bg-white px-2.5 py-2.5 text-left shadow-[0_8px_18px_rgba(8,8,8,0.04)]"
+      >
+        <div className="grid h-6 w-6 shrink-0 place-items-center">
+          <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-6 w-6" />
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">
+            {isReminder ? "Reminder" : "Calendar event"}
+          </div>
+          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">
+            {liveTitle}
+          </div>
+          <div className="mt-0.5 truncate text-[12.5px] leading-4 tracking-[0] text-muted">{whenLine}</div>
+        </div>
+        <span className="shrink-0 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]">
+          View
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div className="max-w-[98%] overflow-hidden rounded-[16px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">

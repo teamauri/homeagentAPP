@@ -174,7 +174,7 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
     if (object.type === "reminder_draft" || object.type === "calendar_draft") {
       const p = object.payload as Record<string, unknown>;
       const title = typeof p.title === "string" && p.title ? p.title : "Reminder";
-      const person = typeof p.person === "string" ? p.person : "family";
+      const person = toPersonId(typeof p.person === "string" ? p.person : "family");
       const dateLabel = typeof p.dateLabel === "string" && p.dateLabel ? p.dateLabel : "Today";
       const timeLabel = typeof p.timeLabel === "string" && p.timeLabel ? p.timeLabel : "now";
       const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
