@@ -143,7 +143,11 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
 
 function mergeEvents(current: RobotEvent[], incoming: RobotEvent[]) {
   const byId = new Map(current.map((event) => [event.id, event]));
-  for (const event of incoming) byId.set(event.id, event);
+  for (const event of incoming) {
+    const existing = byId.get(event.id);
+    // Preserve client-only fields the API doesn't know about (e.g. kept).
+    byId.set(event.id, existing ? { ...event, kept: existing.kept } : event);
+  }
   return [...byId.values()];
 }
 
