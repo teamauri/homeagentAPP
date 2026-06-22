@@ -161,31 +161,28 @@ function CounterRow({ label, done, total }: { label: string; done: number; total
   );
 }
 
-// A finished robot event lands in chat as a keepsake: Vita (the family keeper)
-// shares the clip the robot captured, marked as the event's completion.
+// A finished job lands in chat as a new message: a job card showing the Done
+// status, with the captured video embedded and a Keep button at the bottom.
 function RobotCompletionRow({ event }: { event: RobotEvent }) {
-  const rowChildren = useChildren();
-  const who = rowChildren.find((c) => c.id === event.person)?.name ?? (event.person === "family" ? "Family" : event.person);
+  const agentId = event.agent ?? "vita";
+  const agentName = teamAgentById[agentId]?.name ?? "Vita";
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <TeamBadge agentId="vita" size="sm" />
+      <TeamBadge agentId={agentId} size="sm" />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{teamAgentById["vita"].name}</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{agentName}</span>
           <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
         </div>
-        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">
-          {who} finished "{event.title}." Tap Keep to save it to Journey.
-        </p>
-        {event.result ? <VideoResultCard event={event} /> : null}
+        <JobDoneCard event={event} />
       </div>
     </div>
   );
 }
 
-function VideoResultCard({ event }: { event: RobotEvent }) {
+function JobDoneCard({ event }: { event: RobotEvent }) {
   const { keepEvent } = useRobotEvents();
-  const result = event.result!;
+  const result = event.result;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -200,46 +197,64 @@ function VideoResultCard({ event }: { event: RobotEvent }) {
   // Seek to 1s on metadata load so the first meaningful frame shows as thumbnail
   // instead of a black screen (only when no explicit poster image is provided).
   const handleMetadata = () => {
-    if (!result.poster && videoRef.current && !playing) {
+    if (result && !result.poster && videoRef.current && !playing) {
       videoRef.current.currentTime = 1;
     }
   };
 
   return (
-    <div className="mt-2 max-w-[98%] overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
-      <div className="relative bg-[#17181b]">
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video
-          ref={videoRef}
-          src={result.videoUrl}
-          poster={result.poster}
-          playsInline
-          preload="metadata"
-          controls={playing}
-          onLoadedMetadata={handleMetadata}
-          onEnded={() => setPlaying(false)}
-          onPause={() => setPlaying(false)}
-          className="block max-h-72 w-full object-cover"
-        />
-        {!playing ? (
-          <button onClick={play} className="absolute inset-0 grid place-items-center" aria-label="Play clip">
-            <span className="grid h-12 w-12 place-items-center rounded-full bg-white/95 text-ink shadow">
-              <svg viewBox="0 0 24 24" className="h-6 w-6 translate-x-[1px]" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </span>
-            <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">{result.duration}</span>
-          </button>
-        ) : null}
-      </div>
-      <div className="flex items-center gap-2 px-3.5 py-2.5">
-        <span className="text-mint">
-          <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="m8.5 12 2.5 2.5 4.5-5" />
+    <div className="w-full overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
+      {/* Job card header */}
+      <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
+        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
+          <DoodleIcon name={event.icon} className="h-8 w-8" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{event.dateLabel} · {event.timeLabel}</div>
+          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{event.title}</div>
+        </div>
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#2f9d5b]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#2f9d5b]">
+          <svg viewBox="0 0 24 24" className="h-[10px] w-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m5 12 4.5 4.5L19 7" />
           </svg>
+          Done
         </span>
-        <span className="flex-1 truncate text-[13px] font-semibold text-ink">Event complete · {event.title}</span>
+      </div>
+
+      {/* Embedded video */}
+      {result ? (
+        <div className="border-t border-line/70">
+          <div className="relative bg-[#17181b]">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              ref={videoRef}
+              src={result.videoUrl}
+              poster={result.poster}
+              playsInline
+              preload="metadata"
+              controls={playing}
+              onLoadedMetadata={handleMetadata}
+              onEnded={() => setPlaying(false)}
+              onPause={() => setPlaying(false)}
+              className="block max-h-64 w-full object-cover"
+            />
+            {!playing ? (
+              <button onClick={play} className="absolute inset-0 grid place-items-center" aria-label="Play clip">
+                <span className="grid h-12 w-12 place-items-center rounded-full bg-white/95 text-ink shadow">
+                  <svg viewBox="0 0 24 24" className="h-6 w-6 translate-x-[1px]" fill="currentColor" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+                <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">{result.duration}</span>
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Keep button */}
+      <div className="flex items-center gap-2 border-t border-line px-3.5 py-2.5">
+        <span className="flex-1 truncate text-[13px] text-muted">Job complete · {event.title}</span>
         {event.kept ? (
           <span className="shrink-0 text-[12px] font-medium text-gold">💗 Kept</span>
         ) : (
