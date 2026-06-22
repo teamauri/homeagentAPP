@@ -190,8 +190,19 @@ function VideoResultCard({ event }: { event: RobotEvent }) {
   const [playing, setPlaying] = useState(false);
 
   const play = () => {
-    videoRef.current?.play();
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play();
+    }
     setPlaying(true);
+  };
+
+  // Seek to 1s on metadata load so the first meaningful frame shows as thumbnail
+  // instead of a black screen (only when no explicit poster image is provided).
+  const handleMetadata = () => {
+    if (!result.poster && videoRef.current && !playing) {
+      videoRef.current.currentTime = 1;
+    }
   };
 
   return (
@@ -203,7 +214,9 @@ function VideoResultCard({ event }: { event: RobotEvent }) {
           src={result.videoUrl}
           poster={result.poster}
           playsInline
+          preload="metadata"
           controls={playing}
+          onLoadedMetadata={handleMetadata}
           onEnded={() => setPlaying(false)}
           onPause={() => setPlaying(false)}
           className="block max-h-72 w-full object-cover"
