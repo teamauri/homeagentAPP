@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { jobIcon, seedStanding, seedUpcoming, type JobSource, type StandingJob } from "@/lib/jobs";
 import { teamAgentById } from "@/lib/team";
-import { personLabels } from "./calendar-ui";
+import { useChildren } from "./FamilyContext";
 import { DoodleIcon } from "./Icons";
 import { NewJobView } from "./NewJobView";
 import { EventDetailSheet } from "./EventDetailSheet";
@@ -39,6 +39,8 @@ const shortDay = (d: string) => SHORT_DAY[d] ?? d;
 
 export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: () => void; onSubpageChange?: (open: boolean) => void } = {}) {
   const { events, addEvent, removeEvent, startHighlight } = useRobotEvents();
+  const children = useChildren();
+  const personLabel = (id: string) => children.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   const [standing, setStanding] = useState<StandingJob[]>(seedStanding);
   const [creating, setCreating] = useState(false);
   const [editJob, setEditJob] = useState<StandingJob | null>(null);
@@ -56,7 +58,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         dateLabel: e.dateLabel,
         timeLabel: e.timeLabel,
         iconName: e.icon,
-        meta: personLabels[e.person],
+        meta: personLabel(e.person),
         source: "auri",
         forRobot: true,
       })),
@@ -163,7 +165,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
       {/* Tap a row → the shared event detail sheet (created events can be deleted). */}
       {sel ? (() => {
         const created = sel.eventId ? events.find((e) => e.id === sel.eventId) : undefined;
-        const whenLine = [sel.dateLabel, sel.timeLabel, created ? personLabels[created.person] : ""].filter(Boolean).join(" · ");
+        const whenLine = [sel.dateLabel, sel.timeLabel, created ? personLabel(created.person) : ""].filter(Boolean).join(" · ");
         return (
           <EventDetailSheet
             detail={{

@@ -5,17 +5,16 @@ import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
 import { teamAgentById } from "@/lib/team";
 import { TeamBadge } from "./TeamBadge";
-import { useFamilyMember } from "./FamilyContext";
+import { useChildren, useFamilyMember } from "./FamilyContext";
 import { chatFixtureMessages } from "@/lib/chat-fixtures";
 import { ChatMessage } from "@/lib/chat-contracts";
 import { TeamAgentId } from "@/lib/team";
-import { personLabels } from "./calendar-ui";
 import { RobotEvent, useRobotEvents } from "./RobotEventContext";
 import { ChatTurnCard, DraftInfo } from "@/lib/chat-draft";
 
 type ChatTurn = {
   id: string;
-  sender: "Mom" | "Dad" | "Housekeeper" | "Cameraman" | "Companion";
+  sender: string;
   time: string;
   avatar: "mom" | "dad" | TeamAgentId;
   text: string;
@@ -165,7 +164,8 @@ function CounterRow({ label, done, total }: { label: string; done: number; total
 // A finished robot event lands in chat as a keepsake: Vita (the family keeper)
 // shares the clip the robot captured, marked as the event's completion.
 function RobotCompletionRow({ event }: { event: RobotEvent }) {
-  const who = personLabels[event.person] ?? event.person;
+  const rowChildren = useChildren();
+  const who = rowChildren.find((c) => c.id === event.person)?.name ?? (event.person === "family" ? "Family" : event.person);
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
       <TeamBadge agentId="vita" size="sm" />

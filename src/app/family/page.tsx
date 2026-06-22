@@ -19,12 +19,51 @@ async function fileToAvatarUrl(file: File): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
+async function encodePhoto(file: File): Promise<{ name: string; mimeType: string; dataBase64: string; capturedAtISO: string } | null> {
+  try {
+    const max = 768;
+    type DrawFn = (c: CanvasRenderingContext2D, w: number, h: number) => void;
+    type Decoded = { width: number; height: number; draw: DrawFn };
+    let bitmap: ImageBitmap | null = null;
+    try { bitmap = await createImageBitmap(file); } catch { /* HEIC fallback below */ }
+    let decoded: Decoded;
+    if (bitmap) {
+      const b = bitmap;
+      decoded = { width: b.width, height: b.height, draw: (c, w, h) => c.drawImage(b, 0, 0, w, h) };
+    } else {
+      decoded = await new Promise<Decoded>((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve({ width: img.naturalWidth, height: img.naturalHeight, draw: (c, w, h) => c.drawImage(img, 0, 0, w, h) }); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("decode")); };
+        img.src = url;
+      });
+    }
+    const { width, height, draw } = decoded;
+    const scale = Math.min(1, max / Math.max(width, height));
+    const w = Math.max(1, Math.round(width * scale));
+    const h = Math.max(1, Math.round(height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    draw(ctx, w, h);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+    const dataBase64 = dataUrl.split(",")[1] ?? "";
+    if (!dataBase64) return null;
+    return { name: file.name, mimeType: "image/jpeg", dataBase64, capturedAtISO: new Date(file.lastModified || Date.now()).toISOString() };
+  } catch { return null; }
+}
+
 export default function FamilySettingsPage() {
   const [members, setMembers] = useState<FamilyMemberProfile[] | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetDone, setResetDone] = useState(false);
+  const [organizing, setOrganizing] = useState(false);
+  const [organizeStatus, setOrganizeStatus] = useState<string | null>(null);
+  const organizeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Load from localStorage immediately (survives redeploys)
@@ -52,6 +91,31 @@ export default function FamilySettingsPage() {
   function remove(id: string) {
     setMembers((cur) => (cur ? cur.filter((m) => m.id !== id) : cur));
     setSaved(false);
+  }
+
+  async function onOrganizeFiles(files: FileList | null) {
+    if (!files || !files.length) return;
+    const isImage = (f: File) => f.type.startsWith("image/") || /\.(heic|heif|jpe?g|png|gif|webp)$/i.test(f.name);
+    const images = [...files].filter(isImage);
+    if (!images.length) { setOrganizeStatus("No photos found in selection."); return; }
+    setOrganizing(true);
+    setOrganizeStatus(null);
+    try {
+      const encoded = await Promise.all(images.map(encodePhoto));
+      const photos = encoded.filter(Boolean);
+      if (!photos.length) { setOrganizeStatus("Couldn't read those photos."); return; }
+      const res = await fetch("/api/album/organize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setOrganizeStatus(`${photos.length} photo${photos.length === 1 ? "" : "s"} added to Journey ✓`);
+    } catch {
+      setOrganizeStatus("Organize failed — please try again.");
+    } finally {
+      setOrganizing(false);
+    }
   }
 
   async function save() {
@@ -110,6 +174,32 @@ export default function FamilySettingsPage() {
                 ＋ Add a child
               </button>
 
+              <button
+                onClick={save}
+                disabled={saving}
+                className="w-full rounded-full bg-ink py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
+              >
+                {saving ? "Saving…" : saved ? "Saved ✓" : "Save family"}
+              </button>
+
+              <div className="mt-6 border-t border-line pt-5">
+                <p className="text-[13px] font-semibold text-ink">Journey</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                  Add photos from your camera roll to Journey. Iris will organize them by child and day.
+                </p>
+                <button
+                  onClick={() => organizeRef.current?.click()}
+                  disabled={organizing}
+                  className="mt-3 w-full rounded-full border border-line bg-white py-3 text-[14px] font-semibold text-ink disabled:opacity-40"
+                >
+                  {organizing ? "Organizing…" : "＋ Organize photos"}
+                </button>
+                <input ref={organizeRef} type="file" accept="image/*" multiple hidden onChange={(e) => onOrganizeFiles(e.target.files)} />
+                {organizeStatus ? (
+                  <p className="mt-2 text-center text-[12px] text-muted">{organizeStatus}</p>
+                ) : null}
+              </div>
+
               <div className="mt-6 border-t border-line pt-5">
                 <p className="text-[13px] font-semibold text-ink">Demo data</p>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted">
@@ -127,16 +217,6 @@ export default function FamilySettingsPage() {
           )}
         </div>
 
-        {/* Save button — always visible, sticks to bottom of content */}
-        <div className="sticky bottom-0 border-t border-line bg-paper px-[26px] pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
-          <button
-            onClick={save}
-            disabled={saving}
-            className="w-full rounded-full bg-ink py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
-          >
-            {saving ? "Saving…" : saved ? "Saved ✓" : "Save family"}
-          </button>
-        </div>
       </div>
     </main>
   );
