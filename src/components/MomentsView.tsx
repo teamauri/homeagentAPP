@@ -141,7 +141,39 @@ export function MomentsView() {
       const data = await res.json();
       setAuriResult({ memoryId: data.memoryId, durationSeconds: data.durationSeconds, mediaUrl: data.mediaUrl });
       setAuriPhase("done");
-      refresh().catch(() => {});
+      await refresh().catch(() => {});
+      // Show the new film in the timeline immediately — even if the server store
+      // hasn't propagated across serverless instances yet (it'll be there on the
+      // next load). Skip if a refresh already surfaced it.
+      if (data.mediaUrl) {
+        setGrowth((prev) => {
+          if (!prev) return prev;
+          const present = prev.days.some(
+            (d) => (data.memoryId && d.memoryId === data.memoryId) || d.media.some((m) => m.url === data.mediaUrl),
+          );
+          if (present) return prev;
+          const now = new Date();
+          const newDay: DayGroup = {
+            dateISO: now.toISOString(),
+            dateLabel: `Today · ${now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`,
+            caption: "A short film from your video, made by Auri Cut.",
+            isFirstDay: false,
+            memoryId: data.memoryId,
+            media: [
+              {
+                id: data.memoryId ?? `auri-${now.getTime()}`,
+                kind: "video",
+                source: "auri",
+                url: data.mediaUrl,
+                durationLabel: data.durationSeconds ? secLabel(data.durationSeconds) : undefined,
+                capturedAtISO: now.toISOString(),
+                isFirst: false,
+              },
+            ],
+          };
+          return { ...prev, days: [newDay, ...prev.days] };
+        });
+      }
     } catch (e) {
       setAuriPhase("idle");
       // A stale deploy (the app updated while this tab stayed open) makes a
