@@ -312,8 +312,24 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const keepEvent = useCallback((id: string) => {
+    // Optimistically mark as kept in local state, then persist to server.
     setEvents((current) => current.map((event) => (event.id === id ? { ...event, kept: true } : event)));
+    fetch(`/api/robot/capture-tasks/${encodeURIComponent(id)}/keep`, { method: "POST" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.memoryUrl) {
+          setEvents((current) =>
+            current.map((event) =>
+              event.id === id && event.result
+                ? { ...event, result: { ...event.result, memoryUrl: data.memoryUrl } }
+                : event
+            )
+          );
+        }
+      })
+      .catch(() => {});
   }, []);
+
 
   const removeEvent = useCallback((id: string) => {
     setEvents((current) => current.filter((event) => event.id !== id));

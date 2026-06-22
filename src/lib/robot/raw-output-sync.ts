@@ -2,13 +2,11 @@ import { AuriClient, AuriError, type RawOutputStatusResponse } from "@/lib/auri/
 import type { CalendarApiEvent } from "@/lib/calendar-api";
 import {
   addDemoMedia,
-  createDemoMemoryFromMedia,
   getDemoCalendarEvent,
   persistDemoStore,
   updateDemoCalendarRobotStatus,
   type DemoMediaInput,
   type DemoMediaItem,
-  type DemoMemoryItem,
 } from "@/lib/demo/demo-store";
 import { storeBinaryFile } from "@/lib/demo/media-storage";
 
@@ -19,7 +17,6 @@ export interface RawOutputSyncResult {
   httpStatus: number;
   event?: CalendarApiEvent;
   media?: DemoMediaItem[];
-  memory?: DemoMemoryItem;
   rawOutput?: RawOutputStatusResponse;
   error?: string;
   detail?: string;
@@ -167,18 +164,11 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
     };
 
     const media = addDemoMedia([mediaInput], "auri");
-    const memory = createDemoMemoryFromMedia(media, {
-      title: event.title,
-      body: "A raw recording and transcript from Auri Robot are ready.",
-      status: "ready",
-      statusLabel: "Ready",
-    });
 
     const now = new Date().toISOString();
     const updated = updateDemoCalendarRobotStatus(event.id, {
       status: "done",
       rawOutputStatus: "ready",
-      rawOutputMemoryId: memory?.id,
       rawOutputVideoUrl: storedVideo.url,
       transcriptJsonUrl: storedTranscriptJson.url,
       transcriptTxtUrl: storedTranscriptTxt.url,
@@ -192,7 +182,6 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
       httpStatus: 200,
       event: updated,
       media,
-      memory,
       rawOutput,
       metadata: { provider: "local-demo-store", storage: storedVideo.storage },
     };
