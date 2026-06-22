@@ -14,7 +14,7 @@ import { ChatTurnCard, DraftInfo } from "@/lib/chat-draft";
 
 type ChatTurn = {
   id: string;
-  sender: "Mom" | "Dad" | "Vita" | "Iris" | "Lumi";
+  sender: "Mom" | "Dad" | "Housekeeper" | "Cameraman" | "Companion";
   time: string;
   avatar: "mom" | "dad" | TeamAgentId;
   text: string;
@@ -453,18 +453,54 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const confirmed = state === "confirmed";
 
   if (confirmed) {
+    if (editing) {
+      return (
+        <div className="max-w-[98%] overflow-hidden rounded-[16px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
+          <div className="space-y-2 px-3.5 py-3">
+            <div className="mb-1 text-[12px] font-medium text-muted">{isReminder ? "Edit reminder" : "Edit event"}</div>
+            <input
+              className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Title"
+            />
+            <input
+              className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
+              value={editTime}
+              onChange={(e) => setEditTime(e.target.value)}
+              placeholder="Time (e.g. 1:30 PM)"
+            />
+            <select
+              className="w-full rounded-[10px] border border-line bg-surface px-3 py-1.5 text-[14px] text-ink outline-none"
+              value={editPerson}
+              onChange={(e) => setEditPerson(e.target.value as DraftInfo["person"])}
+            >
+              {PERSON_OPTIONS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+            <div className="flex gap-2 pt-1">
+              <button onClick={confirm} className="flex-1 rounded-full bg-ink py-2 text-[14px] font-medium text-white">
+                Save
+              </button>
+              <button onClick={() => setEditing(false)} className="rounded-full border border-line px-4 py-2 text-[14px] font-medium text-muted">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <button
-        onClick={() => {
-          sessionStorage.setItem("auri.tab.v1", "today");
-          window.location.href = "/";
-        }}
-        className="grid min-h-[72px] w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-[15px] border border-line bg-white px-2.5 py-2.5 text-left shadow-[0_8px_18px_rgba(8,8,8,0.04)]"
-      >
+      <div className="grid min-h-[72px] w-full grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-2 rounded-[15px] border border-line bg-white px-2.5 py-2.5 shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
         <div className="grid h-6 w-6 shrink-0 place-items-center">
           <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-6 w-6" />
         </div>
-        <div className="min-w-0">
+        <button
+          onClick={() => { window.location.href = "/calendar"; }}
+          className="min-w-0 text-left"
+        >
           <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">
             {isReminder ? "Reminder" : "Calendar event"}
           </div>
@@ -472,11 +508,22 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
             {liveTitle}
           </div>
           <div className="mt-0.5 truncate text-[12.5px] leading-4 tracking-[0] text-muted">{whenLine}</div>
+        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={() => setEditing(true)}
+            className="text-[12.5px] font-medium text-ink/50"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => { window.location.href = "/calendar"; }}
+            className="shrink-0 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]"
+          >
+            View
+          </button>
         </div>
-        <span className="shrink-0 whitespace-nowrap rounded-full border border-line px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]">
-          View
-        </span>
-      </button>
+      </div>
     );
   }
 
