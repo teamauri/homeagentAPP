@@ -432,7 +432,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
       person: livePerson,
       dateLabel: draft.dateLabel,
       timeLabel: liveTime,
-      forRobot: false,
+      forRobot: true,
     });
     writeDraftState(key, "confirmed");
     setState("confirmed");
