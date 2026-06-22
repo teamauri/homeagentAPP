@@ -222,6 +222,19 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [ready, refreshCreatedEvents]);
 
+  // Heartbeat: re-POST pending robot events every 30s so Render's in-memory
+  // calendar stays populated even after a cold start. DockKit polls every 5s,
+  // so this guarantees it finds events as long as the web app is open.
+  useEffect(() => {
+    if (!ready) return;
+    const interval = setInterval(() => {
+      events
+        .filter((e) => e.forRobot && e.status !== "done")
+        .forEach(persistEventToCalendarApi);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [ready, events]);
+
   useEffect(() => {
     if (!ready) return;
     const candidates = events.filter(
