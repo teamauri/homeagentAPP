@@ -253,8 +253,7 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
       ) : null}
 
       {/* Keep button */}
-      <div className="flex items-center gap-2 border-t border-line px-3.5 py-2.5">
-        <span className="flex-1 truncate text-[13px] text-muted">Job complete · {event.title}</span>
+      <div className="flex items-center justify-end gap-2 border-t border-line px-3.5 py-2.5">
         {event.kept ? (
           <span className="shrink-0 text-[12px] font-medium text-gold">💗 Kept</span>
         ) : (
