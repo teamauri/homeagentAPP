@@ -167,8 +167,10 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     note: event.note ?? event.body,
     person: event.person,
     scheduledAt,
-    dateLabel: event.dateLabel,
-    timeLabel: event.timeLabel,
+    // Always derive display labels from the real time — never trust the server's
+    // frozen "Today"/"now" strings, which would otherwise re-pin to today daily.
+    dateLabel: deriveDateLabel(scheduledAt),
+    timeLabel: deriveTimeLabel(scheduledAt),
     icon,
     agent: agentFromIcon(icon),
     forRobot: event.forRobot,
@@ -288,7 +290,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
           const scheduledAt = Number.isFinite(e.scheduledAt)
             ? e.scheduledAt
             : scheduledAtFromLabels(e.dateLabel, e.timeLabel) ?? Date.now();
-          return { ...e, status, scheduledAt };
+          // Re-derive labels so a frozen "Today" from a prior day shows correctly.
+          return { ...e, status, scheduledAt, dateLabel: deriveDateLabel(scheduledAt), timeLabel: deriveTimeLabel(scheduledAt) };
         });
         // Drop one-time jobs whose time has already passed — this clears the old
         // backlog of frozen "Today"/"now" jobs from previous days.
