@@ -123,16 +123,6 @@ function addTombstone(id: string) {
   }
 }
 
-// A one-time job that has nothing left to show: its time has passed and the
-// robot never took it past "scheduled". These are dropped everywhere (and
-// cleaned from the server) so the past never clutters Upcoming or the calendar.
-// Recurring standing jobs are projected live and never stored, so they're exempt.
-function isStaleOnce(event: RobotEvent, now: number = Date.now()): boolean {
-  if (event.kind === "highlight") return false;
-  if (event.status !== "scheduled") return false;
-  return Number.isFinite(event.scheduledAt) && event.scheduledAt < now;
-}
-
 function statusFromApi(status: CalendarApiEvent["status"]): RobotEventStatus {
   if (status === "recording" || status === "uploading" || status === "uploaded") return "recording";
   if (status === "done") return "done";
@@ -196,16 +186,15 @@ function mergeEvents(current: RobotEvent[], incoming: RobotEvent[]) {
   const tombstoned = readTombstones();
   const byId = new Map(current.map((event) => [event.id, event]));
   for (const event of incoming) {
-    // Never resurrect a locally-deleted job, and never re-add a job whose time
-    // has already passed (the server snapshot may still hold stale copies).
+    // Only skip jobs the user explicitly deleted (tombstoned). A past scheduled
+    // time is NOT a reason to drop — the job stays so DockKit can record it and
+    // the calendar can show it; Upcoming hides past jobs at the view level.
     if (tombstoned.has(event.id)) continue;
-    if (isStaleOnce(event) && !byId.has(event.id)) continue;
     const existing = byId.get(event.id);
     // Preserve client-only fields the API doesn't know about (e.g. kept).
     byId.set(event.id, existing ? { ...event, kept: existing.kept } : event);
   }
-  // Drop any now-stale one-time jobs (including ones that just aged out locally).
-  return [...byId.values()].filter((event) => !isStaleOnce(event));
+  return [...byId.values()];
 }
 
 function persistEventToCalendarApi(event: RobotEvent) {
@@ -250,25 +239,12 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload: { items?: CalendarApiEvent[] } | null) => {
         if (!Array.isArray(payload?.items)) return;
-        // Purge legacy events that predate durable timestamps: their frozen
-        // "Today" can't be trusted (it re-resolves to today on every load and so
-        // never expires). DELETE them so the server snapshot stops hoarding them.
-        const fresh = payload.items.filter((raw) => {
-          if (typeof raw.scheduledAt !== "number") {
-            addTombstone(raw.id);
-            removeEventFromCalendarApi(raw.id);
-            return false;
-          }
-          return true;
-        });
-        const apiEvents = fresh.map(eventFromApi);
-        // Clean one-time jobs whose time has passed — dead data, drop everywhere.
-        for (const event of apiEvents) {
-          if (isStaleOnce(event)) {
-            addTombstone(event.id);
-            removeEventFromCalendarApi(event.id);
-          }
-        }
+        // The poll READS the server; it must never DELETE from it. Deleting jobs
+        // here (for a missing timestamp or a passed time) is what made freshly
+        // created jobs vanish within 5s and never reach the robot. eventFromApi
+        // backfills scheduledAt from the labels when the server didn't store one,
+        // so nothing is lost. Deletion happens only on an explicit user action.
+        const apiEvents = payload.items.map(eventFromApi);
         setEvents((current) => mergeEvents(current, apiEvents));
         completedCount.current = apiEvents.filter((event) => event.status === "done").length;
       })
@@ -293,14 +269,13 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
           // Re-derive labels so a frozen "Today" from a prior day shows correctly.
           return { ...e, status, scheduledAt, dateLabel: deriveDateLabel(scheduledAt), timeLabel: deriveTimeLabel(scheduledAt) };
         });
-        // Drop one-time jobs whose time has already passed — this clears the old
-        // backlog of frozen "Today"/"now" jobs from previous days.
-        const stale = migrated.filter(isStaleOnce);
-        for (const e of stale) {
-          addTombstone(e.id);
-          removeEventFromCalendarApi(e.id);
-        }
-        localEvents = migrated.filter((e) => !isStaleOnce(e));
+        // Keep every job — a past scheduled time is NOT a reason to delete. The
+        // robot (DockKit) needs the job to stay on the server through and past
+        // its scheduled minute so it can record it. Upcoming hides past one-time
+        // jobs at the view level (JobsView filters scheduledAt > now); the
+        // calendar still shows them on their day. Deletion only happens on an
+        // explicit user action (removeEvent) — never on a staleness heuristic.
+        localEvents = migrated;
         setEvents(localEvents);
         completedCount.current = localEvents.filter((e) => e.status === "done").length;
       }
