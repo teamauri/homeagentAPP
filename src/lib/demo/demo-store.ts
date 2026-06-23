@@ -3,6 +3,7 @@ import { CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
 import {
   CalendarApiEvent,
   CalendarEventInput,
+  CalendarJobAgentId,
   CalendarRawOutputStatus,
   CalendarRobotCaptureStatus,
   deriveCalendarEventIcon,
@@ -15,6 +16,7 @@ type StoredObject = CreatedLocalObject & { payload: Record<string, unknown>; cre
 type DemoObjectAction = "add" | "save" | "send" | "log" | "complete";
 type DemoMediaSource = "phone" | "auri";
 type DemoMediaType = "photo" | "video" | "clip";
+const calendarAgentIds = new Set<CalendarJobAgentId>(["iris", "lumi", "vita"]);
 
 export interface DemoMediaInput {
   id?: string;
@@ -178,6 +180,11 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
           }).format(new Date(Date.now() + 60_000));
           existingEvent.updatedAt = new Date().toISOString();
         }
+        const agent = toCalendarJobAgent(p.agent);
+        if (agent && existingEvent.agent !== agent) {
+          existingEvent.agent = agent;
+          existingEvent.updatedAt = new Date().toISOString();
+        }
         const existingObj = (currentStore.__auriDemoObjects ?? []).find(
           (o) => (o.type === "reminder_draft" || o.type === "calendar_draft") &&
                  typeof o.payload.title === "string" &&
@@ -227,9 +234,9 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
                            (typeof p.time === "string" && p.time) ? p.time : "now";
       const timeLabel = rawTimeLabel.trim().toLowerCase() === "now"
         ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai" }).format(new Date(Date.now() + 60_000))
-        : rawTimeLabel;
+        : normalizeTimeLabel(rawTimeLabel);
       const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
-      upsertDemoCalendarEvent({ title, person, dateLabel, timeLabel, note, forRobot: true });
+      upsertDemoCalendarEvent({ title, person, dateLabel, timeLabel, note, forRobot: true, agent: toCalendarJobAgent(p.agent) });
     }
 
     return { id: created.id, type: created.type, route: created.route, status: created.status };
@@ -280,6 +287,7 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
     dateLabel: input.dateLabel,
     timeLabel: input.timeLabel,
     icon: input.icon ?? existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
+    agent: input.agent ?? existing?.agent,
     source: "created",
     forRobot,
     auriClientVideoUuid: forRobot ? (existing?.auriClientVideoUuid ?? randomUUID()) : undefined,
@@ -398,6 +406,30 @@ function toPersonId(value: unknown): PersonId {
   const person = String(value || "family");
   if (["mia", "leo", "baby", "mom", "dad", "grandma", "family"].includes(person)) return person as PersonId;
   return "family";
+}
+
+function toCalendarJobAgent(value: unknown): CalendarJobAgentId | undefined {
+  const agent = String(value || "");
+  return calendarAgentIds.has(agent as CalendarJobAgentId) ? (agent as CalendarJobAgentId) : undefined;
+}
+
+function normalizeTimeLabel(value: string): string {
+  const trimmed = value.trim();
+  const friendly = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (friendly) {
+    const h = parseInt(friendly[1], 10);
+    const period = friendly[3].toUpperCase();
+    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${h12}:${friendly[2]} ${period}`;
+  }
+  const twentyFour = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (twentyFour) {
+    const h = parseInt(twentyFour[1], 10);
+    const period = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${twentyFour[2]} ${period}`;
+  }
+  return trimmed;
 }
 
 function toMediaType(value: unknown): DemoMediaType {

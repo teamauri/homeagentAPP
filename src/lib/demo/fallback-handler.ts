@@ -47,6 +47,29 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
   }
 
   // 2) Actionable → Auri frames + a helper takes the task (second voice).
+  if (/拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(input)) {
+    const timeMatch = request.message?.match(/(\d{1,2})[:：](\d{2})/) ?? null;
+    const timeLabel = timeMatch ? `${timeMatch[1]}:${timeMatch[2]} PM` : "8:00 PM";
+    const title = request.message?.replace(/今晚|今天|today|tonight/gi, "").replace(/\d{1,2}[:：]\d{2}/, "").trim() || "Capture family moment";
+    const helper: ChatHelperSegment = {
+      teamMemberId: "iris",
+      name: "Iris the eye",
+      reply: `收到，我会在今晚${timeLabel.replace(" PM", "")}拍下这个瞬间。`,
+      cards: [
+        {
+          type: "reminder",
+          title,
+          subtitle: `Today · ${timeLabel} · Mia`,
+          body: "Scheduled camera capture",
+          cta: "Edit",
+          metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "mia", agent: "iris" },
+        },
+      ],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title, timeLabel, dateLabel: "Today", person: "mia", agent: "iris", note: request.message } }],
+    };
+    return auri("交给 Iris 来拍这个瞬间。", { intent: "photo_video", helper, suggestedFollowups: ["改时间", "拍完自动保存到 Memory"] });
+  }
+
   if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {
     // Detect "now / 现在" — use the current time rather than the hardcoded 2 PM slot.
     const isNow = input.includes("now") || input.includes("现在") || input.includes("立刻") || input.includes("马上");

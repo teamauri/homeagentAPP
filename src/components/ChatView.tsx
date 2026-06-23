@@ -482,6 +482,8 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   }, [matchingEvent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isReminder = draft.kind === "reminder";
+  const agentId = draft.agent ?? matchingEvent?.agent ?? (isReminder ? "vita" : "vita");
+  const agent = teamAgentById[agentId];
 
   // Use live edits when confirmed so the confirmed card shows what was saved.
   const liveTitle = editTitle || draft.title;
@@ -507,6 +509,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
         dateLabel: draft.dateLabel,
         timeLabel: liveTime,
         forRobot: true,
+        agent: agentId,
       });
       setConfirmedEventId(id);
     }
@@ -574,12 +577,10 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
           onClick={() => setEditing(true)}
           className="flex w-full items-start gap-2.5 px-3 py-3 text-left"
         >
-          <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center">
-            <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-6 w-6" />
-          </div>
+          <TeamBadge agentId={agentId} size="xs" />
           <div className="min-w-0 flex-1">
             <div className="text-[12px] leading-4 text-muted">
-              {isReminder ? "Reminder" : "Calendar event"}
+              {agent.name}
             </div>
             <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">
               {liveTitle}
@@ -640,10 +641,10 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
         <>
           <div className="flex items-start gap-3 px-3.5 pt-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center">
-              <DoodleIcon name={isReminder ? "bell" : "calendar"} className="h-8 w-8" />
+              <TeamBadge agentId={agentId} size="sm" />
             </div>
             <div className="min-w-0 flex-1 pb-1">
-              <div className="text-[12px] leading-4 tracking-[0] text-muted">{isReminder ? "Reminder" : "Calendar event"}</div>
+              <div className="text-[12px] leading-4 tracking-[0] text-muted">{agent.name}</div>
               <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{liveTitle}</div>
               {whenLine ? <div className="mt-0.5 text-[12.5px] leading-4 tracking-[0] text-muted">{whenLine}</div> : null}
               {draft.note ? <div className="mt-1 line-clamp-2 text-[13px] leading-[18px] tracking-[0] text-ink/70">"{draft.note}"</div> : null}

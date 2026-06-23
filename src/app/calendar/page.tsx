@@ -6,6 +6,7 @@ import { useRobotEvents } from "@/components/RobotEventContext";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
 import { deriveTimeLabel } from "@/lib/job-time";
 import { jobIcon, loadStandingJobs, standingScheduledAtToday, type StandingJob } from "@/lib/jobs";
+import type { TeamAgentId } from "@/lib/team";
 
 // A calendar block — a one-time job the family created, or one instance of a
 // standing (Every-day) job projected onto a day. Both carry a real datetime.
@@ -18,6 +19,7 @@ type Block = {
   eventId?: string;    // backed by a one-time event (deletable)
   standingId?: string; // backed by a standing job (managed from Jobs)
   icon?: string;
+  agent?: TeamAgentId;
   note?: string;
   statusLabel?: string;
 };
@@ -106,7 +108,7 @@ export default function CalendarPage() {
     for (const e of events) {
       place({
         id: e.id, eventId: e.id, title: e.title, person: e.person, scheduledAt: e.scheduledAt,
-        robot: e.forRobot, icon: e.icon, note: e.note, statusLabel: STATUS_LABEL[e.status],
+        robot: e.forRobot, icon: e.icon, agent: e.agent ?? "vita", note: e.note, statusLabel: STATUS_LABEL[e.status],
       });
     }
     for (const job of standing) {
@@ -115,7 +117,7 @@ export default function CalendarPage() {
         const scheduledAt = standingScheduledAtToday(job, w.dayStart);
         place({
           id: `standing-${job.id}-${w.key}`, standingId: job.id, title: job.title,
-          person: job.person, scheduledAt, robot: true, icon: jobIcon[job.type],
+          person: job.person, scheduledAt, robot: true, icon: jobIcon[job.type], agent: job.agent,
         });
       }
     }
@@ -274,6 +276,7 @@ export default function CalendarPage() {
             detail={{
               title: sel.title,
               icon: sel.icon ?? "calendar",
+              agent: sel.agent,
               whenLine,
               note: sel.note,
               quoteNote: !!sel.note,

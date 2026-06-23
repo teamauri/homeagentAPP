@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { getMockNeeds, getMockUpcoming } from "@/lib/mock-data";
-import { teamAgents, teamAgentByName } from "@/lib/team";
+import { teamAgentById, teamAgents, teamAgentByName } from "@/lib/team";
 import type { CalendarEvent, NeedItem } from "@/lib/types";
 import { StatusPill } from "./calendar-ui";
 import { DoodleIcon } from "./Icons";
@@ -116,6 +116,8 @@ function RobotEventRow({ event, onRun }: { event: RobotEvent; onRun: () => void 
   const rowChildren = useChildren();
   const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   const meta = robotStatusMeta[event.status];
+  const agentId = event.agent ?? "vita";
+  const agent = teamAgentById[agentId];
   return (
     <article className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-line/85 bg-white px-3.5 py-2.5 shadow-[0_1px_4px_rgba(8,8,8,0.03)]">
       <div className="grid h-[42px] w-[42px] shrink-0 place-items-center">
@@ -124,6 +126,11 @@ function RobotEventRow({ event, onRun }: { event: RobotEvent; onRun: () => void 
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-[15px] font-semibold leading-[17px] text-ink">{event.title}</h3>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 truncate text-[13px] leading-[16px] text-muted">
+          <span className="inline-flex items-center gap-1 pr-0.5 text-ink/80">
+            <TeamBadge agentId={agentId} size="xs" />
+            <span>{agent.name}</span>
+          </span>
+          <span>·</span>
           <span>{personLabel(event.person)}</span>
           <span>·</span>
           <span>{event.dateLabel} · {event.timeLabel}</span>

@@ -162,7 +162,7 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     dateLabel: deriveDateLabel(scheduledAt),
     timeLabel: deriveTimeLabel(scheduledAt),
     icon,
-    agent: agentFromIcon(icon),
+    agent: event.agent ?? agentFromIcon(icon),
     forRobot: event.forRobot,
     photoUrl: event.photoUrl,
     voiceUrl: event.voiceUrl,

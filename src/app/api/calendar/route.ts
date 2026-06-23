@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CalendarApiEvent, CalendarEventInput } from "@/lib/calendar-api";
+import { CalendarApiEvent, CalendarEventInput, type CalendarJobAgentId } from "@/lib/calendar-api";
 import { listDemoCalendarEvents, persistDemoStore, removeDemoCalendarEvent, upsertDemoCalendarEvent } from "@/lib/demo/demo-store";
 import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 import type { PersonId } from "@/lib/types";
@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const personIds = new Set<PersonId>(["mia", "leo", "baby", "mom", "dad", "grandma", "family"]);
+const calendarAgentIds = new Set<CalendarJobAgentId>(["iris", "lumi", "vita"]);
 
 function wantsTruthy(value: string | null) {
   return value === "1" || value === "true" || value === "yes";
@@ -54,6 +55,9 @@ function normalizeInput(body: unknown): { input?: CalendarEventInput; error?: st
   const dateLabel = typeof payload.dateLabel === "string" ? payload.dateLabel.trim() : "";
   const timeLabel = typeof payload.timeLabel === "string" ? payload.timeLabel.trim() : "";
   const person = typeof payload.person === "string" && personIds.has(payload.person as PersonId) ? (payload.person as PersonId) : "family";
+  const agent = typeof payload.agent === "string" && calendarAgentIds.has(payload.agent as CalendarJobAgentId)
+    ? (payload.agent as CalendarJobAgentId)
+    : undefined;
 
   if (!title) return { error: "title is required" };
   if (!dateLabel) return { error: "dateLabel is required" };
@@ -70,6 +74,8 @@ function normalizeInput(body: unknown): { input?: CalendarEventInput; error?: st
       dateLabel,
       timeLabel,
       forRobot: Boolean(payload.forRobot),
+      icon: typeof payload.icon === "string" && payload.icon.trim() ? payload.icon.trim() : undefined,
+      agent,
       photoUrl: typeof payload.photoUrl === "string" ? payload.photoUrl : undefined,
       voiceUrl: typeof payload.voiceUrl === "string" ? payload.voiceUrl : undefined,
       voiceDuration: typeof payload.voiceDuration === "number" ? payload.voiceDuration : undefined,

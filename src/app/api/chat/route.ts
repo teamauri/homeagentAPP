@@ -4,7 +4,7 @@ import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
-import { ChatAIResponse, ChatApiResponse, ChatRequestBody, ChatResponseCard, ObjectToCreate } from "@/lib/chat-server/types";
+import { ChatAIResponse, ChatApiResponse, ChatRequestBody, ChatResponseCard, ObjectToCreate, type TeamMemberId } from "@/lib/chat-server/types";
 
 export const runtime = "nodejs";
 // Real model calls (DeepSeek/Gemini) can exceed the 10s default; raise it
@@ -22,8 +22,58 @@ function normalizeRequestBody(body: unknown): ChatRequestBody {
   };
 }
 
+function requestText(request: ChatRequestBody) {
+  const attachments = request.attachments?.map((a) => `${a.type ?? ""} ${a.name ?? ""}`).join(" ") ?? "";
+  return `${request.message ?? ""} ${attachments}`.toLowerCase();
+}
+
+function wantsCameraCapture(request: ChatRequestBody) {
+  return /拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(requestText(request));
+}
+
+function normalizeTimeLabel(value: unknown) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  const friendly = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (friendly) {
+    const h = parseInt(friendly[1], 10);
+    const period = friendly[3].toUpperCase();
+    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${h12}:${friendly[2]} ${period}`;
+  }
+  const twentyFour = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (twentyFour) {
+    const h = parseInt(twentyFour[1], 10);
+    const period = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${twentyFour[2]} ${period}`;
+  }
+  return trimmed;
+}
+
+function forceHelperAgent(response: ChatAIResponse, agent: Extract<TeamMemberId, "iris" | "lumi" | "vita">): ChatAIResponse {
+  const helperName = agent === "iris" ? "Iris the eye" : agent === "lumi" ? "Lumi the companion" : "Vita the keeper";
+  if (!response.helper) return response;
+  return {
+    ...response,
+    intent: agent === "iris" ? "photo_video" : response.intent,
+    helper: {
+      ...response.helper,
+      teamMemberId: agent,
+      name: helperName,
+      objectsToCreate: objectsWithAgent(response.helper.objectsToCreate, agent),
+      cards: response.helper.cards.map((card) => ({ ...card, metadata: { ...card.metadata, agent } })),
+    },
+  };
+}
+
+function normalizeRouting(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
+  if (wantsCameraCapture(request)) return forceHelperAgent(response, "iris");
+  return response;
+}
+
 async function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
-  const fallback = createFallbackChatResponse(chatRequest);
+  const fallback = normalizeRouting(createFallbackChatResponse(chatRequest), chatRequest);
   return NextResponse.json(
     await withCreatedObjects(fallback, {
       provider: "fallback",
@@ -48,8 +98,16 @@ function synthesizeCardsFromObjects(objects: ObjectToCreate[] | undefined): Chat
   return out;
 }
 
-function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"]) {
-  const created = createDemoObjects(objects);
+function objectsWithAgent(objects: ChatAIResponse["objectsToCreate"], agent?: TeamMemberId) {
+  if (!agent || !["iris", "lumi", "vita"].includes(agent)) return objects;
+  return objects.map((object) => {
+    if (object.type !== "reminder_draft" && object.type !== "calendar_draft") return object;
+    return { ...object, payload: { ...object.payload, timeLabel: normalizeTimeLabel(object.payload.timeLabel), time: normalizeTimeLabel(object.payload.time), agent: object.payload.agent ?? agent } };
+  });
+}
+
+function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"], agent?: TeamMemberId) {
+  const created = createDemoObjects(objectsWithAgent(objects, agent));
   const withRoutes = cards.map((card, index) => (created[index] ? { ...card, targetRoute: created[index].route } : card));
   return { created, cards: withRoutes };
 }
@@ -68,9 +126,10 @@ async function withCreatedObjects(response: ChatAIResponse, metadata: ChatApiRes
   if (helper) {
     // Synthesize cards if the AI forgot to include them but did create objects.
     const helperCards = helper.cards?.length ? helper.cards : synthesizeCardsFromObjects(helper.objectsToCreate);
-    const h = attachRoutes(helperCards, helper.objectsToCreate);
+    const helperObjects = objectsWithAgent(helper.objectsToCreate, helper.teamMemberId);
+    const h = attachRoutes(helperCards, helperObjects);
     helperCreated = h.created;
-    helper = { ...helper, cards: h.cards };
+    helper = { ...helper, cards: h.cards, objectsToCreate: helperObjects };
   }
 
   const createdLocalObjects = [...top.created, ...helperCreated];
@@ -104,7 +163,7 @@ export async function POST(request: Request) {
   if (process.env.DEEPSEEK_API_KEY) {
     try {
       const { response, model } = await callDeepSeekChat(chatRequest);
-      return NextResponse.json(await withCreatedObjects(response, { provider: "deepseek", fallbackUsed: false, model }));
+      return NextResponse.json(await withCreatedObjects(normalizeRouting(response, chatRequest), { provider: "deepseek", fallbackUsed: false, model }));
     } catch (error) {
       console.error("[api/chat] DeepSeek path failed", error);
       if (!process.env.GEMINI_API_KEY) {
@@ -116,7 +175,7 @@ export async function POST(request: Request) {
   if (process.env.GEMINI_API_KEY) {
     try {
       const { response, model } = await callGeminiChat(chatRequest);
-      return NextResponse.json(await withCreatedObjects(response, { provider: "gemini", fallbackUsed: false, model }));
+      return NextResponse.json(await withCreatedObjects(normalizeRouting(response, chatRequest), { provider: "gemini", fallbackUsed: false, model }));
     } catch (error) {
       console.error("[api/chat] Gemini path failed; using fallback", error);
       return await fallbackResponse(chatRequest, error instanceof Error ? error.message : "Gemini path failed");
