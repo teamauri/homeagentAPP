@@ -308,10 +308,9 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       // ignore malformed storage
     }
 
-    // Re-POST only live jobs so the server doesn't get the dead ones back.
-    for (const event of localEvents) {
-      if (event.forRobot && !isStaleOnce(event)) persistEventToCalendarApi(event);
-    }
+    // Deliberately do NOT re-POST loaded events here. They were already persisted
+    // on create; re-posting on every load is what made deleted/dead jobs come
+    // back. The server keeps created events on its persistent disk.
 
     void refreshCreatedEvents();
 
@@ -337,18 +336,11 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [ready, refreshCreatedEvents]);
 
-  // Heartbeat: re-POST pending robot events every 30s so Render's in-memory
-  // calendar stays populated even after a cold start. DockKit polls every 5s,
-  // so this guarantees it finds events as long as the web app is open.
-  useEffect(() => {
-    if (!ready) return;
-    const interval = setInterval(() => {
-      events
-        .filter((e) => e.forRobot && e.status !== "done")
-        .forEach(persistEventToCalendarApi);
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [ready, events]);
+  // NOTE: there is deliberately no "heartbeat" that re-POSTs loaded events. Doing
+  // so made every open tab resurrect data — a client would load the server's
+  // events into local state, then push them all back every 30s, so nothing could
+  // ever be deleted. Events are persisted once on create/edit (addEvent /
+  // updateEvent) and kept by the server's persistent disk; that is enough.
 
   useEffect(() => {
     if (!ready) return;
