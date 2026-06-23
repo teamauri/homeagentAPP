@@ -24,10 +24,10 @@ declare global {
   }
 }
 
-const tabs: { key: TabKey; label: string; icon: string }[] = [
-  { key: "chat", label: "Chat", icon: "family" },
-  { key: "today", label: "Jobs", icon: "bell" },
-  { key: "memory", label: "Journey", icon: "photos" },
+const tabs: { key: TabKey; label: string; icon: string; activeBg: string; activeText: string }[] = [
+  { key: "chat", label: "Chat", icon: "home", activeBg: "bg-[#FF6B6B]/15", activeText: "text-[#E03C3C]" },
+  { key: "today", label: "Jobs", icon: "bell", activeBg: "bg-[#FF9F43]/15", activeText: "text-[#D47A00]" },
+  { key: "memory", label: "Journey", icon: "photos", activeBg: "bg-[#A855F7]/15", activeText: "text-[#7C3AED]" },
 ];
 
 const titles: Record<TabKey, string> = {
@@ -124,8 +124,8 @@ function BottomTabBar({ activeTab, onTabChange }: { activeTab: TabKey; onTabChan
             aria-current={active ? "page" : undefined}
             className="flex flex-col items-center gap-1 py-0.5"
           >
-            <DoodleIcon name={tab.icon} className="h-[24px] w-[24px]" monochrome active={active} />
-            <span className={clsx("text-[11px] font-medium tracking-wide", active ? "text-ink" : "text-muted/70")}>{tab.label}</span>
+            <DoodleIcon name={tab.icon} className={clsx("h-[24px] w-[24px] transition-all", !active && "opacity-40 grayscale")} />
+            <span className={clsx("text-[11px] font-medium tracking-wide", active ? tab.activeText : "text-muted/70")}>{tab.label}</span>
           </button>
         );
       })}

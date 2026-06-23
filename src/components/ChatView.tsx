@@ -269,7 +269,10 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
 
 function useParentDisplayName(avatar: string, fallback: string): string {
   const member = useFamilyMember(avatar === "mom" || avatar === "dad" ? avatar : undefined);
-  return member?.name || fallback;
+  if (member?.name) return member.name;
+  const agent = teamAgentById[avatar as TeamAgentId];
+  if (agent) return agent.name;
+  return fallback;
 }
 
 function ChatTurnRow({ turn }: { turn: ChatTurn }) {
