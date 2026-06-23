@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { jobIcon, seedStanding, seedUpcoming, type JobSource, type StandingJob } from "@/lib/jobs";
+import { jobIcon, loadStandingJobs, seedStanding, standingScheduledAtToday, STANDING_KEY, type StandingJob } from "@/lib/jobs";
+import { deriveDateLabel, deriveTimeLabel } from "@/lib/job-time";
 import { teamAgentById } from "@/lib/team";
 import { useChildren } from "./FamilyContext";
 import { DoodleIcon } from "./Icons";
@@ -10,45 +11,26 @@ import { EventDetailSheet } from "./EventDetailSheet";
 import { useRobotEvents } from "./RobotEventContext";
 
 const STATUS_LABEL: Record<string, string> = { scheduled: "Scheduled", recording: "Recording", done: "Done" };
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // "Jobs" — everything the family has set Auri to do, in two zones:
-//   Upcoming   · one-time + imported calendar events (clears after it runs)
+//   Upcoming   · the next occurrence of each job, soonest first (clears once run)
 //   Every day  · standing recurring jobs with on/off toggles
-// This replaces the old "Inbox / Needs You" surface. No drafts to confirm — just
-// what Auri is set to deliver, and the switches that control it.
+// One job is one card. Upcoming shows future one-time jobs PLUS the next instance
+// of every enabled standing job — flip a toggle off and it leaves both Upcoming
+// and the calendar.
 
-// One unified row for the Upcoming zone, whether it came from a created event
-// (also shown on the calendar) or the mock seed.
+// One unified row for the Upcoming zone.
 type UpcomingItem = {
   id: string;
-  eventId?: string; // present when backed by a real event (opens the calendar)
+  eventId?: string;    // backed by a real one-time event (opens the detail sheet)
+  standingId?: string; // backed by a standing job (opens its editor)
   title: string;
-  dateLabel: string;
-  timeLabel: string;
+  scheduledAt: number; // canonical time — drives ordering + the derived labels
   iconName: string;
   meta: string;
-  source: JobSource;
   forRobot: boolean;
 };
-
-// Every calendar event is a robot task, so the Auri Robot badge shows on all of them.
-// A "Today" job whose scheduled time has passed is expired and removed from
-// Upcoming. "now" jobs are always considered past (they should have run instantly).
-function isExpired(dateLabel: string, timeLabel: string): boolean {
-  if (dateLabel !== "Today") return false;
-  const lower = timeLabel.toLowerCase().trim();
-  if (lower === "now") return true;
-  const m = timeLabel.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!m) return false;
-  let hour = parseInt(m[1]);
-  const min = parseInt(m[2]);
-  const period = m[3].toUpperCase();
-  if (period === "PM" && hour !== 12) hour += 12;
-  if (period === "AM" && hour === 12) hour = 0;
-  const scheduled = new Date();
-  scheduled.setHours(hour, min, 0, 0);
-  return Date.now() > scheduled.getTime();
-}
 
 const SHORT_DAY: Record<string, string> = {
   Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun", Tomorrow: "Tmrw",
@@ -60,37 +42,62 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   const children = useChildren();
   const personLabel = (id: string) => children.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   const [standing, setStanding] = useState<StandingJob[]>(seedStanding);
+  const [standingReady, setStandingReady] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editJob, setEditJob] = useState<StandingJob | null>(null);
   const [sel, setSel] = useState<UpcomingItem | null>(null);
 
-  // Upcoming = one-time events the family created (live in the shared store, so
-  // they also appear on the calendar) + the mock seed. "Done" events clear out.
+  // Load the saved Every-day list once; fall back to seed on first run.
+  useEffect(() => {
+    setStanding(loadStandingJobs());
+    setStandingReady(true);
+  }, []);
+
+  // Persist after first load so toggles + added jobs stick across reloads/builds.
+  useEffect(() => {
+    if (!standingReady) return;
+    try {
+      localStorage.setItem(STANDING_KEY, JSON.stringify(standing));
+    } catch {
+      // ignore quota failures
+    }
+  }, [standing, standingReady]);
+
+  const now = Date.now();
+
+  // The next time a standing job runs: today if its start is still ahead,
+  // otherwise tomorrow. Keeps Upcoming showing a live "next occurrence".
+  const standingNextOccurrence = (job: StandingJob) => {
+    const todayStart = standingScheduledAtToday(job, now);
+    return todayStart > now ? todayStart : todayStart + DAY_MS;
+  };
+
+  // Upcoming = future one-time jobs (status not done) + the next instance of
+  // each enabled standing job, all sorted soonest-first.
   const upcomingItems: UpcomingItem[] = [
     ...events
-      .filter((e) => !e.kind && e.status !== "done" && !isExpired(e.dateLabel, e.timeLabel))
+      .filter((e) => !e.kind && e.status !== "done" && e.scheduledAt > now)
       .map<UpcomingItem>((e) => ({
         id: e.id,
         eventId: e.id,
         title: e.title,
-        dateLabel: e.dateLabel,
-        timeLabel: e.timeLabel,
+        scheduledAt: e.scheduledAt,
         iconName: e.icon,
         meta: personLabel(e.person),
-        source: "auri",
         forRobot: true,
       })),
-    ...seedUpcoming.map<UpcomingItem>((j) => ({
-      id: j.id,
-      title: j.title,
-      dateLabel: j.dateLabel,
-      timeLabel: j.timeLabel,
-      iconName: jobIcon[j.type],
-      meta: j.subtitle,
-      source: j.source,
-      forRobot: true,
-    })),
-  ];
+    ...standing
+      .filter((job) => job.enabled)
+      .map<UpcomingItem>((job) => ({
+        id: `standing-${job.id}`,
+        standingId: job.id,
+        title: job.title,
+        scheduledAt: standingNextOccurrence(job),
+        iconName: jobIcon[job.type],
+        meta: `${teamAgentById[job.agent]?.name ?? ""} · ${personLabel(job.person)}`,
+        forRobot: true,
+      })),
+  ].sort((a, b) => a.scheduledAt - b.scheduledAt);
 
   // Tell the shell to drop its "Jobs" header while the New/Edit page is open —
   // that page has its own "‹ Back · New job" header, so the global one is noise.
@@ -102,10 +109,20 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   const toggle = (id: string) =>
     setStanding((cur) => cur.map((job) => (job.id === id ? { ...job, enabled: !job.enabled } : job)));
 
+  // A one-time job opens the detail sheet; a standing instance opens its editor.
+  const selectItem = (item: UpcomingItem) => {
+    if (item.standingId) {
+      const job = standing.find((j) => j.id === item.standingId);
+      if (job) setEditJob(job);
+      return;
+    }
+    setSel(item);
+  };
+
   // Run a highlight job now: it starts capturing for real and the live counter
   // card shows up in the Home stream, so jump there to watch it.
   const run = (job: StandingJob) => {
-    if (job.type === "highlight") startHighlight({ title: job.title, person: "family" });
+    if (job.type === "highlight") startHighlight({ title: job.title, person: job.person });
     onRunActivity?.();
   };
 
@@ -152,9 +169,9 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         </div>
         <div className="overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
           {upcomingItems.length ? (
-            upcomingItems.map((item, i) => <UpcomingRow key={item.id} item={item} first={i === 0} onSelect={() => setSel(item)} />)
+            upcomingItems.map((item, i) => <UpcomingRow key={item.id} item={item} first={i === 0} onSelect={() => selectItem(item)} />)
           ) : (
-            <p className="px-4 py-5 text-[13px] leading-5 text-muted">Nothing one-time yet. Tap “New”, choose “One time”, and it lands here.</p>
+            <p className="px-4 py-5 text-[13px] leading-5 text-muted">Nothing scheduled yet. Tap “New” to set Auri a job.</p>
           )}
         </div>
       </section>
@@ -180,10 +197,11 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         </div>
       </section>
 
-      {/* Tap a row → the shared event detail sheet (created events can be deleted). */}
+      {/* Tap a one-time job → the shared detail sheet (can be deleted). Standing
+          jobs route to their editor instead (handled in selectItem). */}
       {sel ? (() => {
         const created = sel.eventId ? events.find((e) => e.id === sel.eventId) : undefined;
-        const whenLine = [sel.dateLabel, sel.timeLabel, created ? personLabel(created.person) : ""].filter(Boolean).join(" · ");
+        const whenLine = [deriveDateLabel(sel.scheduledAt), deriveTimeLabel(sel.scheduledAt), created ? personLabel(created.person) : ""].filter(Boolean).join(" · ");
         return (
           <EventDetailSheet
             detail={{
@@ -217,8 +235,8 @@ function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boo
   return (
     <button onClick={onSelect} className={`flex w-full items-center gap-3 px-3.5 py-3 text-left ${first ? "" : "border-t border-line/70"}`}>
       <div className="w-[40px] shrink-0 text-center">
-        <div className="text-[11px] leading-4 text-muted">{shortDay(item.dateLabel)}</div>
-        <div className="text-[14px] font-semibold leading-4 text-ink">{item.timeLabel.replace(/\s?[AP]M$/i, "")}</div>
+        <div className="text-[11px] leading-4 text-muted">{shortDay(deriveDateLabel(item.scheduledAt))}</div>
+        <div className="text-[14px] font-semibold leading-4 text-ink">{deriveTimeLabel(item.scheduledAt).replace(/\s?[AP]M$/i, "")}</div>
       </div>
       <span className="h-8 w-px shrink-0 bg-line" aria-hidden="true" />
       <div className="grid h-[40px] w-[40px] shrink-0 place-items-center">
@@ -228,11 +246,6 @@ function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boo
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{item.title}</h3>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
           {item.forRobot ? <RobotBadge /> : null}
-          {item.source === "gcal" ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#2e7dd1]/10 px-1.5 py-0.5 text-[10.5px] font-semibold leading-3 text-[#2e7dd1]">
-              <DoodleIcon name="calendar" className="h-3 w-3" /> Google
-            </span>
-          ) : null}
           <span className="text-[12.5px] leading-[18px] tracking-[0] text-muted">{item.meta}</span>
         </div>
       </div>

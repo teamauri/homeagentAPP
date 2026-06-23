@@ -30,6 +30,10 @@ export interface CalendarApiEvent {
   id: string;
   title: string;
   person: PersonId;
+  // Durable absolute time (epoch ms). dateLabel/timeLabel are derived display
+  // strings. Events stored before this field existed are "legacy" and get
+  // purged on read, since their frozen "Today" can't be resolved to a real day.
+  scheduledAt?: number;
   dateLabel: string;
   timeLabel: string;
   icon: string;
@@ -55,6 +59,7 @@ export interface CalendarEventInput {
   note?: string;
   body?: string;
   person: PersonId;
+  scheduledAt?: number;
   dateLabel: string;
   timeLabel: string;
   forRobot?: boolean;

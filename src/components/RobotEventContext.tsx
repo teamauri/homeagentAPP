@@ -4,6 +4,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { deriveCalendarEventIcon, type CalendarApiEvent } from "@/lib/calendar-api";
 import type { PersonId } from "@/lib/types";
 import type { TeamAgentId } from "@/lib/team";
+import { deriveDateLabel, deriveTimeLabel, scheduledAtFromLabels } from "@/lib/job-time";
 
 // A "robot event" is a calendar event the parent hands to the Auri Robot: the
 // robot shows a reminder at the set time, captures the moment, then sends the
@@ -27,6 +28,10 @@ export interface RobotEvent {
   title: string;
   note?: string;
   person: PersonId;
+  // Canonical scheduled time (epoch ms). dateLabel/timeLabel are DERIVED from
+  // this for display + kept in sync for the calendar API / DockKit, which still
+  // speak in strings. scheduledAt is the source of truth for ordering + expiry.
+  scheduledAt: number;
   dateLabel: string;
   timeLabel: string;
   icon: string;
@@ -54,8 +59,11 @@ export interface NewRobotEventInput {
   title: string;
   note?: string;
   person: PersonId;
-  dateLabel: string;
-  timeLabel: string;
+  // Preferred: a real datetime. dateLabel/timeLabel are derived from it. Callers
+  // that only have strings (legacy chat drafts) may pass those instead.
+  scheduledAt?: number;
+  dateLabel?: string;
+  timeLabel?: string;
   forRobot: boolean;
   agent?: TeamAgentId;
   photoUrl?: string;
@@ -91,6 +99,39 @@ function nowLabel() {
 export const deriveEventIcon = deriveCalendarEventIcon;
 
 const STORAGE_KEY = "auri.events.v1";
+// Tombstones: ids the user deleted locally. The 5s server poll must never
+// resurrect these, even if a stale copy still lives in the server snapshot.
+const TOMBSTONE_KEY = "auri.deletedIds.v1";
+
+function readTombstones(): Set<string> {
+  try {
+    const raw = localStorage.getItem(TOMBSTONE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function addTombstone(id: string) {
+  try {
+    const set = readTombstones();
+    set.add(id);
+    localStorage.setItem(TOMBSTONE_KEY, JSON.stringify([...set]));
+  } catch {
+    // ignore storage failures
+  }
+}
+
+// A one-time job that has nothing left to show: its time has passed and the
+// robot never took it past "scheduled". These are dropped everywhere (and
+// cleaned from the server) so the past never clutters Upcoming or the calendar.
+// Recurring standing jobs are projected live and never stored, so they're exempt.
+function isStaleOnce(event: RobotEvent, now: number = Date.now()): boolean {
+  if (event.kind === "highlight") return false;
+  if (event.status !== "scheduled") return false;
+  return Number.isFinite(event.scheduledAt) && event.scheduledAt < now;
+}
 
 function statusFromApi(status: CalendarApiEvent["status"]): RobotEventStatus {
   if (status === "recording" || status === "uploading" || status === "uploaded") return "recording";
@@ -113,11 +154,19 @@ function agentFromIcon(icon: string): TeamAgentId {
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
   const rawVideoUrl = event.robot?.rawOutputVideoUrl;
   const icon = (event.icon && event.icon !== "spark") ? event.icon : deriveCalendarEventIcon(event.title, event.person);
+  // Prefer the durable absolute time. Legacy events (no scheduledAt) fall back
+  // to parsing the labels; refreshCreatedEvents purges those separately.
+  const scheduledAt =
+    typeof event.scheduledAt === "number"
+      ? event.scheduledAt
+      : scheduledAtFromLabels(event.dateLabel, event.timeLabel) ??
+        (event.createdAt ? new Date(event.createdAt).getTime() : Date.now());
   return {
     id: event.id,
     title: event.title,
     note: event.note ?? event.body,
     person: event.person,
+    scheduledAt,
     dateLabel: event.dateLabel,
     timeLabel: event.timeLabel,
     icon,
@@ -142,13 +191,19 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
 }
 
 function mergeEvents(current: RobotEvent[], incoming: RobotEvent[]) {
+  const tombstoned = readTombstones();
   const byId = new Map(current.map((event) => [event.id, event]));
   for (const event of incoming) {
+    // Never resurrect a locally-deleted job, and never re-add a job whose time
+    // has already passed (the server snapshot may still hold stale copies).
+    if (tombstoned.has(event.id)) continue;
+    if (isStaleOnce(event) && !byId.has(event.id)) continue;
     const existing = byId.get(event.id);
     // Preserve client-only fields the API doesn't know about (e.g. kept).
     byId.set(event.id, existing ? { ...event, kept: existing.kept } : event);
   }
-  return [...byId.values()];
+  // Drop any now-stale one-time jobs (including ones that just aged out locally).
+  return [...byId.values()].filter((event) => !isStaleOnce(event));
 }
 
 function persistEventToCalendarApi(event: RobotEvent) {
@@ -160,6 +215,7 @@ function persistEventToCalendarApi(event: RobotEvent) {
       title: event.title,
       note: event.note,
       person: event.person,
+      scheduledAt: event.scheduledAt,
       dateLabel: event.dateLabel,
       timeLabel: event.timeLabel,
       forRobot: event.forRobot,
@@ -192,7 +248,25 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       .then((response) => (response.ok ? response.json() : null))
       .then((payload: { items?: CalendarApiEvent[] } | null) => {
         if (!Array.isArray(payload?.items)) return;
-        const apiEvents = payload.items.map(eventFromApi);
+        // Purge legacy events that predate durable timestamps: their frozen
+        // "Today" can't be trusted (it re-resolves to today on every load and so
+        // never expires). DELETE them so the server snapshot stops hoarding them.
+        const fresh = payload.items.filter((raw) => {
+          if (typeof raw.scheduledAt !== "number") {
+            addTombstone(raw.id);
+            removeEventFromCalendarApi(raw.id);
+            return false;
+          }
+          return true;
+        });
+        const apiEvents = fresh.map(eventFromApi);
+        // Clean one-time jobs whose time has passed — dead data, drop everywhere.
+        for (const event of apiEvents) {
+          if (isStaleOnce(event)) {
+            addTombstone(event.id);
+            removeEventFromCalendarApi(event.id);
+          }
+        }
         setEvents((current) => mergeEvents(current, apiEvents));
         completedCount.current = apiEvents.filter((event) => event.status === "done").length;
       })
@@ -207,16 +281,34 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
       if (Array.isArray(parsed) && parsed.length) {
-        // Any event left "recording" from a previous session never finished.
-        localEvents = parsed.map((e: RobotEvent) => (e.status === "recording" ? { ...e, status: "scheduled" } : e));
+        const migrated: RobotEvent[] = parsed.map((e: RobotEvent) => {
+          // Any event left "recording" from a previous session never finished.
+          const status = e.status === "recording" ? "scheduled" : e.status;
+          // Backfill scheduledAt for events stored before timestamps existed.
+          const scheduledAt = Number.isFinite(e.scheduledAt)
+            ? e.scheduledAt
+            : scheduledAtFromLabels(e.dateLabel, e.timeLabel) ?? Date.now();
+          return { ...e, status, scheduledAt };
+        });
+        // Drop one-time jobs whose time has already passed — this clears the old
+        // backlog of frozen "Today"/"now" jobs from previous days.
+        const stale = migrated.filter(isStaleOnce);
+        for (const e of stale) {
+          addTombstone(e.id);
+          removeEventFromCalendarApi(e.id);
+        }
+        localEvents = migrated.filter((e) => !isStaleOnce(e));
         setEvents(localEvents);
-        completedCount.current = localEvents.filter((e: RobotEvent) => e.status === "done").length;
+        completedCount.current = localEvents.filter((e) => e.status === "done").length;
       }
     } catch {
       // ignore malformed storage
     }
 
-    for (const event of localEvents) persistEventToCalendarApi(event);
+    // Re-POST only live jobs so the server doesn't get the dead ones back.
+    for (const event of localEvents) {
+      if (event.forRobot && !isStaleOnce(event)) persistEventToCalendarApi(event);
+    }
 
     void refreshCreatedEvents();
 
@@ -286,13 +378,20 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
   const addEvent = useCallback((input: NewRobotEventInput) => {
     const id = `revent_${Date.now()}`;
+    // Resolve to a real datetime, then derive the display labels from it so
+    // they always read correctly ("Today" only when it actually is today).
+    const scheduledAt =
+      input.scheduledAt ??
+      scheduledAtFromLabels(input.dateLabel ?? "Today", input.timeLabel ?? "now") ??
+      Date.now();
     const event: RobotEvent = {
       id,
       title: input.title,
       note: input.note,
       person: input.person,
-      dateLabel: input.dateLabel,
-      timeLabel: input.timeLabel,
+      scheduledAt,
+      dateLabel: deriveDateLabel(scheduledAt),
+      timeLabel: deriveTimeLabel(scheduledAt),
       forRobot: input.forRobot,
       icon: deriveEventIcon(input.title, input.person),
       agent: input.agent ?? "vita",
@@ -306,12 +405,20 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     return id;
   }, []);
 
-  const updateEvent = useCallback((id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "dateLabel" | "timeLabel">>) => {
+  const updateEvent = useCallback((id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "scheduledAt" | "dateLabel" | "timeLabel">>) => {
     setEvents((current) => current.map((event) => {
       if (event.id !== id) return event;
-      const updated = { ...event, ...updates };
-      persistEventToCalendarApi(updated);
-      return updated;
+      // Keep scheduledAt and the display labels in lockstep, whichever changed.
+      const next = { ...event, ...updates };
+      if (typeof updates.scheduledAt === "number") {
+        next.dateLabel = deriveDateLabel(updates.scheduledAt);
+        next.timeLabel = deriveTimeLabel(updates.scheduledAt);
+      } else if (updates.dateLabel !== undefined || updates.timeLabel !== undefined) {
+        const resolved = scheduledAtFromLabels(next.dateLabel, next.timeLabel);
+        if (resolved !== null) next.scheduledAt = resolved;
+      }
+      persistEventToCalendarApi(next);
+      return next;
     }));
   }, []);
 
@@ -336,6 +443,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
 
   const removeEvent = useCallback((id: string) => {
+    // Tombstone so the server poll can't resurrect it on the next 5s tick.
+    addTombstone(id);
     setEvents((current) => current.filter((event) => event.id !== id));
     removeEventFromCalendarApi(id);
   }, []);
@@ -372,6 +481,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
         id,
         title: opts?.title ?? "Evening highlights",
         person: opts?.person ?? "family",
+        scheduledAt: Date.now(),
         dateLabel: "Today",
         timeLabel: nowLabel(),
         icon: "camera-note",

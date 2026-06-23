@@ -276,6 +276,7 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
     note: input.note,
     body: input.body ?? input.note,
     person: input.person,
+    scheduledAt: input.scheduledAt ?? existing?.scheduledAt,
     dateLabel: input.dateLabel,
     timeLabel: input.timeLabel,
     icon: input.icon ?? existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
