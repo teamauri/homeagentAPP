@@ -1,11 +1,13 @@
 import type { PersonId } from "./types";
 import type { TeamAgentId } from "./team";
+import { todayAt } from "./job-time";
 
 // A "job" is something the family has set Auri to do. Two shapes:
-//  - UpcomingJob: a one-time, dated job (or an imported calendar event). Shows in
-//    the "Upcoming" zone and clears itself after it runs.
+//  - A one-time, dated job (an event in the shared store). Shows in the
+//    "Upcoming" zone and on the calendar; clears itself once its time passes.
 //  - StandingJob: a recurring job that runs every day on a schedule/alarm. Shows
-//    in the "Every day" zone with an on/off toggle.
+//    in the "Every day" zone with an on/off toggle, and — when enabled —
+//    projects one instance per day onto Upcoming and the calendar.
 // Both map onto the same underlying Session model (see docs/REPOSITION_DESIGN.md).
 
 // Each job type maps to the teammate that runs it: Iris (the eye) captures and
@@ -26,48 +28,48 @@ export const jobIcon: Record<JobType, string> = {
   nudge: "shield",
 };
 
+// A standing job's recurrence: a daily window (start–end) or a single alarm.
+// Times are "HH:MM" 24h so a real datetime can be derived for any day.
+export type StandingSchedule =
+  | { kind: "window"; start: string; end: string }
+  | { kind: "alarm"; alarm: string };
+
 export interface StandingJob {
   id: string;
   type: JobType;
   agent: TeamAgentId; // the teammate responsible — shown as avatar + name
   title: string;
-  trigger: string; // e.g. "Daily 5–8 PM · Family"
+  trigger: string; // human label, e.g. "5–8 PM · Family" — derived from schedule
+  person: PersonId;
+  schedule: StandingSchedule;
   enabled: boolean;
 }
 
-export interface UpcomingJob {
-  id: string;
-  type: JobType;
-  agent: TeamAgentId;
-  title: string;
-  subtitle: string; // e.g. "Iris · one-time highlight · Leo"
-  dateLabel: string; // e.g. "Tue"
-  timeLabel: string; // e.g. "3:00 PM"
-  source: JobSource;
+// localStorage key for the Every-day list (toggle states + user-added jobs).
+// Shared by the Jobs screen and the Calendar route so both reflect one source.
+export const STANDING_KEY = "auri.standing.v1";
+
+// Read the saved Every-day list, falling back to seed on first run. Client-only.
+export function loadStandingJobs(): StandingJob[] {
+  try {
+    const raw = localStorage.getItem(STANDING_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length) return parsed as StandingJob[];
+  } catch {
+    // ignore malformed storage
+  }
+  return seedStanding;
 }
 
-export const seedUpcoming: UpcomingJob[] = [
-  {
-    id: "recital",
-    type: "highlight",
-    agent: "iris",
-    title: "Piano recital · capture 30s",
-    subtitle: "Iris · one-time highlight · Leo",
-    dateLabel: "Tue",
-    timeLabel: "3:00 PM",
-    source: "auri",
-  },
-  {
-    id: "vaccination",
-    type: "nudge",
-    agent: "vita",
-    title: "Vaccination · bring booklet",
-    subtitle: "Vita · nudge",
-    dateLabel: "Sat",
-    timeLabel: "9:00 AM",
-    source: "gcal",
-  },
-];
+// The time a standing job's daily instance starts (window start, or the alarm).
+export function standingStartHHMM(job: StandingJob): string {
+  return job.schedule.kind === "window" ? job.schedule.start : job.schedule.alarm;
+}
+
+// Today's real datetime for a standing job's instance (epoch ms).
+export function standingScheduledAtToday(job: StandingJob, now: number = Date.now()): number {
+  return todayAt(standingStartHHMM(job), now);
+}
 
 // One standing job per teammate (at least). Iris ×2 (capture + watch),
 // Lumi ×2 (reading + activity), Vita ×2 (routine + check-in), Nova ×1 (workout).
@@ -77,7 +79,9 @@ export const seedStanding: StandingJob[] = [
     type: "highlight",
     agent: "iris",
     title: "Evening highlights",
-    trigger: "5–8 PM",
+    trigger: "5–8 PM · Family",
+    person: "family",
+    schedule: { kind: "window", start: "17:00", end: "20:00" },
     enabled: true,
   },
   {
@@ -85,7 +89,9 @@ export const seedStanding: StandingJob[] = [
     type: "watch",
     agent: "iris",
     title: "Home watch",
-    trigger: "8 AM–8 PM",
+    trigger: "8 AM–8 PM · Family",
+    person: "family",
+    schedule: { kind: "window", start: "08:00", end: "20:00" },
     enabled: true,
   },
   {
@@ -94,6 +100,8 @@ export const seedStanding: StandingJob[] = [
     agent: "lumi",
     title: "Bedtime reading",
     trigger: "6:30 PM · Leo",
+    person: "leo",
+    schedule: { kind: "window", start: "18:30", end: "19:00" },
     enabled: true,
   },
   {
@@ -102,6 +110,8 @@ export const seedStanding: StandingJob[] = [
     agent: "lumi",
     title: "Afternoon activity",
     trigger: "4 PM · Mia",
+    person: "mia",
+    schedule: { kind: "window", start: "16:00", end: "17:00" },
     enabled: true,
   },
   {
@@ -110,6 +120,8 @@ export const seedStanding: StandingJob[] = [
     agent: "vita",
     title: "Morning routine",
     trigger: "Alarm 7:30 AM",
+    person: "family",
+    schedule: { kind: "alarm", alarm: "07:30" },
     enabled: true,
   },
   {
@@ -118,6 +130,8 @@ export const seedStanding: StandingJob[] = [
     agent: "vita",
     title: "Midday meds",
     trigger: "Alarm 12 PM · Grandma",
+    person: "grandma",
+    schedule: { kind: "alarm", alarm: "12:00" },
     enabled: false,
   },
   {
@@ -126,21 +140,8 @@ export const seedStanding: StandingJob[] = [
     agent: "nova",
     title: "Home workout",
     trigger: "7 AM · Mom",
+    person: "mom",
+    schedule: { kind: "window", start: "07:00", end: "08:00" },
     enabled: true,
   },
 ];
-
-// Map a one-off event created in the composer into an Upcoming job.
-export function upcomingFromInput(input: { title: string; person: PersonId; dateLabel: string; timeLabel: string; forRobot: boolean }, personLabel: string, id: string): UpcomingJob {
-  const isCapture = input.forRobot;
-  return {
-    id,
-    type: isCapture ? "highlight" : "nudge",
-    agent: isCapture ? "iris" : "vita",
-    title: input.title,
-    subtitle: isCapture ? `Iris · one-time highlight · ${personLabel}` : "Vita · nudge",
-    dateLabel: input.dateLabel,
-    timeLabel: input.timeLabel,
-    source: "auri",
-  };
-}

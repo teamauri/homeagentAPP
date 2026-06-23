@@ -1,45 +1,39 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { upcoming } from "@/lib/mock-data";
 import type { PersonId } from "@/lib/types";
 import { useRobotEvents } from "@/components/RobotEventContext";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
+import { deriveTimeLabel } from "@/lib/job-time";
+import { jobIcon, loadStandingJobs, standingScheduledAtToday, type StandingJob } from "@/lib/jobs";
 
-const HIDDEN_KEY = "auri.hiddenCalIds.v1";
-
-// A calendar block — either a mock upcoming event or one the family created
-// (which may or may not be handed to the robot).
-type Block = { id: string; title: string; person: PersonId; timeLabel: string; robot: boolean };
-
-// A Google-Calendar-style day view. This screen stands in for the user's real
-// Google Calendar, so it deliberately mimics GCal: a week date strip, an hourly
-// time grid, and solid colored event blocks in Google's event palette.
-
-// The 7-day forward strip starting "today" (2026-06-19 is a Friday).
-const WEEK: { key: string; dow: string; date: number; today?: boolean }[] = [
-  { key: "fri", dow: "FRI", date: 19, today: true },
-  { key: "sat", dow: "SAT", date: 20 },
-  { key: "sun", dow: "SUN", date: 21 },
-  { key: "mon", dow: "MON", date: 22 },
-  { key: "tue", dow: "TUE", date: 23 },
-  { key: "wed", dow: "WED", date: 24 },
-  { key: "thu", dow: "THU", date: 25 },
-];
-
-// Which day each event lands on (dateLabel → strip key). "Today" is Friday the
-// 19th in this demo week.
-const DAY_OF: Record<string, string> = {
-  Today: "fri",
-  Friday: "fri",
-  Tomorrow: "sat",
-  Saturday: "sat",
-  Sunday: "sun",
-  Monday: "mon",
-  Tuesday: "tue",
-  Wednesday: "wed",
-  Thursday: "thu",
+// A calendar block — a one-time job the family created, or one instance of a
+// standing (Every-day) job projected onto a day. Both carry a real datetime.
+type Block = {
+  id: string;
+  title: string;
+  person: PersonId;
+  scheduledAt: number;
+  robot: boolean;
+  eventId?: string;    // backed by a one-time event (deletable)
+  standingId?: string; // backed by a standing job (managed from Jobs)
+  icon?: string;
+  note?: string;
+  statusLabel?: string;
 };
+
+// A Google-Calendar-style day view standing in for the user's real calendar:
+// a week date strip, an hourly grid, and solid colored event blocks. The week
+// always starts on the real "today", so dates never drift.
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DOW = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+function startOfDay(epoch: number): number {
+  const d = new Date(epoch);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
 
 // Google event colors, keyed by whose calendar the event belongs to.
 const PERSON_COLOR: Record<PersonId, string> = {
@@ -53,13 +47,7 @@ const PERSON_COLOR: Record<PersonId, string> = {
 };
 
 const PERSON_LABEL: Record<PersonId, string> = {
-  mia: "Mia",
-  leo: "Leo",
-  family: "Family",
-  baby: "Baby",
-  mom: "Mom",
-  dad: "Dad",
-  grandma: "Grandma",
+  mia: "Mia", leo: "Leo", family: "Family", baby: "Baby", mom: "Mom", dad: "Dad", grandma: "Grandma",
 };
 
 // Visible grid window: 7 AM → 9 PM.
@@ -67,12 +55,10 @@ const START_HOUR = 7;
 const END_HOUR = 21;
 const ROW_H = 56; // px per hour
 
-function parseHour(timeLabel: string): number {
-  const m = timeLabel.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!m) return START_HOUR;
-  let h = parseInt(m[1], 10) % 12;
-  if (/pm/i.test(m[3])) h += 12;
-  return h + parseInt(m[2], 10) / 60;
+// Fractional hour-of-day for vertical placement.
+function hourOfDay(epoch: number): number {
+  const d = new Date(epoch);
+  return d.getHours() + d.getMinutes() / 60;
 }
 
 function hourLabel(h: number): string {
@@ -82,63 +68,66 @@ function hourLabel(h: number): string {
 }
 
 export default function CalendarPage() {
-  const [selected, setSelected] = useState("fri");
   const { events, removeEvent } = useRobotEvents();
+  const [standing, setStanding] = useState<StandingJob[]>([]);
+  const [selected, setSelected] = useState(0);
   const [sel, setSel] = useState<Block | null>(null);
-  // Mock seed events can't be removed from source, so deleting one just hides
-  // its id (persisted). Created events are removed from the shared store.
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [now] = useState(() => Date.now());
 
+  // Load Every-day jobs from the shared store (same toggles as the Jobs screen).
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HIDDEN_KEY);
-      if (raw) setHidden(JSON.parse(raw));
-    } catch {
-      // ignore
-    }
+    setStanding(loadStandingJobs());
   }, []);
 
-  const deleteBlock = (b: Block) => {
-    if (b.id.startsWith("revent_")) {
-      removeEvent(b.id);
-    } else {
-      setHidden((cur) => {
-        const next = cur.includes(b.id) ? cur : [...cur, b.id];
-        try {
-          localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
-        } catch {
-          // ignore
-        }
-        return next;
-      });
-    }
-    setSel(null);
-  };
+  // The 7-day forward strip starting today, recomputed from the real clock.
+  const week = useMemo(() => {
+    const today = startOfDay(now);
+    return Array.from({ length: 7 }, (_, i) => {
+      const dayStart = today + i * DAY_MS;
+      const d = new Date(dayStart);
+      return { key: i, dow: DOW[d.getDay()], date: d.getDate(), today: i === 0, dayStart };
+    });
+  }, [now]);
 
+  const monthLabel = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(now)),
+    [now]
+  );
+
+  // All blocks for the week: one-time events + one instance per enabled standing
+  // job per day. Each lands in the day column whose date it shares.
   const byDay = useMemo(() => {
-    const map: Record<string, Block[]> = {};
-    const push = (b: Block, dateLabel: string) => {
-      if (hidden.includes(b.id)) return;
-      const day = DAY_OF[dateLabel];
-      if (!day) return;
+    const map: Record<number, Block[]> = {};
+    const place = (b: Block) => {
+      const day = week.findIndex((w) => startOfDay(b.scheduledAt) === w.dayStart);
+      if (day === -1) return; // outside the visible week
       (map[day] ??= []).push(b);
     };
-    // Every calendar event is a robot task, so all blocks get the robot marker.
-    for (const e of upcoming) {
-      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: true }, e.dateLabel);
-    }
     for (const e of events) {
-      push({ id: e.id, title: e.title, person: e.person, timeLabel: e.timeLabel, robot: true }, e.dateLabel);
+      place({
+        id: e.id, eventId: e.id, title: e.title, person: e.person, scheduledAt: e.scheduledAt,
+        robot: e.forRobot, icon: e.icon, note: e.note, statusLabel: STATUS_LABEL[e.status],
+      });
+    }
+    for (const job of standing) {
+      if (!job.enabled) continue;
+      for (const w of week) {
+        const scheduledAt = standingScheduledAtToday(job, w.dayStart);
+        place({
+          id: `standing-${job.id}-${w.key}`, standingId: job.id, title: job.title,
+          person: job.person, scheduledAt, robot: true, icon: jobIcon[job.type],
+        });
+      }
     }
     return map;
-  }, [events, hidden]);
+  }, [events, standing, week]);
 
   // Lay out the day's events, splitting overlapping ones into side-by-side
   // columns the way Google Calendar does.
   const laidOut = useMemo(() => {
     const items = (byDay[selected] ?? [])
       .map((e) => {
-        const start = parseHour(e.timeLabel);
+        const start = hourOfDay(e.scheduledAt);
         return { e, start, end: start + 1 };
       })
       .sort((a, b) => a.start - b.start);
@@ -148,7 +137,6 @@ export default function CalendarPage() {
     let clusterEnd = -1;
 
     const flush = () => {
-      // Greedy column assignment within a cluster of mutually-overlapping events.
       const colEnds: number[] = [];
       const withCol = cluster.map((it) => {
         let col = colEnds.findIndex((end) => it.start >= end);
@@ -175,8 +163,8 @@ export default function CalendarPage() {
   }, [byDay, selected]);
 
   const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
-  // Static "now" line (mock) — only drawn on today.
-  const nowTop = (13.4 - START_HOUR) * ROW_H;
+  // Live "now" line, drawn only on today's column.
+  const nowTop = (hourOfDay(now) - START_HOUR) * ROW_H;
 
   return (
     <main className="min-h-screen bg-[#e9ecef] px-3 py-4 font-body md:grid md:place-items-center md:px-10">
@@ -189,13 +177,13 @@ export default function CalendarPage() {
               <a href="/" aria-label="Back" className="-ml-1 grid h-9 w-9 place-items-center rounded-full text-[#5f6368] hover:bg-black/5">
                 <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4-4.6-4.6z" /></svg>
               </a>
-              <h1 className="flex-1 text-[20px] font-medium text-[#3c4043]">June 2026</h1>
+              <h1 className="flex-1 text-[20px] font-medium text-[#3c4043]">{monthLabel}</h1>
               <div className="grid h-8 w-8 place-items-center rounded-full bg-[#1a73e8] text-[13px] font-medium text-white">J</div>
             </div>
 
             {/* Week date strip */}
             <div className="mt-2 grid grid-cols-7">
-              {WEEK.map((d) => {
+              {week.map((d) => {
                 const active = selected === d.key;
                 const hasEvents = (byDay[d.key]?.length ?? 0) > 0;
                 return (
@@ -234,8 +222,8 @@ export default function CalendarPage() {
                 </div>
               ))}
 
-              {/* Now line (mock, today only) */}
-              {selected === "fri" ? (
+              {/* Now line (today only) */}
+              {week[selected]?.today && nowTop >= 0 && nowTop <= (END_HOUR - START_HOUR) * ROW_H ? (
                 <div className="absolute left-[52px] right-0 z-10" style={{ top: nowTop + 12 }}>
                   <div className="relative">
                     <span className="absolute -left-1 -top-[5px] h-2.5 w-2.5 rounded-full bg-[#ea4335]" />
@@ -248,7 +236,6 @@ export default function CalendarPage() {
               {laidOut.map(({ e, start, col, cols }) => {
                 const top = (start - START_HOUR) * ROW_H + 12;
                 const color = PERSON_COLOR[e.person];
-                // Column geometry within the area between the time gutter (58px) and right edge (12px).
                 const left = `calc(58px + (100% - 70px) * ${col} / ${cols})`;
                 const width = `calc((100% - 70px) / ${cols} - 3px)`;
                 return (
@@ -268,7 +255,7 @@ export default function CalendarPage() {
                       <span className="truncate text-[13px] font-medium leading-4">{e.title}</span>
                     </div>
                     <div className="truncate text-[11px] leading-4 text-white/85">
-                      {e.timeLabel} · {PERSON_LABEL[e.person]}
+                      {deriveTimeLabel(e.scheduledAt)} · {PERSON_LABEL[e.person]}
                     </div>
                   </button>
                 );
@@ -278,25 +265,21 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Tap an event → full details + delete (shared with Jobs). */}
+      {/* Tap a block → details. One-time jobs can be deleted; standing jobs are
+          managed from the Jobs screen (no delete here). */}
       {sel ? (() => {
-        const created = sel.id.startsWith("revent_") ? events.find((e) => e.id === sel.id) : undefined;
-        const mock = created ? undefined : upcoming.find((e) => e.id === sel.id);
-        const dateLabel = created?.dateLabel ?? mock?.dateLabel ?? "";
-        const whenLine = [dateLabel, sel.timeLabel, PERSON_LABEL[sel.person]].filter(Boolean).join(" · ");
+        const whenLine = [deriveTimeLabel(sel.scheduledAt), PERSON_LABEL[sel.person]].filter(Boolean).join(" · ");
         return (
           <EventDetailSheet
             detail={{
               title: sel.title,
-              icon: created?.icon ?? mock?.icon ?? "calendar",
+              icon: sel.icon ?? "calendar",
               whenLine,
-              note: created?.note ?? mock?.body,
-              quoteNote: !!created,
-              statusLabel: created ? STATUS_LABEL[created.status] : undefined,
-              hasPhoto: !!created?.photoUrl,
-              hasVoice: !!created?.voiceUrl,
+              note: sel.note,
+              quoteNote: !!sel.note,
+              statusLabel: sel.statusLabel,
             }}
-            onDelete={() => deleteBlock(sel)}
+            onDelete={sel.eventId ? () => { removeEvent(sel.eventId!); setSel(null); } : undefined}
             onClose={() => setSel(null)}
           />
         );

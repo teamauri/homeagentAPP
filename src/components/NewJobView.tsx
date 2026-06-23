@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { PersonId } from "@/lib/types";
-import { type JobType, type StandingJob } from "@/lib/jobs";
+import { type JobType, type StandingJob, type StandingSchedule } from "@/lib/jobs";
+import { parseDateTime } from "@/lib/job-time";
 import { teamAgentById, type TeamAgentId } from "@/lib/team";
 import { useChildren, useParents } from "./FamilyContext";
 import { TeamBadge } from "./TeamBadge";
@@ -45,7 +46,7 @@ export function NewJobView({
   editJob?: StandingJob;
   onClose: () => void;
   onSubmitStanding: (job: StandingJob, isEdit: boolean) => void;
-  onSubmitOnce: (input: { title: string; person: PersonId; dateLabel: string; timeLabel: string; forRobot: boolean }) => void;
+  onSubmitOnce: (input: { title: string; person: PersonId; scheduledAt: number; forRobot: boolean }) => void;
   onDelete?: (id: string) => void;
 }) {
   const isEdit = !!editJob;
@@ -56,13 +57,15 @@ export function NewJobView({
     ...children.map((c) => ({ id: c.id, label: c.name })),
     ...parents.map((p) => ({ id: p.id, label: p.name })),
   ], [children, parents]);
+  const editWindow = editJob?.schedule.kind === "window" ? editJob.schedule : undefined;
+  const editAlarm = editJob?.schedule.kind === "alarm" ? editJob.schedule : undefined;
   const [type, setType] = useState<JobType | null>(editJob?.type ?? null);
   const [title, setTitle] = useState(editJob?.title ?? "");
-  const [person, setPerson] = useState<PersonId>("family");
+  const [person, setPerson] = useState<PersonId>(editJob?.person ?? "family");
   const [repeat, setRepeat] = useState<"everyday" | "once">("everyday");
-  const [start, setStart] = useState("17:00");
-  const [end, setEnd] = useState("20:00");
-  const [alarm, setAlarm] = useState("07:30");
+  const [start, setStart] = useState(editWindow?.start ?? "17:00");
+  const [end, setEnd] = useState(editWindow?.end ?? "20:00");
+  const [alarm, setAlarm] = useState(editAlarm?.alarm ?? "07:30");
   const [onceDate, setOnceDate] = useState("");
   const [onceTime, setOnceTime] = useState("15:00");
 
@@ -77,25 +80,33 @@ export function NewJobView({
     if (!tpl) return;
     const personLabel = people.find((p) => p.id === person)?.label ?? person;
     if (repeat === "once") {
-      // Full weekday name so it maps onto the calendar's day strip.
-      const d = onceDate ? new Date(`${onceDate}T00:00:00`) : null;
-      const dateLabel = d ? new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(d) : "Today";
       onSubmitOnce({
         title: title || tpl.label,
         person,
-        dateLabel,
-        timeLabel: fmtTime(onceTime),
+        // Canonical datetime from the date + time pickers (local time).
+        scheduledAt: parseDateTime(onceDate, onceTime),
         // Every calendar event is a robot task.
         forRobot: true,
       });
       return;
     }
+    const schedule: StandingSchedule =
+      tpl.sched === "window" ? { kind: "window", start, end } : { kind: "alarm", alarm };
     const trigger =
       tpl.sched === "window"
         ? `${fmtTime(start)}–${fmtTime(end)} · ${personLabel}`
         : `Alarm ${fmtTime(alarm)}`;
     onSubmitStanding(
-      { id: editJob?.id ?? `job_${Date.now()}`, type: tpl.type, agent: tpl.agent, title: title || tpl.label, trigger, enabled: editJob?.enabled ?? true },
+      {
+        id: editJob?.id ?? `job_${Date.now()}`,
+        type: tpl.type,
+        agent: tpl.agent,
+        title: title || tpl.label,
+        trigger,
+        person,
+        schedule,
+        enabled: editJob?.enabled ?? true,
+      },
       isEdit
     );
   };

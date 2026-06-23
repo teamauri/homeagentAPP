@@ -2,43 +2,28 @@ import { NextResponse } from "next/server";
 import { CalendarApiEvent, CalendarEventInput } from "@/lib/calendar-api";
 import { listDemoCalendarEvents, persistDemoStore, removeDemoCalendarEvent, upsertDemoCalendarEvent } from "@/lib/demo/demo-store";
 import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
-import { upcoming } from "@/lib/mock-data";
-import type { CalendarEvent, PersonId } from "@/lib/types";
+import type { PersonId } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const personIds = new Set<PersonId>(["mia", "leo", "baby", "mom", "dad", "grandma", "family"]);
 
-function seedEvent(event: CalendarEvent): CalendarApiEvent {
-  return {
-    id: event.id,
-    title: event.title,
-    person: event.person,
-    dateLabel: event.dateLabel,
-    timeLabel: event.timeLabel,
-    body: event.body,
-    icon: event.icon,
-    source: "seed",
-    forRobot: false,
-    status: event.status,
-    statusLabel: event.statusLabel,
-    suggested: event.suggested,
-  };
-}
-
 function wantsTruthy(value: string | null) {
   return value === "1" || value === "true" || value === "yes";
 }
 
+// Only real, family-created jobs — no seed/mock data is ever injected.
 function filteredEvents(request: Request) {
   const url = new URL(request.url);
   const source = url.searchParams.get("source");
   const robotOnly = wantsTruthy(url.searchParams.get("robot"));
 
-  let items = [...upcoming.map(seedEvent), ...listDemoCalendarEvents()];
-  if (source === "seed" || source === "created") {
-    items = items.filter((event) => event.source === source);
+  let items: CalendarApiEvent[] = listDemoCalendarEvents();
+  if (source === "seed") {
+    items = []; // seed data has been removed
+  } else if (source === "created") {
+    items = items.filter((event) => event.source === "created");
   }
   if (robotOnly) {
     items = items.filter((event) => event.forRobot);
@@ -81,6 +66,7 @@ function normalizeInput(body: unknown): { input?: CalendarEventInput; error?: st
       note: typeof payload.note === "string" ? payload.note : undefined,
       body: typeof payload.body === "string" ? payload.body : undefined,
       person,
+      scheduledAt: typeof payload.scheduledAt === "number" ? payload.scheduledAt : undefined,
       dateLabel,
       timeLabel,
       forRobot: Boolean(payload.forRobot),
