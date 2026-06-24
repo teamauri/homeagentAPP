@@ -388,9 +388,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     const candidates = events.filter(
       (event) =>
         event.forRobot &&
-        event.robot?.recordingMode === "cameraman_highlight" &&
+        (event.recordingMode === "cameraman_highlight" || event.robot?.recordingMode === "cameraman_highlight") &&
         event.robot?.auriVideoId &&
-        event.robot?.vlogId &&
         !event.robot.highlightVideoUrl &&
         !event.robot.highlightMemoryId &&
         !syncingTasks.current.has(event.id)
