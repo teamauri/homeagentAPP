@@ -43,13 +43,13 @@ function epochFromId(id: string): number {
 
 const chatThreadIds = [
   "mom-meds",
-  "vita-meds",
+  "homekeeper-meds",
   "dad-film",
-  "iris-film",
+  "cameraman-film",
   "mom-react",
-  "vita-checkup",
-  "lumi-reading",
-  "vita-routine",
+  "homekeeper-checkup",
+  "companion-reading",
+  "homekeeper-routine",
 ];
 
 const turns: ChatTurn[] = chatFixtureMessages
@@ -70,7 +70,7 @@ const avatarStyles = {
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
   const { completions, events } = useRobotEvents();
-  // Highlight jobs that are mid-capture: Iris shows a live counter card that
+  // Highlight jobs that are mid-capture: Cameraman shows a live counter card that
   // climbs as the run catches real clips/photos, then hands off to the keepsake.
   const runningHighlights = events.filter((event) => event.kind === "highlight" && event.status === "recording");
   // Merge live chat turns with robot-event activity (completions + in-flight
@@ -113,10 +113,10 @@ function HighlightProgressRow({ event }: { event: RobotEvent }) {
   const target = event.highlight ?? { clipTarget: 0, photoTarget: 0 };
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <TeamBadge agentId="iris" size="sm" />
+      <TeamBadge agentId="cameraman" size="sm" />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{teamAgentById["iris"].name}</span>
+          <span className="text-[15px] font-semibold leading-5 text-ink">{teamAgentById["cameraman"].name}</span>
           <span className="text-[13px] text-muted">{event.timeLabel}</span>
         </div>
         <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">Catching the highlights — eyes up.</p>
@@ -164,8 +164,8 @@ function CounterRow({ label, done, total }: { label: string; done: number; total
 // A finished job lands in chat as a new message: a job card showing the Done
 // status, with the captured video embedded and a Keep button at the bottom.
 function RobotCompletionRow({ event }: { event: RobotEvent }) {
-  const agentId = event.agent ?? "vita";
-  const agentName = teamAgentById[agentId]?.name ?? "Vita";
+  const agentId = event.agent ?? "homekeeper";
+  const agentName = teamAgentById[agentId]?.name ?? "Reminder";
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
       <TeamBadge agentId={agentId} size="sm" />
@@ -224,6 +224,11 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
       {/* Embedded video */}
       {result ? (
         <div className="border-t border-line/70">
+          {result.summary ? (
+            <p className="border-b border-line/70 px-3.5 py-3 text-[13px] leading-[19px] tracking-[0] text-ink">
+              {result.summary}
+            </p>
+          ) : null}
           <div className="relative bg-[#17181b]">
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
@@ -482,7 +487,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   }, [matchingEvent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isReminder = draft.kind === "reminder";
-  const agentId = draft.agent ?? matchingEvent?.agent ?? (isReminder ? "vita" : "vita");
+  const agentId = draft.agent ?? matchingEvent?.agent ?? "homekeeper";
   const agent = teamAgentById[agentId];
 
   // Use live edits when confirmed so the confirmed card shows what was saved.
@@ -510,6 +515,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
         timeLabel: liveTime,
         forRobot: true,
         agent: agentId,
+        recordingMode: draft.recordingMode,
       });
       setConfirmedEventId(id);
     }
@@ -662,7 +668,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
                 <svg viewBox="0 0 24 24" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m5 12 4.5 4.5L19 7" />
                 </svg>
-                {isReminder ? "Reminder set" : "Added to your calendar"}
+                {isReminder ? "Homekeeper set" : "Added to your calendar"}
               </span>
               <a href="/calendar" className="text-[13px] font-semibold text-ink">View calendar</a>
             </div>

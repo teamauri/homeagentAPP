@@ -19,6 +19,7 @@ export interface RobotEventResult {
   poster?: string;
   duration: string;
   memoryUrl?: string;
+  summary?: string;
   transcriptJsonUrl?: string;
   transcriptTxtUrl?: string;
 }
@@ -36,6 +37,7 @@ export interface RobotEvent {
   timeLabel: string;
   icon: string;
   agent?: TeamAgentId;
+  recordingMode?: string;
   // When true the robot shows a reminder + captures it; when false it's just a
   // plain calendar event the family planned (still shown on the calendar).
   forRobot: boolean;
@@ -66,6 +68,7 @@ export interface NewRobotEventInput {
   timeLabel?: string;
   forRobot: boolean;
   agent?: TeamAgentId;
+  recordingMode?: string;
   photoUrl?: string;
   voiceUrl?: string;
   voiceDuration?: number;
@@ -144,9 +147,9 @@ function durationLabel(seconds?: number) {
 }
 
 function agentFromIcon(icon: string): TeamAgentId {
-  if (icon === "camera-note") return "iris";
-  if (icon === "book") return "lumi";
-  return "vita";
+  if (icon === "camera-note") return "cameraman";
+  if (icon === "book") return "companion";
+  return "homekeeper";
 }
 
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
@@ -172,6 +175,7 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     timeLabel: deriveTimeLabel(scheduledAt),
     icon,
     agent: event.agent ?? agentFromIcon(icon),
+    recordingMode: event.recordingMode ?? event.robot?.recordingMode,
     forRobot: event.forRobot,
     photoUrl: event.photoUrl,
     voiceUrl: event.voiceUrl,
@@ -194,6 +198,7 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
           videoUrl: rawVideoUrl,
           duration: "Recorded",
           memoryUrl: event.robot?.rawOutputMemoryId ? `/memory/${event.robot.rawOutputMemoryId}` : undefined,
+          summary: event.robot?.rawOutputSummary,
           transcriptJsonUrl: event.robot?.transcriptJsonUrl,
           transcriptTxtUrl: event.robot?.transcriptTxtUrl,
         }
@@ -231,6 +236,7 @@ function persistEventToCalendarApi(event: RobotEvent) {
       forRobot: event.forRobot,
       icon: event.icon,
       agent: event.agent,
+      recordingMode: event.recordingMode ?? event.robot?.recordingMode,
       photoUrl: event.photoUrl,
       voiceUrl: event.voiceUrl,
       voiceDuration: event.voiceDuration,
@@ -364,7 +370,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     const candidates = events.filter(
       (event) =>
         event.forRobot &&
-        (event.agent === "iris" || event.robot?.recordingMode === "cameraman_highlight") &&
+        event.robot?.recordingMode === "cameraman_highlight" &&
         event.robot?.auriVideoId &&
         event.robot?.vlogId &&
         !event.robot.highlightVideoUrl &&
@@ -407,7 +413,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       timeLabel: deriveTimeLabel(scheduledAt),
       forRobot: input.forRobot,
       icon: deriveEventIcon(input.title, input.person),
-      agent: input.agent ?? "vita",
+      agent: input.agent ?? "homekeeper",
+      recordingMode: input.recordingMode,
       photoUrl: input.photoUrl,
       voiceUrl: input.voiceUrl,
       voiceDuration: input.voiceDuration,
@@ -498,7 +505,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
         dateLabel: "Today",
         timeLabel: nowLabel(),
         icon: "camera-note",
-        agent: "iris" as TeamAgentId,
+        agent: "cameraman" as TeamAgentId,
+        recordingMode: "cameraman_highlight",
         forRobot: true,
         kind: "highlight",
         highlight: { clipTarget, photoTarget },

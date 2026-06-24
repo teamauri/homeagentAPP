@@ -30,9 +30,9 @@ export interface AuriClientConfig {
 
 export function auriConfigFromEnv(): AuriClientConfig {
   return {
-    // NEXT_PUBLIC_* is readable in the browser (client-side pipeline); plain
-    // AURI_* is the server-side fallback. Default to the deployed backend.
-    host: (process.env.NEXT_PUBLIC_AURI_HOST || process.env.AURI_HOST || "https://auriedit.onrender.com").replace(/\/$/, ""),
+    // Plain AURI_* should win on the server (API routes, smoke tests, deployed
+    // secrets); NEXT_PUBLIC_* remains the browser-readable fallback.
+    host: (process.env.AURI_HOST || process.env.NEXT_PUBLIC_AURI_HOST || "https://auriedit.onrender.com").replace(/\/$/, ""),
     appId: process.env.NEXT_PUBLIC_AURI_APP_ID || process.env.AURI_APP_ID || "homeagent-memory",
     authToken: process.env.AURI_AUTH_TOKEN || undefined,
     pollIntervalMs: Number(process.env.AURI_POLL_INTERVAL_MS || 5000),
@@ -136,6 +136,8 @@ export interface RawOutputStatusResponse {
   videoId: string;
   status: RawOutputJobStatus;
   progress?: number;
+  summaryText?: string | null;
+  summaryJson?: Record<string, unknown> | null;
   videoDownloadUrl?: string | null;
   transcriptJsonDownloadUrl?: string | null;
   transcriptTxtDownloadUrl?: string | null;
@@ -406,6 +408,8 @@ interface RawRawOutput {
   video_id?: string;
   status?: RawOutputJobStatus;
   progress?: number;
+  summary_text?: string | null;
+  summary_json?: Record<string, unknown> | null;
   video_download_url?: string | null;
   transcript_json_download_url?: string | null;
   transcript_txt_download_url?: string | null;
@@ -429,6 +433,8 @@ function mapRawOutput(d: RawRawOutput | null | undefined, videoIdFallback: strin
     videoId: raw.video_id ?? videoIdFallback,
     status: normalizeRawOutputStatus(raw.status),
     progress: raw.progress,
+    summaryText: raw.summary_text,
+    summaryJson: raw.summary_json,
     videoDownloadUrl: raw.video_download_url,
     transcriptJsonDownloadUrl: raw.transcript_json_download_url,
     transcriptTxtDownloadUrl: raw.transcript_txt_download_url ?? raw.transcript_text_download_url,

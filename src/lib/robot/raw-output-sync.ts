@@ -1,3 +1,8 @@
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 import { AuriClient, AuriError, type RawOutputStatusResponse } from "@/lib/auri/client";
 import type { CalendarApiEvent } from "@/lib/calendar-api";
 import {
@@ -24,6 +29,8 @@ export interface RawOutputSyncResult {
 }
 
 const rawOutputSyncLocks = new Map<string, Promise<RawOutputSyncResult>>();
+const execFileAsync = promisify(execFile);
+const ffmpegBinary = process.env.FFMPEG_PATH || "ffmpeg";
 
 function statusCodeFor(error: unknown) {
   if (error instanceof AuriError && error.status >= 400 && error.status < 600) return error.status;
@@ -32,6 +39,35 @@ function statusCodeFor(error: unknown) {
 
 function isRetryableRawOutputLookupError(error: unknown) {
   return error instanceof AuriError && (error.status === 404 || error.status === 409);
+}
+
+async function extractPosterFrame(videoBytes: Uint8Array, videoId: string) {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "auri-raw-poster-"));
+  const inputPath = path.join(tempDir, `${videoId}.mp4`);
+  const outputPath = path.join(tempDir, `${videoId}.jpg`);
+  try {
+    await writeFile(inputPath, Buffer.from(videoBytes));
+    await execFileAsync(ffmpegBinary, [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-ss",
+      "1",
+      "-i",
+      inputPath,
+      "-frames:v",
+      "1",
+      "-q:v",
+      "3",
+      outputPath,
+    ]);
+    return new Uint8Array(await readFile(outputPath));
+  } catch {
+    return undefined;
+  } finally {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 export async function syncRawOutputForTask(taskId: string, client = new AuriClient()): Promise<RawOutputSyncResult> {
@@ -72,7 +108,7 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
     return { outcome: "missing_video_id", httpStatus: 409, event, error: "Capture task has no Auri video id" };
   }
 
-  if (robot?.rawOutputMemoryId && robot.rawOutputVideoUrl) {
+  if (robot?.rawOutputVideoUrl) {
     return alreadySyncedResult(event);
   }
 
@@ -128,14 +164,17 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
       client.downloadRawOutputTranscript(videoId, "json"),
       client.downloadRawOutputTranscript(videoId, "txt"),
     ]);
+    const summaryText = rawOutput.summaryText?.trim();
 
     const latestEvent = getDemoCalendarEvent(taskId);
-    if (latestEvent?.robot?.rawOutputMemoryId && latestEvent.robot.rawOutputVideoUrl) {
+    if (latestEvent?.robot?.rawOutputVideoUrl) {
       return alreadySyncedResult(latestEvent, rawOutput);
     }
 
-    const [storedVideo, storedTranscriptJson, storedTranscriptTxt] = await Promise.all([
+    const posterBytes = await extractPosterFrame(videoBytes, videoId);
+    const [storedVideo, storedPoster, storedTranscriptJson, storedTranscriptTxt] = await Promise.all([
       storeBinaryFile(videoBytes, `${videoId}-raw-output.mp4`, videoHead.contentType || "video/mp4"),
+      posterBytes ? storeBinaryFile(posterBytes, `${videoId}-raw-output-poster.jpg`, "image/jpeg") : Promise.resolve(undefined),
       storeBinaryFile(transcriptJsonBytes, `${videoId}-transcript.json`, jsonHead.contentType || "application/json"),
       storeBinaryFile(transcriptTxtBytes, `${videoId}-transcript.txt`, txtHead.contentType || "text/plain"),
     ]);
@@ -146,18 +185,24 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
       sourceType: "auri",
       mediaType: "video",
       url: storedVideo.url,
+      thumbnailUrl: storedPoster?.url,
       capturedAt: robot?.startedAt || event.createdAt || new Date().toISOString(),
       person: event.person,
-      body: "A raw Auri Robot recording is ready with transcript.",
+      body: summaryText || "A raw Auri Robot recording is ready with transcript.",
       tags: ["auri-robot", "raw-output", "transcript"],
       metadata: {
         ingestMode: "auri-raw-output",
         captureTaskId: event.id,
         auriVideoId: videoId,
         recordingMode: robot?.recordingMode,
+        summaryText: summaryText || undefined,
+        summaryJson: rawOutput.summaryJson,
+        posterUrl: storedPoster?.url,
+        thumbnailUrl: storedPoster?.url,
         transcriptJsonUrl: storedTranscriptJson.url,
         transcriptTxtUrl: storedTranscriptTxt.url,
         videoSize: storedVideo.size,
+        posterSize: storedPoster?.size,
         transcriptJsonSize: storedTranscriptJson.size,
         transcriptTxtSize: storedTranscriptTxt.size,
       },
@@ -170,6 +215,8 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
       status: "done",
       rawOutputStatus: "ready",
       rawOutputVideoUrl: storedVideo.url,
+      rawOutputPosterUrl: storedPoster?.url,
+      rawOutputSummary: summaryText || undefined,
       transcriptJsonUrl: storedTranscriptJson.url,
       transcriptTxtUrl: storedTranscriptTxt.url,
       rawOutputReadyAt: now,

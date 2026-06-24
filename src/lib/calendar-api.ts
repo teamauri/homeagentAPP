@@ -5,7 +5,7 @@ export type CalendarApiEventSource = "seed" | "created";
 export type CalendarApiEventStatus = Status | "scheduled" | "recording" | "uploading" | "uploaded" | "done" | "failed";
 export type CalendarRobotCaptureStatus = "scheduled" | "recording" | "uploading" | "uploaded" | "done" | "failed";
 export type CalendarRawOutputStatus = "pending" | "processing" | "ready" | "failed";
-export type CalendarJobAgentId = Extract<TeamAgentId, "iris" | "lumi" | "vita">;
+export type CalendarJobAgentId = Extract<TeamAgentId, "cameraman" | "companion" | "homekeeper">;
 
 export interface CalendarRobotCaptureState {
   status: CalendarRobotCaptureStatus;
@@ -22,6 +22,8 @@ export interface CalendarRobotCaptureState {
   rawOutputStatus?: CalendarRawOutputStatus;
   rawOutputMemoryId?: string;
   rawOutputVideoUrl?: string;
+  rawOutputPosterUrl?: string;
+  rawOutputSummary?: string;
   transcriptJsonUrl?: string;
   transcriptTxtUrl?: string;
   rawOutputReadyAt?: string;
@@ -46,6 +48,7 @@ export interface CalendarApiEvent {
   timeLabel: string;
   icon: string;
   agent?: CalendarJobAgentId;
+  recordingMode?: string;
   source: CalendarApiEventSource;
   forRobot: boolean;
   status: CalendarApiEventStatus;
@@ -74,6 +77,7 @@ export interface CalendarEventInput {
   forRobot?: boolean;
   icon?: string;
   agent?: CalendarJobAgentId;
+  recordingMode?: string;
   photoUrl?: string;
   voiceUrl?: string;
   voiceDuration?: number;

@@ -1,4 +1,4 @@
-// Types for the "growth album" — phone photos/videos organized by Iris into a
+// Types for the "growth album" — phone photos/videos organized by Cameraman into a
 // day-by-day timeline, with milestone ("First") detection and a milestone +
 // support session for Memory.
 

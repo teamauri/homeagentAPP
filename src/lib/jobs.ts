@@ -10,8 +10,8 @@ import { todayAt } from "./job-time";
 //    projects one instance per day onto Upcoming and the calendar.
 // Both map onto the same underlying Session model (see docs/REPOSITION_DESIGN.md).
 
-// Each job type maps to the teammate that runs it: Iris (the eye) captures and
-// watches, Lumi (the companion) reads and runs activities, Vita (the keeper)
+// Each job type maps to the teammate that runs it: Cameraman (the eye) captures and
+// watches, Companion (the companion) reads and runs activities, Reminder (the keeper)
 // runs routines and check-ins, Nova (the coach) runs workouts.
 export type JobType = "highlight" | "watch" | "reading" | "activity" | "routine" | "checkin" | "workout" | "nudge";
 export type JobSource = "auri" | "todo" | "gcal";
@@ -71,13 +71,13 @@ export function standingScheduledAtToday(job: StandingJob, now: number = Date.no
   return todayAt(standingStartHHMM(job), now);
 }
 
-// One standing job per teammate (at least). Iris ×2 (capture + watch),
-// Lumi ×2 (reading + activity), Vita ×2 (routine + check-in), Nova ×1 (workout).
+// One standing job per teammate (at least). Cameraman ×2 (capture + watch),
+// Companion ×2 (reading + activity), Reminder ×2 (routine + check-in), Nova ×1 (workout).
 export const seedStanding: StandingJob[] = [
   {
     id: "evening-highlights",
     type: "highlight",
-    agent: "iris",
+    agent: "cameraman",
     title: "Evening highlights",
     trigger: "5–8 PM · Family",
     person: "family",
@@ -87,7 +87,7 @@ export const seedStanding: StandingJob[] = [
   {
     id: "home-watch",
     type: "watch",
-    agent: "iris",
+    agent: "cameraman",
     title: "Home watch",
     trigger: "8 AM–8 PM · Family",
     person: "family",
@@ -97,7 +97,7 @@ export const seedStanding: StandingJob[] = [
   {
     id: "bedtime-reading",
     type: "reading",
-    agent: "lumi",
+    agent: "companion",
     title: "Bedtime reading",
     trigger: "6:30 PM · Leo",
     person: "leo",
@@ -107,7 +107,7 @@ export const seedStanding: StandingJob[] = [
   {
     id: "afternoon-activity",
     type: "activity",
-    agent: "lumi",
+    agent: "companion",
     title: "Afternoon activity",
     trigger: "4 PM · Mia",
     person: "mia",
@@ -117,7 +117,7 @@ export const seedStanding: StandingJob[] = [
   {
     id: "morning-routine",
     type: "routine",
-    agent: "vita",
+    agent: "homekeeper",
     title: "Morning routine",
     trigger: "Alarm 7:30 AM",
     person: "family",
@@ -127,7 +127,7 @@ export const seedStanding: StandingJob[] = [
   {
     id: "midday-meds",
     type: "checkin",
-    agent: "vita",
+    agent: "homekeeper",
     title: "Midday meds",
     trigger: "Alarm 12 PM · Grandma",
     person: "grandma",

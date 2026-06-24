@@ -108,7 +108,7 @@ export default function CalendarPage() {
     for (const e of events) {
       place({
         id: e.id, eventId: e.id, title: e.title, person: e.person, scheduledAt: e.scheduledAt,
-        robot: e.forRobot, icon: e.icon, agent: e.agent ?? "vita", note: e.note, statusLabel: STATUS_LABEL[e.status],
+        robot: e.forRobot, icon: e.icon, agent: e.agent ?? "homekeeper", note: e.note, statusLabel: STATUS_LABEL[e.status],
       });
     }
     for (const job of standing) {

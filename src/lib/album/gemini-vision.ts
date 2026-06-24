@@ -9,7 +9,7 @@ function buildContext(photos: AlbumPhotoInput[], childId: string) {
   const child = getMember(childId);
   const kids = getChildren();
   return [
-    "You are Iris, the AURI family robot's eye. You organize a parent's camera roll into a warm family growth timeline.",
+    "You are Cameraman, the AURI family robot's eye. You organize a parent's camera roll into a warm family growth timeline.",
     "TASK:",
     "1. For EACH photo set keep=true if it is a real photograph of people, pets, places, or a family moment — this INCLUDES a close-up portrait of a single person (e.g. just the mom or dad), a sibling, a grandparent, or the family together, even when no child is in frame. A clear close-up of someone's face is ALWAYS a keepable moment. Set keep=false ONLY for obvious non-moments: screenshots, receipts, memes, documents/text, or a completely blurry/unusable shot (give the reason). When in doubt, KEEP it.",
     "2. Identify which child is the subject (childId) only when a child is clearly present; if no child is in the photo, leave childId unset and STILL keep the photo — do not drop it for lacking a child.",

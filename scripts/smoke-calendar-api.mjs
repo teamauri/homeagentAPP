@@ -56,6 +56,8 @@ async function withFakeAuriServer(fn) {
           video_id: "video-smoke-from-auri",
           status: "READY",
           progress: 1,
+          summary_text: "Mia read the story.",
+          summary_json: { source: "preprocess_transcript" },
           video_download_url: "/v1/videos/video-smoke-from-auri/raw-output/video/download",
           transcript_json_download_url: "/v1/videos/video-smoke-from-auri/raw-output/transcript/download?format=json",
           transcript_text_download_url: "/v1/videos/video-smoke-from-auri/raw-output/transcript/download?format=txt",
@@ -92,12 +94,17 @@ async function withFakeAuriServer(fn) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   const previousHost = process.env.AURI_HOST;
-  process.env.AURI_HOST = `http://127.0.0.1:${address.port}`;
+  const previousPublicHost = process.env.NEXT_PUBLIC_AURI_HOST;
+  const fakeHost = `http://127.0.0.1:${address.port}`;
+  process.env.AURI_HOST = fakeHost;
+  process.env.NEXT_PUBLIC_AURI_HOST = fakeHost;
   try {
     return await fn();
   } finally {
     if (previousHost === undefined) delete process.env.AURI_HOST;
     else process.env.AURI_HOST = previousHost;
+    if (previousPublicHost === undefined) delete process.env.NEXT_PUBLIC_AURI_HOST;
+    else process.env.NEXT_PUBLIC_AURI_HOST = previousPublicHost;
     await new Promise((resolve) => server.close(resolve));
   }
 }
@@ -133,12 +140,97 @@ const calendarRoute = routeUserland("api/calendar");
 const memoryRoute = routeUserland("api/memory");
 const mediaBlobRoute = routeUserland("api/media/blob/[name]");
 const smokeId = `smoke_calendar_${Date.now()}`;
+const cleanupIds = [];
+
+async function deleteCalendarEventIfPresent(id) {
+  try {
+    await calendarRoute.DELETE(
+      new Request(`http://localhost/api/calendar?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      })
+    );
+  } catch {
+    // Best-effort cleanup only; preserve the original smoke failure.
+  }
+}
+
+function cleanupSmokeSnapshot() {
+  const snapshotPath = path.join(root, ".data", "demo.json");
+  if (!fs.existsSync(snapshotPath)) return;
+  const data = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
+  const smokeIds = new Set(cleanupIds);
+  const removedUrls = [];
+  const isSmokeCapture = (value) => typeof value === "string" && (smokeIds.has(value) || value.startsWith("smoke_calendar_"));
+
+  if (Array.isArray(data.media)) {
+    data.media = data.media.filter((item) => {
+      const isSmoke = isSmokeCapture(item?.metadata?.captureTaskId);
+      if (isSmoke) {
+        if (typeof item.url === "string") removedUrls.push(item.url);
+        for (const key of ["transcriptJsonUrl", "transcriptTxtUrl"]) {
+          if (typeof item.metadata?.[key] === "string") removedUrls.push(item.metadata[key]);
+        }
+      }
+      return !isSmoke;
+    });
+  }
+
+  if (Array.isArray(data.memory)) {
+    data.memory = data.memory.filter((item) => !isSmokeCapture(item?.metadata?.captureTaskId));
+  }
+
+  fs.writeFileSync(snapshotPath, JSON.stringify(data));
+  for (const url of removedUrls) {
+    const name = url.split("/").pop();
+    if (!name) continue;
+    for (const dir of [path.join(root, ".data", "media"), path.join(root, ".data", "blobs")]) {
+      try {
+        fs.unlinkSync(path.join(dir, name));
+      } catch {
+        // Blob may already be absent depending on storage backend.
+      }
+    }
+  }
+}
+
+process.on("uncaughtException", async (error) => {
+  for (const id of cleanupIds) {
+    await deleteCalendarEventIfPresent(id);
+  }
+  cleanupSmokeSnapshot();
+  console.error(error);
+  process.exitCode = 1;
+});
 
 const seedResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?source=seed"));
 const seedPayload = await jsonFromResponse(seedResponse);
 assert(seedResponse.status === 200, "calendar: expected 200 for seed read", { status: seedResponse.status, payload: seedPayload });
-assert(seedPayload.summary.seed >= 6, "calendar: expected seeded in-app events", seedPayload.summary);
-assert(seedPayload.items.some((item) => item.id === "piano-lesson" && item.source === "seed"), "calendar: expected piano lesson seed event", seedPayload.items);
+assert(seedPayload.summary.seed === 0, "calendar: seed data should stay disabled", seedPayload.summary);
+assert(seedPayload.items.length === 0, "calendar: seed reads should not inject in-app events", seedPayload.items);
+
+const cameramanProbeResponse = await postJson(calendarRoute, "http://localhost/api/calendar", {
+  id: `${smokeId}_cameraman_probe`,
+  title: "Cameraman highlight probe",
+  note: "Pipeline selection should come from recordingMode, not agent",
+  person: "mia",
+  dateLabel: "Tomorrow",
+  timeLabel: "3:30 PM",
+  forRobot: true,
+  agent: "cameraman",
+  recordingMode: "cameraman_highlight",
+});
+const cameramanProbePayload = await jsonFromResponse(cameramanProbeResponse);
+if (cameramanProbePayload.event?.id) cleanupIds.push(cameramanProbePayload.event.id);
+assert(cameramanProbeResponse.status === 201, "calendar: expected cameraman probe create 201", {
+  status: cameramanProbeResponse.status,
+  payload: cameramanProbePayload,
+});
+assert(cameramanProbePayload.event?.agent === "cameraman", "calendar: expected cameraman agent to persist", cameramanProbePayload.event);
+assert(
+  cameramanProbePayload.event?.recordingMode === "cameraman_highlight",
+  "calendar: expected top-level cameraman recordingMode to persist",
+  cameramanProbePayload.event
+);
 
 const createResponse = await postJson(calendarRoute, "http://localhost/api/calendar", {
   id: smokeId,
@@ -150,6 +242,7 @@ const createResponse = await postJson(calendarRoute, "http://localhost/api/calen
   forRobot: true,
 });
 const createPayload = await jsonFromResponse(createResponse);
+if (createPayload.event?.id) cleanupIds.push(createPayload.event.id);
 assert(createResponse.status === 201, "calendar: expected create 201", { status: createResponse.status, payload: createPayload });
 assert(createPayload.event?.id, "calendar: expected created event id", createPayload);
 assert(createPayload.event.source === "created", "calendar: expected created event source", createPayload);
@@ -166,6 +259,13 @@ assert(robotPayload.items.some((item) => item.id === createPayload.event.id && i
 assert(robotPayload.items.every((item) => item.forRobot === true), "calendar: robot filter should only return robot events", robotPayload.items);
 const robotTask = robotPayload.items.find((item) => item.id === createPayload.event.id);
 assert(robotTask?.auriClientVideoUuid === createPayload.event.auriClientVideoUuid, "calendar: robot read should expose the Auri client video UUID", robotTask);
+const cameramanProbeTask = robotPayload.items.find((item) => item.id === cameramanProbePayload.event.id);
+assert(cameramanProbeTask?.agent === "cameraman", "calendar: robot feed should preserve cameraman agent", cameramanProbeTask);
+assert(
+  cameramanProbeTask?.recordingMode === "cameraman_highlight",
+  "calendar: robot feed should preserve top-level cameraman recordingMode",
+  cameramanProbeTask
+);
 
 const robotStatusRoute = routeUserland("api/robot/capture-tasks/[taskId]/status");
 const rawOutputSyncRoute = routeUserland("api/robot/capture-tasks/[taskId]/raw-output/sync");
@@ -205,6 +305,7 @@ const missingRawOutputResponse = await postJson(calendarRoute, "http://localhost
   forRobot: true,
 });
 const missingRawOutputPayload = await jsonFromResponse(missingRawOutputResponse);
+if (missingRawOutputPayload.event?.id) cleanupIds.push(missingRawOutputPayload.event.id);
 assert(missingRawOutputResponse.status === 201, "calendar: expected second robot event create 201", {
   status: missingRawOutputResponse.status,
   payload: missingRawOutputPayload,
@@ -239,6 +340,7 @@ const concurrentSyncResponse = await postJson(calendarRoute, "http://localhost/a
   forRobot: true,
 });
 const concurrentSyncPayload = await jsonFromResponse(concurrentSyncResponse);
+if (concurrentSyncPayload.event?.id) cleanupIds.push(concurrentSyncPayload.event.id);
 assert(concurrentSyncResponse.status === 201, "calendar: expected concurrent robot event create 201", {
   status: concurrentSyncResponse.status,
   payload: concurrentSyncPayload,
@@ -276,7 +378,6 @@ await withFakeAuriServer(async () => {
     payload: rawOutputSyncPayload,
   });
   assert(rawOutputSyncPayload.outcome === "ready", "raw output sync: expected ready outcome", rawOutputSyncPayload);
-  assert(rawOutputSyncPayload.event?.robot?.rawOutputMemoryId, "raw output sync: expected memory id in sync result", rawOutputSyncPayload.event);
   const syncedRobot = rawOutputSyncPayload.event?.robot;
   for (const artifactUrl of [syncedRobot?.rawOutputVideoUrl, syncedRobot?.transcriptJsonUrl, syncedRobot?.transcriptTxtUrl]) {
     assert(artifactUrl?.startsWith("/api/media/blob/"), "raw output sync: expected artifacts to use media blob route", {
@@ -309,8 +410,8 @@ await withFakeAuriServer(async () => {
   const syncedRobotTask = afterSyncPayload.items.find((item) => item.id === createPayload.event.id);
   const missingRawOutputTask = afterSyncPayload.items.find((item) => item.id === missingRawOutputPayload.event.id);
   assert(syncedRobotTask?.robot?.rawOutputStatus === "ready", "raw output sync: expected ready state", syncedRobotTask);
-  assert(syncedRobotTask?.robot?.rawOutputMemoryId, "raw output sync: expected memory id on robot task", syncedRobotTask);
   assert(syncedRobotTask?.robot?.rawOutputVideoUrl, "raw output sync: expected stored video URL", syncedRobotTask);
+  assert(syncedRobotTask?.robot?.rawOutputSummary === "Mia read the story.", "raw output sync: expected preprocessing summary", syncedRobotTask);
   assert(syncedRobotTask?.robot?.transcriptJsonUrl, "raw output sync: expected JSON transcript URL", syncedRobotTask);
   assert(syncedRobotTask?.robot?.transcriptTxtUrl, "raw output sync: expected text transcript URL", syncedRobotTask);
   assert(missingRawOutputTask?.robot?.rawOutputStatus === "pending", "raw output sync: expected missing raw-output job to stay pending", missingRawOutputTask);
@@ -319,11 +420,6 @@ await withFakeAuriServer(async () => {
   const memoryResponse = await memoryRoute.GET(new Request("http://localhost/api/memory"));
   const memoryPayload = await jsonFromResponse(memoryResponse);
   assert(memoryResponse.status === 200, "memory: expected 200 after raw output sync", { status: memoryResponse.status, payload: memoryPayload });
-  assert(
-    memoryPayload.items.some((item) => item.id === syncedRobotTask.robot.rawOutputMemoryId),
-    "memory: expected raw output memory to be listed",
-    memoryPayload.items
-  );
   assert(
     memoryPayload.media.some((item) => item.mediaType === "video" && item.metadata?.captureTaskId === createPayload.event.id),
     "memory: expected raw output video media to be listed",
@@ -358,11 +454,6 @@ await withFakeAuriServer(async () => {
   const afterConcurrentMemoryResponse = await memoryRoute.GET(new Request("http://localhost/api/memory"));
   const afterConcurrentMemoryPayload = await jsonFromResponse(afterConcurrentMemoryResponse);
   const concurrentMedia = afterConcurrentMemoryPayload.media.filter((item) => item.metadata?.captureTaskId === concurrentSyncPayload.event.id);
-  const concurrentMediaIds = new Set(concurrentMedia.map((item) => item.id));
-  const concurrentMemories = afterConcurrentMemoryPayload.items.filter((item) =>
-    Array.isArray(item.mediaIds) && item.mediaIds.some((mediaId) => concurrentMediaIds.has(mediaId))
-  );
-  assert(concurrentMemories.length === 1, "raw output sync: concurrent sync should create exactly one memory", concurrentMemories);
   assert(concurrentMedia.length === 1, "raw output sync: concurrent sync should create exactly one media item", concurrentMedia);
 });
 
@@ -393,11 +484,24 @@ const deleteResponse = await calendarRoute.DELETE(
 const deletePayload = await jsonFromResponse(deleteResponse);
 assert(deleteResponse.status === 200, "calendar: expected delete 200", { status: deleteResponse.status, payload: deletePayload });
 
+const deleteCameramanProbeResponse = await calendarRoute.DELETE(
+  new Request(`http://localhost/api/calendar?id=${encodeURIComponent(cameramanProbePayload.event.id)}`, {
+    method: "DELETE",
+  })
+);
+const deleteCameramanProbePayload = await jsonFromResponse(deleteCameramanProbeResponse);
+assert(deleteCameramanProbeResponse.status === 200, "calendar: expected cameraman probe delete 200", {
+  status: deleteCameramanProbeResponse.status,
+  payload: deleteCameramanProbePayload,
+});
+
 const afterDeleteResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?robot=true"));
 const afterDeletePayload = await jsonFromResponse(afterDeleteResponse);
 assert(!afterDeletePayload.items.some((item) => item.id === createPayload.event.id), "calendar: deleted event should not be listed", afterDeletePayload.items);
 assert(!afterDeletePayload.items.some((item) => item.id === missingRawOutputPayload.event.id), "calendar: deleted second event should not be listed", afterDeletePayload.items);
 assert(!afterDeletePayload.items.some((item) => item.id === concurrentSyncPayload.event.id), "calendar: deleted concurrent event should not be listed", afterDeletePayload.items);
+assert(!afterDeletePayload.items.some((item) => item.id === cameramanProbePayload.event.id), "calendar: deleted cameraman probe should not be listed", afterDeletePayload.items);
+cleanupSmokeSnapshot();
 
 console.log(
   JSON.stringify(

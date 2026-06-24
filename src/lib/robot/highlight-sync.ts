@@ -34,7 +34,7 @@ function isRetryableHighlightLookupError(error: unknown) {
 }
 
 function isCameramanEvent(event: CalendarApiEvent) {
-  return event.agent === "iris" || event.robot?.recordingMode === "cameraman_highlight";
+  return event.robot?.recordingMode === "cameraman_highlight";
 }
 
 function alreadySyncedResult(event: CalendarApiEvent): HighlightSyncResult {

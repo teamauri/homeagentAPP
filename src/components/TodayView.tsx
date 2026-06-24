@@ -116,7 +116,7 @@ function RobotEventRow({ event, onRun }: { event: RobotEvent; onRun: () => void 
   const rowChildren = useChildren();
   const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   const meta = robotStatusMeta[event.status];
-  const agentId = event.agent ?? "vita";
+  const agentId = event.agent ?? "homekeeper";
   const agent = teamAgentById[agentId];
   return (
     <article className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-line/85 bg-white px-3.5 py-2.5 shadow-[0_1px_4px_rgba(8,8,8,0.03)]">

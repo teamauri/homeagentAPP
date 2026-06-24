@@ -16,7 +16,7 @@ type StoredObject = CreatedLocalObject & { payload: Record<string, unknown>; cre
 type DemoObjectAction = "add" | "save" | "send" | "log" | "complete";
 type DemoMediaSource = "phone" | "auri";
 type DemoMediaType = "photo" | "video" | "clip";
-const calendarAgentIds = new Set<CalendarJobAgentId>(["iris", "lumi", "vita"]);
+const calendarAgentIds = new Set<CalendarJobAgentId>(["cameraman", "companion", "homekeeper"]);
 
 export interface DemoMediaInput {
   id?: string;
@@ -185,6 +185,11 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
           existingEvent.agent = agent;
           existingEvent.updatedAt = new Date().toISOString();
         }
+        const recordingMode = toRecordingMode(p.recordingMode);
+        if (recordingMode && existingEvent.recordingMode !== recordingMode) {
+          existingEvent.recordingMode = recordingMode;
+          existingEvent.updatedAt = new Date().toISOString();
+        }
         const existingObj = (currentStore.__auriDemoObjects ?? []).find(
           (o) => (o.type === "reminder_draft" || o.type === "calendar_draft") &&
                  typeof o.payload.title === "string" &&
@@ -236,7 +241,16 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
         ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai" }).format(new Date(Date.now() + 60_000))
         : normalizeTimeLabel(rawTimeLabel);
       const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
-      upsertDemoCalendarEvent({ title, person, dateLabel, timeLabel, note, forRobot: true, agent: toCalendarJobAgent(p.agent) });
+      upsertDemoCalendarEvent({
+        title,
+        person,
+        dateLabel,
+        timeLabel,
+        note,
+        forRobot: true,
+        agent: toCalendarJobAgent(p.agent),
+        recordingMode: toRecordingMode(p.recordingMode),
+      });
     }
 
     return { id: created.id, type: created.type, route: created.route, status: created.status };
@@ -288,6 +302,7 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
     timeLabel: input.timeLabel,
     icon: input.icon ?? existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
     agent: input.agent ?? existing?.agent,
+    recordingMode: input.recordingMode ?? existing?.recordingMode,
     source: "created",
     forRobot,
     auriClientVideoUuid: forRobot ? (existing?.auriClientVideoUuid ?? randomUUID()) : undefined,
@@ -333,6 +348,8 @@ export interface DemoRobotCaptureStatusInput {
   rawOutputStatus?: CalendarRawOutputStatus;
   rawOutputMemoryId?: string;
   rawOutputVideoUrl?: string;
+  rawOutputPosterUrl?: string;
+  rawOutputSummary?: string;
   transcriptJsonUrl?: string;
   transcriptTxtUrl?: string;
   rawOutputReadyAt?: string;
@@ -383,6 +400,8 @@ export function updateDemoCalendarRobotStatus(taskId: string, input: DemoRobotCa
     rawOutputStatus: rawOutputStatusFor(input, event.robot),
     rawOutputMemoryId: input.rawOutputMemoryId ?? event.robot?.rawOutputMemoryId,
     rawOutputVideoUrl: input.rawOutputVideoUrl ?? event.robot?.rawOutputVideoUrl,
+    rawOutputPosterUrl: input.rawOutputPosterUrl ?? event.robot?.rawOutputPosterUrl,
+    rawOutputSummary: input.rawOutputSummary ?? event.robot?.rawOutputSummary,
     transcriptJsonUrl: input.transcriptJsonUrl ?? event.robot?.transcriptJsonUrl,
     transcriptTxtUrl: input.transcriptTxtUrl ?? event.robot?.transcriptTxtUrl,
     rawOutputReadyAt: input.rawOutputReadyAt ?? event.robot?.rawOutputReadyAt,
@@ -421,8 +440,17 @@ function toPersonId(value: unknown): PersonId {
 }
 
 function toCalendarJobAgent(value: unknown): CalendarJobAgentId | undefined {
-  const agent = String(value || "");
+  const raw = String(value || "").trim().toLowerCase();
+  const agent =
+    raw === "iris" ? "cameraman" :
+    raw === "lumi" ? "companion" :
+    raw === "vita" || raw === "reminder" ? "homekeeper" :
+    raw;
   return calendarAgentIds.has(agent as CalendarJobAgentId) ? (agent as CalendarJobAgentId) : undefined;
+}
+
+function toRecordingMode(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function normalizeTimeLabel(value: string): string {

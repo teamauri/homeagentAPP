@@ -8,7 +8,17 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const personIds = new Set<PersonId>(["mia", "leo", "baby", "mom", "dad", "grandma", "family"]);
-const calendarAgentIds = new Set<CalendarJobAgentId>(["iris", "lumi", "vita"]);
+const calendarAgentIds = new Set<CalendarJobAgentId>(["cameraman", "companion", "homekeeper"]);
+
+function normalizeAgent(value: unknown): CalendarJobAgentId | undefined {
+  const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
+  const agent =
+    raw === "iris" ? "cameraman" :
+    raw === "lumi" ? "companion" :
+    raw === "vita" || raw === "reminder" ? "homekeeper" :
+    raw;
+  return calendarAgentIds.has(agent as CalendarJobAgentId) ? (agent as CalendarJobAgentId) : undefined;
+}
 
 function wantsTruthy(value: string | null) {
   return value === "1" || value === "true" || value === "yes";
@@ -55,9 +65,7 @@ function normalizeInput(body: unknown): { input?: CalendarEventInput; error?: st
   const dateLabel = typeof payload.dateLabel === "string" ? payload.dateLabel.trim() : "";
   const timeLabel = typeof payload.timeLabel === "string" ? payload.timeLabel.trim() : "";
   const person = typeof payload.person === "string" && personIds.has(payload.person as PersonId) ? (payload.person as PersonId) : "family";
-  const agent = typeof payload.agent === "string" && calendarAgentIds.has(payload.agent as CalendarJobAgentId)
-    ? (payload.agent as CalendarJobAgentId)
-    : undefined;
+  const agent = normalizeAgent(payload.agent);
 
   if (!title) return { error: "title is required" };
   if (!dateLabel) return { error: "dateLabel is required" };
@@ -76,6 +84,7 @@ function normalizeInput(body: unknown): { input?: CalendarEventInput; error?: st
       forRobot: Boolean(payload.forRobot),
       icon: typeof payload.icon === "string" && payload.icon.trim() ? payload.icon.trim() : undefined,
       agent,
+      recordingMode: typeof payload.recordingMode === "string" && payload.recordingMode.trim() ? payload.recordingMode.trim() : undefined,
       photoUrl: typeof payload.photoUrl === "string" ? payload.photoUrl : undefined,
       voiceUrl: typeof payload.voiceUrl === "string" ? payload.voiceUrl : undefined,
       voiceDuration: typeof payload.voiceDuration === "number" ? payload.voiceDuration : undefined,

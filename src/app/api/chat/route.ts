@@ -51,12 +51,12 @@ function normalizeTimeLabel(value: unknown) {
   return trimmed;
 }
 
-function forceHelperAgent(response: ChatAIResponse, agent: Extract<TeamMemberId, "iris" | "lumi" | "vita">): ChatAIResponse {
-  const helperName = agent === "iris" ? "Iris the eye" : agent === "lumi" ? "Lumi the companion" : "Vita the keeper";
+function forceHelperAgent(response: ChatAIResponse, agent: Extract<TeamMemberId, "cameraman" | "companion" | "homekeeper">): ChatAIResponse {
+  const helperName = agent === "cameraman" ? "Cameraman" : agent === "companion" ? "Companion" : "Homekeeper";
   if (!response.helper) return response;
   return {
     ...response,
-    intent: agent === "iris" ? "photo_video" : response.intent,
+    intent: agent === "cameraman" ? "photo_video" : response.intent,
     helper: {
       ...response.helper,
       teamMemberId: agent,
@@ -68,7 +68,7 @@ function forceHelperAgent(response: ChatAIResponse, agent: Extract<TeamMemberId,
 }
 
 function normalizeRouting(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
-  if (wantsCameraCapture(request)) return forceHelperAgent(response, "iris");
+  if (wantsCameraCapture(request)) return forceHelperAgent(response, "cameraman");
   return response;
 }
 
@@ -99,11 +99,34 @@ function synthesizeCardsFromObjects(objects: ObjectToCreate[] | undefined): Chat
 }
 
 function objectsWithAgent(objects: ChatAIResponse["objectsToCreate"], agent?: TeamMemberId) {
-  if (!agent || !["iris", "lumi", "vita"].includes(agent)) return objects;
+  if (!agent || !["cameraman", "companion", "homekeeper"].includes(agent)) return objects;
   return objects.map((object) => {
     if (object.type !== "reminder_draft" && object.type !== "calendar_draft") return object;
-    return { ...object, payload: { ...object.payload, timeLabel: normalizeTimeLabel(object.payload.timeLabel), time: normalizeTimeLabel(object.payload.time), agent: object.payload.agent ?? agent } };
+    const normalizedAgent = normalizeAgentId(object.payload.agent) ?? agent;
+    return {
+      ...object,
+      payload: {
+        ...object.payload,
+        timeLabel: normalizeTimeLabel(object.payload.timeLabel),
+        time: normalizeTimeLabel(object.payload.time),
+        agent: normalizedAgent,
+        recordingMode: typeof object.payload.recordingMode === "string" && object.payload.recordingMode.trim()
+          ? object.payload.recordingMode.trim()
+          : normalizedAgent === "cameraman"
+            ? "cameraman_highlight"
+            : undefined,
+      },
+    };
   });
+}
+
+function normalizeAgentId(value: unknown): TeamMemberId | undefined {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "iris") return "cameraman";
+  if (raw === "lumi") return "companion";
+  if (raw === "vita" || raw === "reminder") return "homekeeper";
+  if (["cameraman", "companion", "homekeeper"].includes(raw)) return raw as TeamMemberId;
+  return undefined;
 }
 
 function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"], agent?: TeamMemberId) {

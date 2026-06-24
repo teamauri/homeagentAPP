@@ -86,7 +86,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         title: e.title,
         scheduledAt: e.scheduledAt,
         iconName: e.icon,
-        agent: e.agent ?? "vita",
+        agent: e.agent ?? "homekeeper",
         meta: personLabel(e.person),
         forRobot: true,
       })),

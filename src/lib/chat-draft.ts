@@ -13,6 +13,7 @@ export type DraftInfo = {
   dateLabel: string;
   timeLabel: string;
   agent?: TeamAgentId;
+  recordingMode?: string;
   note?: string;
 };
 
@@ -124,11 +125,20 @@ function humanizeWhen(payload: Record<string, unknown>): { dateLabel: string; ti
 }
 
 const BOILERPLATE = /draft ready|ready for review/i;
-const JOB_AGENT_IDS = new Set<TeamAgentId>(["iris", "lumi", "vita"]);
+const JOB_AGENT_IDS = new Set<TeamAgentId>(["cameraman", "companion", "homekeeper"]);
 
 function normalizeAgent(value: unknown): TeamAgentId | undefined {
-  const agent = String(value || "");
+  const raw = String(value || "").trim().toLowerCase();
+  const agent =
+    raw === "iris" ? "cameraman" :
+    raw === "lumi" ? "companion" :
+    raw === "vita" || raw === "reminder" ? "homekeeper" :
+    raw;
   return JOB_AGENT_IDS.has(agent as TeamAgentId) ? (agent as TeamAgentId) : undefined;
+}
+
+function normalizeRecordingMode(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | undefined, createdId?: string): DraftInfo | undefined {
@@ -154,6 +164,7 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
   const { dateLabel, timeLabel } = humanizeWhen(merged);
   const noteRaw = (payload.note ?? (card.body && !BOILERPLATE.test(card.body) ? card.body : undefined)) as string | undefined;
   const agent = normalizeAgent(merged.agent);
+  const recordingMode = normalizeRecordingMode(merged.recordingMode);
 
   return {
     kind: isReminder ? "reminder" : "calendar",
@@ -164,6 +175,7 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
     dateLabel,
     timeLabel,
     agent,
+    recordingMode,
     note: noteRaw ? String(noteRaw) : undefined,
   };
 }
