@@ -44,7 +44,13 @@ function HomeInner() {
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
+  const [showCover, setShowCover] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setShowCover(false), 3000);
+    return () => window.clearTimeout(id);
+  }, []);
 
   // Persist both the active tab and the chat thread so full-page navigations
   // (e.g. tapping "View calendar" or opening a memory detail) return the user
@@ -243,7 +249,22 @@ function HomeInner() {
         <div className={tab === "memory" ? "" : "hidden"}>
           <MomentsView />
         </div>
+        {showCover && tab === "chat" ? <AuriCover /> : null}
       </AppShell>
+  );
+}
+
+function AuriCover() {
+  return (
+    <div className="absolute inset-0 z-20 bg-paper">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/agents/auri-agent-team.png" alt="" className="h-full w-full object-cover" style={{ objectPosition: "50% 45%" }} />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-black/5 to-black/45" />
+      <div className="absolute bottom-[max(4.8rem,env(safe-area-inset-bottom))] left-0 right-0 px-[26px] text-white">
+        <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white/80">Auri Home</p>
+        <h1 className="mt-2 font-display text-[36px] font-normal leading-[0.96] tracking-[-0.01em]">Getting the house ready</h1>
+      </div>
+    </div>
   );
 }
 

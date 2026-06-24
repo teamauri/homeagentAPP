@@ -78,7 +78,7 @@ export function TodayView() {
           <h2 className="text-[15px] font-semibold leading-5 text-ink">Your team</h2>
           <button className="text-[12px] font-semibold leading-5 text-ink">View all</button>
         </div>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {teamAgents.filter((agent) => agent.id !== "auri").map((agent) => (
             <button key={agent.id} className="min-w-0 text-center">
               <TeamBadge agentId={agent.id} size="md" />

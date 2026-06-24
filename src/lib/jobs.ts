@@ -10,9 +10,8 @@ import { todayAt } from "./job-time";
 //    projects one instance per day onto Upcoming and the calendar.
 // Both map onto the same underlying Session model (see docs/REPOSITION_DESIGN.md).
 
-// Each job type maps to the teammate that runs it: Cameraman captures highlights,
-// Watcher observes rooms, Companion reads and runs activities, Homekeeper runs
-// logistics, Baby Logger records care routines, and Coach runs workouts.
+// Each job type maps to the teammate that runs it. `activity` and `checkin` remain
+// for older saved demo data, but new routines expose one fixed capability per agent.
 export type JobType = "highlight" | "watch" | "reading" | "activity" | "routine" | "checkin" | "baby_log" | "workout" | "nudge";
 export type JobSource = "auri" | "todo" | "gcal";
 
@@ -88,9 +87,7 @@ export function standingScheduledAtToday(job: StandingJob, now: number = Date.no
   return todayAt(standingStartHHMM(job), now);
 }
 
-// One standing job per teammate (at least). Cameraman captures, Watcher observes,
-// Companion reads/plays, Homekeeper handles logistics, Baby Logger records care,
-// and Coach runs workouts.
+// One default standing routine per helper agent.
 export const seedStanding: StandingJob[] = [
   {
     id: "evening-highlights",
@@ -123,16 +120,6 @@ export const seedStanding: StandingJob[] = [
     enabled: true,
   },
   {
-    id: "afternoon-activity",
-    type: "activity",
-    agent: "companion",
-    title: "Afternoon activity",
-    trigger: "4 PM · Mia",
-    person: "mia",
-    schedule: { kind: "window", start: "16:00", end: "17:00" },
-    enabled: true,
-  },
-  {
     id: "morning-routine",
     type: "routine",
     agent: "homekeeper",
@@ -141,16 +128,6 @@ export const seedStanding: StandingJob[] = [
     person: "family",
     schedule: { kind: "alarm", alarm: "07:30" },
     enabled: true,
-  },
-  {
-    id: "midday-meds",
-    type: "checkin",
-    agent: "homekeeper",
-    title: "Midday meds",
-    trigger: "Alarm 12 PM · Grandma",
-    person: "grandma",
-    schedule: { kind: "alarm", alarm: "12:00" },
-    enabled: false,
   },
   {
     id: "baby-routine-log",

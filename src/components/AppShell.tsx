@@ -27,19 +27,13 @@ declare global {
 const tabs: { key: TabKey; label: string; icon: string; activeBg: string; activeText: string }[] = [
   { key: "chat", label: "Chat", icon: "home", activeBg: "bg-[#FF6B6B]/15", activeText: "text-[#E03C3C]" },
   { key: "today", label: "Jobs", icon: "bell", activeBg: "bg-[#FF9F43]/15", activeText: "text-[#D47A00]" },
-  { key: "memory", label: "Journey", icon: "photos", activeBg: "bg-[#A855F7]/15", activeText: "text-[#7C3AED]" },
+  { key: "memory", label: "Memories", icon: "photos", activeBg: "bg-[#A855F7]/15", activeText: "text-[#7C3AED]" },
 ];
 
 const titles: Record<TabKey, string> = {
   today: "Jobs",
   chat: "Jane’s Family",
-  memory: "Journey",
-};
-
-const subtitles: Record<TabKey, string> = {
-  today: "What Auri’s set to do for you.",
-  chat: "The Auri team is here to take jobs",
-  memory: "Watch your family grow, together.",
+  memory: "Memories",
 };
 
 export function AppShell({
@@ -73,7 +67,7 @@ export function AppShell({
 function ShellHeader({ activeTab }: { activeTab: TabKey }) {
   return (
     <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]">
-      <header className="flex items-start justify-between gap-3 px-[26px] pb-2 pt-2">
+      <header className="flex items-start justify-between gap-3 px-[26px] pb-3 pt-3">
         <div className="min-w-0">
           <h1 className="font-display text-[30px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
             {titles[activeTab].split("\n").map((line) => (
@@ -82,7 +76,6 @@ function ShellHeader({ activeTab }: { activeTab: TabKey }) {
               </span>
             ))}
           </h1>
-          <p className="mt-1.5 text-[14px] leading-5 text-muted">{subtitles[activeTab]}</p>
         </div>
         <a href="/family" aria-label="Family settings" className="mt-1.5 shrink-0 text-ink/55">
           <svg viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -8,26 +8,18 @@ import { teamAgentById, type TeamAgentId } from "@/lib/team";
 import { useChildren, useParents } from "./FamilyContext";
 import { TeamBadge } from "./TeamBadge";
 
-// The "+ New" (and edit) page: pick what Auri should do, then a minimal config —
-// who it's for and when. Each template is owned by the teammate that runs it.
+// One agent owns one fixed routine capability. This page picks that capability,
+// then exposes only the user-adjustable configuration.
 type Template = { type: JobType; agent: TeamAgentId; label: string; blurb: string; sched: "window" | "alarm" };
 
 const TEMPLATES: Template[] = [
-  { type: "highlight", agent: "cameraman", label: "Highlight", blurb: "Catch real moments", sched: "window" },
-  { type: "watch", agent: "watcher", label: "Home watch", blurb: "Every X minutes", sched: "window" },
-  { type: "reading", agent: "companion", label: "Reading", blurb: "Read with your kid", sched: "window" },
-  { type: "activity", agent: "companion", label: "Activity", blurb: "A daily activity", sched: "window" },
-  { type: "routine", agent: "homekeeper", label: "Routine", blurb: "A checklist to done", sched: "alarm" },
-  { type: "checkin", agent: "homekeeper", label: "Check-in", blurb: "Confirm it got done", sched: "alarm" },
-  { type: "baby_log", agent: "baby_logger", label: "Baby log", blurb: "Feeding, sleep, diapers", sched: "alarm" },
-  { type: "workout", agent: "coach", label: "Workout", blurb: "A home workout", sched: "window" },
+  { type: "highlight", agent: "cameraman", label: "Cameraman", blurb: "Capture family highlights and keepsake moments.", sched: "window" },
+  { type: "watch", agent: "watcher", label: "Watcher", blurb: "Observe the room at intervals and summarize what is happening.", sched: "window" },
+  { type: "reading", agent: "companion", label: "Companion", blurb: "Read, learn, and play alongside the kids.", sched: "window" },
+  { type: "workout", agent: "coach", label: "Coach", blurb: "Run a home workout for the parent.", sched: "window" },
+  { type: "routine", agent: "homekeeper", label: "Homekeeper", blurb: "Keep reminders, calendar, and home checklists moving.", sched: "alarm" },
+  { type: "baby_log", agent: "baby_logger", label: "Baby Logger", blurb: "Record feeding, sleep, diapers, meds, and other care events.", sched: "alarm" },
 ];
-
-// Group templates under the teammate that runs them — so "two jobs per agent"
-// reads as intentional (Cameraman does Highlight + Home watch) instead of looking
-// like duplicate cards. Each job card leads with its own distinct job icon.
-const AGENT_ORDER: TeamAgentId[] = ["cameraman", "watcher", "companion", "coach", "homekeeper", "baby_logger"];
-const TEMPLATE_GROUPS = AGENT_ORDER.map((agent) => ({ agent, items: TEMPLATES.filter((t) => t.agent === agent) })).filter((g) => g.items.length);
 
 function fmtTime(hhmm: string) {
   if (!hhmm) return "";
@@ -74,7 +66,7 @@ export function NewJobView({
 
   const pick = (t: Template) => {
     setType(t.type);
-    if (!title) setTitle(t.label);
+    if (!title) setTitle(defaultTitle(t));
   };
 
   const submit = () => {
@@ -82,7 +74,7 @@ export function NewJobView({
     const personLabel = people.find((p) => p.id === person)?.label ?? person;
     if (repeat === "once") {
       onSubmitOnce({
-        title: title || tpl.label,
+        title: title || defaultTitle(tpl),
         person,
         // Canonical datetime from the date + time pickers (local time).
         scheduledAt: parseDateTime(onceDate, onceTime),
@@ -104,7 +96,7 @@ export function NewJobView({
         id: editJob?.id ?? `job_${Date.now()}`,
         type: tpl.type,
         agent: tpl.agent,
-        title: title || tpl.label,
+            title: title || defaultTitle(tpl),
         trigger,
         person,
         schedule,
@@ -120,7 +112,7 @@ export function NewJobView({
         <button onClick={onClose} className="flex items-center gap-1 text-[15px] font-medium text-ink">
           <span className="text-[24px] font-light leading-none">‹</span> Back
         </button>
-        <span className="font-display text-[20px] leading-none tracking-[-0.01em] text-ink">{isEdit ? "Edit job" : "New job"}</span>
+        <span className="font-display text-[20px] leading-none tracking-[-0.01em] text-ink">{isEdit ? "Edit Routine" : "New Routine"}</span>
         {isEdit && onDelete ? (
           <button onClick={() => onDelete(editJob!.id)} className="text-[14px] font-medium text-[#A32D2D]">Delete</button>
         ) : (
@@ -128,42 +120,35 @@ export function NewJobView({
         )}
       </div>
 
-      <h2 className="mb-3 px-1 text-[16px] font-medium text-ink">What should Auri do?</h2>
+      <h2 className="mb-3 px-1 text-[16px] font-medium text-ink">Choose an agent</h2>
       {isEdit && tpl ? (
-        <div className="mb-6 rounded-[16px] border border-line bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
-          <div className="text-[15px] font-semibold text-ink">{tpl.label}</div>
-          <div className="mt-0.5 text-[13px] text-muted">{teamAgentById[tpl.agent].name} · {tpl.blurb}</div>
+        <div className="mb-6 rounded-[8px] border border-line bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
+          <div className="flex items-center gap-2.5">
+            <TeamBadge agentId={tpl.agent} size="sm" />
+            <div>
+              <div className="text-[15px] font-semibold text-ink">{teamAgentById[tpl.agent].name}</div>
+              <div className="mt-0.5 text-[13px] text-muted">{tpl.blurb}</div>
+            </div>
+          </div>
         </div>
       ) : (
-        <div className="mb-3">
-          {TEMPLATE_GROUPS.map((group) => {
-            const a = teamAgentById[group.agent];
+        <div className="mb-5 space-y-2.5">
+          {TEMPLATES.map((t) => {
+            const a = teamAgentById[t.agent];
+            const active = type === t.type;
             return (
-              <div key={group.agent} className="mb-5">
-                <div className="mb-2 flex items-center gap-2.5 px-1">
-                  <span className="shrink-0">
-                    <TeamBadge agentId={group.agent} size="sm" />
-                  </span>
-                  <div className="text-[14px] leading-4">
-                    <span className="font-semibold text-ink">{a.name}</span> <span className="text-muted">· {a.shortRole}</span>
-                  </div>
+              <button
+                key={t.type}
+                onClick={() => pick(t)}
+                className={`flex w-full items-start gap-3 rounded-[8px] border bg-white px-3.5 py-3 text-left shadow-[0_1px_4px_rgba(8,8,8,0.025)] ${active ? "border-ink" : "border-line"}`}
+              >
+                <TeamBadge agentId={t.agent} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[15px] font-semibold leading-5 text-ink">{a.name}</div>
+                  <div className="mt-0.5 text-[13px] leading-[18px] text-muted">{t.blurb}</div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {group.items.map((t) => {
-                    const active = type === t.type;
-                    return (
-                      <button
-                        key={t.type}
-                        onClick={() => pick(t)}
-                        className={`rounded-[14px] border bg-white px-3.5 py-3 text-left ${active ? "border-ink shadow-[0_2px_10px_rgba(8,8,8,0.06)]" : "border-line"}`}
-                      >
-                        <div className="text-[15px] font-semibold leading-5 text-ink">{t.label}</div>
-                        <div className="mt-1 text-[13px] leading-[17px] text-muted">{t.blurb}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                <span className="pt-1 text-[22px] font-light leading-none text-ink/35">›</span>
+              </button>
             );
           })}
         </div>
@@ -188,7 +173,7 @@ export function NewJobView({
           ) : null}
 
           <Field label="Name">
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={tpl.label} className="w-full rounded-[12px] border border-line bg-white px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-ink" />
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={defaultTitle(tpl)} className="w-full rounded-[12px] border border-line bg-white px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-ink" />
           </Field>
 
           <Field label="For">
@@ -226,12 +211,21 @@ export function NewJobView({
           </Field>
 
           <button onClick={submit} className="w-full rounded-full bg-ink py-3 text-[15px] font-semibold text-white">
-            {isEdit ? "Save changes" : "Add job"}
+            {isEdit ? "Save changes" : "Add routine"}
           </button>
         </div>
       ) : null}
     </div>
   );
+}
+
+function defaultTitle(tpl: Template) {
+  if (tpl.type === "highlight") return "Evening highlights";
+  if (tpl.type === "watch") return "Home watch";
+  if (tpl.type === "reading") return "Reading time";
+  if (tpl.type === "workout") return "Home workout";
+  if (tpl.type === "baby_log") return "Baby routine log";
+  return "Family routine";
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

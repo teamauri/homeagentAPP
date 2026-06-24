@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { jobIcon, loadStandingJobs, seedStanding, standingScheduledAtToday, STANDING_KEY, type StandingJob } from "@/lib/jobs";
 import { deriveDateLabel, deriveTimeLabel } from "@/lib/job-time";
-import { teamAgentById } from "@/lib/team";
+import { helperTeamAgentIds, teamAgentById, teamAgents, type TeamAgent } from "@/lib/team";
 import { useChildren } from "./FamilyContext";
 import { DoodleIcon } from "./Icons";
 import { NewJobView } from "./NewJobView";
 import { EventDetailSheet } from "./EventDetailSheet";
 import { useRobotEvents } from "./RobotEventContext";
-import { TeamBadge } from "./TeamBadge";
 import type { TeamAgentId } from "@/lib/team";
 
 const STATUS_LABEL: Record<string, string> = { scheduled: "Scheduled", recording: "Recording", done: "Done" };
 const DAY_MS = 24 * 60 * 60 * 1000;
+const AGENT_PROFILE_KEY = "auri.agentProfiles.v1";
+const SECTION_TITLE_CLASS = "font-display text-[22px] font-normal leading-none tracking-[-0.01em] text-ink";
+const STACKED_SECTION_CLASS = "mt-8 pb-2";
 
 // "Jobs" — everything the family has set Auri to do, in two zones:
 //   Upcoming   · the next occurrence of each job, soonest first (clears once run)
@@ -35,6 +37,14 @@ type UpcomingItem = {
   forRobot: boolean;
 };
 
+type AgentProfile = Omit<TeamAgent, "id"> & {
+  id: string;
+  enabled: boolean;
+  custom?: boolean;
+};
+
+type AgentProfilePatch = Partial<Pick<AgentProfile, "name" | "role" | "shortRole" | "summary" | "responsibilities" | "enabled">>;
+
 const SHORT_DAY: Record<string, string> = {
   Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun", Tomorrow: "Tmrw",
 };
@@ -49,11 +59,31 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   const [creating, setCreating] = useState(false);
   const [editJob, setEditJob] = useState<StandingJob | null>(null);
   const [sel, setSel] = useState<UpcomingItem | null>(null);
+  const [agentPatches, setAgentPatches] = useState<Record<string, AgentProfilePatch>>({});
+  const [customAgents, setCustomAgents] = useState<AgentProfile[]>([]);
+  const [agentProfilesReady, setAgentProfilesReady] = useState(false);
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [creatingAgent, setCreatingAgent] = useState(false);
 
   // Load the saved Every-day list once; fall back to seed on first run.
   useEffect(() => {
     setStanding(loadStandingJobs());
     setStandingReady(true);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(AGENT_PROFILE_KEY) || "{}") as {
+        patches?: Record<string, AgentProfilePatch>;
+        custom?: AgentProfile[];
+      };
+      setAgentPatches(parsed.patches ?? {});
+      setCustomAgents(Array.isArray(parsed.custom) ? parsed.custom : []);
+    } catch {
+      setAgentPatches({});
+      setCustomAgents([]);
+    }
+    setAgentProfilesReady(true);
   }, []);
 
   // Persist after first load so toggles + added jobs stick across reloads/builds.
@@ -65,6 +95,23 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
       // ignore quota failures
     }
   }, [standing, standingReady]);
+
+  useEffect(() => {
+    if (!agentProfilesReady) return;
+    try {
+      localStorage.setItem(AGENT_PROFILE_KEY, JSON.stringify({ patches: agentPatches, custom: customAgents }));
+    } catch {
+      // ignore quota failures
+    }
+  }, [agentPatches, customAgents, agentProfilesReady]);
+
+  const agentProfiles = useMemo<AgentProfile[]>(() => {
+    const builtIns = helperTeamAgentIds.map((id) => {
+      const base = teamAgentById[id];
+      return { ...base, enabled: true, ...(agentPatches[id] ?? {}) };
+    });
+    return [...builtIns, ...customAgents];
+  }, [agentPatches, customAgents]);
 
   const now = Date.now();
 
@@ -106,7 +153,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
 
   // Tell the shell to drop its "Jobs" header while the New/Edit page is open —
   // that page has its own "‹ Back · New job" header, so the global one is noise.
-  const onSubpage = creating || !!editJob;
+  const onSubpage = creating || !!editJob || !!editingAgentId || creatingAgent;
   useEffect(() => {
     onSubpageChange?.(onSubpage);
   }, [onSubpage, onSubpageChange]);
@@ -134,6 +181,35 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   const closeForm = () => {
     setCreating(false);
     setEditJob(null);
+    setEditingAgentId(null);
+    setCreatingAgent(false);
+  };
+
+  const saveAgentProfile = (profile: AgentProfile) => {
+    if (profile.custom) {
+      setCustomAgents((cur) => {
+        const exists = cur.some((agent) => agent.id === profile.id);
+        return exists ? cur.map((agent) => (agent.id === profile.id ? profile : agent)) : [...cur, profile];
+      });
+    } else {
+      setAgentPatches((cur) => ({
+        ...cur,
+        [profile.id]: {
+          name: profile.name,
+          role: profile.role,
+          shortRole: profile.shortRole,
+          summary: profile.summary,
+          responsibilities: profile.responsibilities,
+          enabled: profile.enabled,
+        },
+      }));
+    }
+    closeForm();
+  };
+
+  const deleteCustomAgent = (id: string) => {
+    setCustomAgents((cur) => cur.filter((agent) => agent.id !== id));
+    closeForm();
   };
 
   if (creating || editJob) {
@@ -158,6 +234,18 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
     );
   }
 
+  if (editingAgentId || creatingAgent) {
+    const existing = editingAgentId ? agentProfiles.find((agent) => agent.id === editingAgentId) : undefined;
+    return (
+        <AgentProfileView
+          agent={existing}
+          onClose={closeForm}
+          onSave={saveAgentProfile}
+          onDelete={existing?.custom ? () => deleteCustomAgent(existing.id) : undefined}
+      />
+    );
+  }
+
   return (
     <div className="pb-4">
       <div className="mb-5 flex justify-end">
@@ -169,7 +257,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
 
       <section className="mb-7">
         <div className="mb-2.5 flex items-baseline justify-between px-1">
-          <h2 className="text-[16px] font-medium text-ink">Upcoming</h2>
+          <h2 className={SECTION_TITLE_CLASS}>Upcoming</h2>
           <span className="text-[12px] leading-4 text-muted">clears after it runs</span>
         </div>
         <div className="overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
@@ -181,11 +269,11 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         </div>
       </section>
 
-      <section className="pb-2">
+      <section className={STACKED_SECTION_CLASS}>
         <div className="mb-2.5 flex items-baseline justify-between px-1">
-          <h2 className="text-[16px] font-medium text-ink">Every day</h2>
+          <h2 className={SECTION_TITLE_CLASS}>Routines</h2>
           <button onClick={() => setCreating(true)} className="flex items-center gap-1 text-[13px] font-semibold leading-4 text-auri">
-            <span className="text-[15px] leading-none">+</span> New
+            <span className="text-[15px] leading-none">+</span> New Routine
           </button>
         </div>
         <div className="overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
@@ -197,6 +285,24 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
               onToggle={() => toggle(job.id)}
               onEdit={() => setEditJob(job)}
               onRun={job.type === "highlight" ? () => run(job) : undefined}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className={STACKED_SECTION_CLASS}>
+        <div className="mb-2.5 flex items-baseline justify-between px-1">
+          <h2 className={SECTION_TITLE_CLASS}>Your agents</h2>
+          <button onClick={() => setCreatingAgent(true)} className="flex items-center gap-1 text-[13px] font-semibold leading-4 text-auri">
+            <span className="text-[15px] leading-none">+</span> New agent
+          </button>
+        </div>
+        <div className="space-y-3">
+          {agentProfiles.map((agent) => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              onOpen={() => setEditingAgentId(agent.id)}
             />
           ))}
         </div>
@@ -229,29 +335,185 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   );
 }
 
-function AgentLabel({ agentId }: { agentId: TeamAgentId }) {
-  const agent = teamAgentById[agentId];
+function AgentCard({ agent, onOpen }: { agent: AgentProfile; onOpen: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f3f3] px-1.5 py-0.5 text-[10.5px] font-semibold leading-3 text-[#0a7d7d]">
-      <TeamBadge agentId={agentId} size="xs" /> {agent.name}
-    </span>
+    <button
+      onClick={onOpen}
+      className="block w-full overflow-hidden rounded-[8px] border border-line bg-white text-left shadow-[0_2px_10px_rgba(8,8,8,0.035)]"
+    >
+      <div className="h-[210px] bg-[#eee7dc]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={agent.portrait} alt="" className="h-full w-full object-cover" style={{ objectPosition: agent.portraitPosition }} />
+      </div>
+      <div className="px-3.5 py-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[18px] font-semibold leading-[22px] text-ink">{agent.name}</h3>
+            <p className="mt-0.5 text-[13px] font-semibold leading-5 text-ink/70">{agent.shortRole}</p>
+          </div>
+          <span className="mt-0.5 shrink-0 rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold leading-4 text-ink/60">Configure</span>
+        </div>
+        <p className="mt-2 text-[13px] leading-[18px] text-muted">{agent.role}</p>
+      </div>
+    </button>
+  );
+}
+
+function AgentProfileView({
+  agent,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  agent?: AgentProfile;
+  onClose: () => void;
+  onSave: (agent: AgentProfile) => void;
+  onDelete?: () => void;
+}) {
+  const fallback: AgentProfile = agent ?? {
+    id: `custom_${Date.now()}`,
+    name: "New Agent",
+    role: "Describe what this agent helps with",
+    shortRole: "Custom",
+    summary: "A custom agent profile for a future capability.",
+    responsibilities: ["New responsibility"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "50% 48%",
+    icon: "robot",
+    tone: "bg-[#E7E0D6]",
+    accent: "text-ink",
+    scope: "group",
+    enabled: true,
+    custom: true,
+  };
+  const [draft, setDraft] = useState<AgentProfile>(fallback);
+  const responsibilities = draft.responsibilities.join(", ");
+  const builtIn = agent && !agent.custom;
+
+  return (
+    <div className="pb-6">
+      <div className="mb-5 flex items-center justify-between">
+        <button onClick={onClose} className="flex items-center gap-1 text-[15px] font-medium text-ink">
+          <span className="text-[24px] font-light leading-none">‹</span> Back
+        </button>
+        <span className="font-display text-[20px] leading-none tracking-[-0.01em] text-ink">{builtIn ? "Configure" : agent ? "Edit agent" : "New agent"}</span>
+        {onDelete ? <button onClick={onDelete} className="text-[14px] font-medium text-[#A32D2D]">Delete</button> : <span className="w-[44px]" />}
+      </div>
+
+      <div className="mb-5 overflow-hidden rounded-[8px] border border-line bg-white">
+        {builtIn ? (
+          <AgentConfigurePanel agent={draft} onToggle={() => setDraft((cur) => ({ ...cur, enabled: !cur.enabled }))} />
+        ) : (
+          <>
+            <div className="h-[210px] bg-[#eee7dc]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={draft.portrait} alt="" className="h-full w-full object-cover" style={{ objectPosition: draft.portraitPosition }} />
+            </div>
+            <div className="space-y-3 px-3.5 py-3.5">
+              <LabeledInput label="Name" value={draft.name} onChange={(name) => setDraft((cur) => ({ ...cur, name }))} />
+              <LabeledInput label="Short role" value={draft.shortRole} onChange={(shortRole) => setDraft((cur) => ({ ...cur, shortRole }))} />
+              <LabeledTextarea label="Role" value={draft.role} onChange={(role) => setDraft((cur) => ({ ...cur, role }))} />
+              <LabeledTextarea label="Description" value={draft.summary} onChange={(summary) => setDraft((cur) => ({ ...cur, summary }))} />
+              <LabeledTextarea
+                label="Responsibilities"
+                value={responsibilities}
+                onChange={(value) => setDraft((cur) => ({ ...cur, responsibilities: value.split(",").map((item) => item.trim()).filter(Boolean) }))}
+              />
+              <label className="flex items-center justify-between border-t border-line pt-3 text-[14px] font-semibold text-ink">
+                Enabled
+                <Toggle on={draft.enabled} onClick={() => setDraft((cur) => ({ ...cur, enabled: !cur.enabled }))} label={`Turn ${draft.name} ${draft.enabled ? "off" : "on"}`} />
+              </label>
+            </div>
+          </>
+        )}
+      </div>
+
+      {agent?.custom ? (
+        <p className="mb-5 px-1 text-[12.5px] leading-5 text-muted">Custom agents are saved as profiles here. Wire them into routing when the capability is ready.</p>
+      ) : null}
+
+      <button onClick={() => onSave(draft)} className="w-full rounded-full bg-ink px-4 py-3 text-[15px] font-semibold text-white">{builtIn ? "Save preferences" : "Save agent"}</button>
+    </div>
+  );
+}
+
+function AgentConfigurePanel({ agent, onToggle }: { agent: AgentProfile; onToggle: () => void }) {
+  const [mainCharacter, setMainCharacter] = useState("Kids");
+  const [cutPrompt, setCutPrompt] = useState("Best moments");
+  const [storyStyle, setStoryStyle] = useState("Warm");
+  const [feedback, setFeedback] = useState("Keep shorter");
+
+  return (
+    <div className="px-3.5 py-3.5">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[18px] font-semibold leading-[22px] text-ink">{agent.name}</h3>
+          <p className="mt-0.5 text-[13px] font-semibold leading-5 text-ink/70">{agent.shortRole}</p>
+        </div>
+        <Toggle on={agent.enabled} onClick={onToggle} label={`Turn ${agent.name} ${agent.enabled ? "off" : "on"}`} />
+      </div>
+      <div className="space-y-4">
+        <OptionGroup label="Main character" value={mainCharacter} options={["Kids", "Family", "Mia", "Leo"]} onChange={setMainCharacter} />
+        <OptionGroup label="Cut prompt" value={cutPrompt} options={["Best moments", "Funny bits", "Milestones", "Shareable"]} onChange={setCutPrompt} />
+        <OptionGroup label="Story style" value={storyStyle} options={["Warm", "Playful", "Cinematic", "Fast"]} onChange={setStoryStyle} />
+        <OptionGroup label="Feedback" value={feedback} options={["Keep shorter", "More faces", "Less shaky", "More context"]} onChange={setFeedback} />
+      </div>
+    </div>
+  );
+}
+
+function OptionGroup({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <div>
+      <div className="mb-2 text-[12px] font-semibold leading-4 text-muted">{label}</div>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option) => (
+          <button
+            key={option}
+            onClick={() => onChange(option)}
+            className={`rounded-[8px] border px-3 py-2 text-left text-[13px] font-semibold leading-4 ${
+              value === option ? "border-ink bg-ink text-white" : "border-line bg-white text-ink/70"
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LabeledInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[12px] font-semibold leading-4 text-muted">{label}</span>
+      <input value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-[8px] border border-line bg-white px-3 py-2 text-[14px] text-ink outline-none focus:border-ink/50" />
+    </label>
+  );
+}
+
+function LabeledTextarea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[12px] font-semibold leading-4 text-muted">{label}</span>
+      <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} className="w-full resize-none rounded-[8px] border border-line bg-white px-3 py-2 text-[14px] leading-5 text-ink outline-none focus:border-ink/50" />
+    </label>
   );
 }
 
 function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boolean; onSelect: () => void }) {
+  const agent = teamAgentById[item.agent];
   return (
     <button onClick={onSelect} className={`flex w-full items-center gap-3 px-3.5 py-3 text-left ${first ? "" : "border-t border-line/70"}`}>
-      <div className="w-[40px] shrink-0 text-center">
+      <div className="w-[52px] shrink-0 text-center">
         <div className="text-[11px] leading-4 text-muted">{shortDay(deriveDateLabel(item.scheduledAt))}</div>
-        <div className="text-[14px] font-semibold leading-4 text-ink">{deriveTimeLabel(item.scheduledAt).replace(/\s?[AP]M$/i, "")}</div>
+        <div className="text-[13px] font-semibold leading-4 text-ink">{deriveTimeLabel(item.scheduledAt)}</div>
       </div>
       <span className="h-8 w-px shrink-0 bg-line" aria-hidden="true" />
-      <TeamBadge agentId={item.agent} size="sm" />
       <div className="min-w-0 flex-1">
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{item.title}</h3>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-          {item.forRobot ? <AgentLabel agentId={item.agent} /> : null}
-          <span className="text-[12.5px] leading-[18px] tracking-[0] text-muted">{item.meta}</span>
+        <div className="mt-0.5 flex items-center gap-2 text-[12.5px] leading-[18px] tracking-[0] text-muted">
+          <span><span className="font-semibold text-ink/75">{agent?.name}</span> {item.meta}</span>
         </div>
       </div>
       <span className="text-[26px] font-light leading-none text-ink/40">›</span>
