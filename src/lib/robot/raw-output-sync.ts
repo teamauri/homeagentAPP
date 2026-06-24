@@ -108,7 +108,7 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
     return { outcome: "missing_video_id", httpStatus: 409, event, error: "Capture task has no Auri video id" };
   }
 
-  if (robot?.rawOutputVideoUrl) {
+  if (robot?.rawOutputVideoUrl && robot.rawOutputSummary && robot.rawOutputPosterUrl) {
     return alreadySyncedResult(event);
   }
 
@@ -152,6 +152,39 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
       });
       await persistDemoStore();
       return { outcome: "pending", httpStatus: 202, event: updated, rawOutput };
+    }
+
+    if (robot?.rawOutputVideoUrl) {
+      const summaryText = rawOutput.summaryText?.trim();
+      let storedPosterUrl = robot.rawOutputPosterUrl;
+      if (!storedPosterUrl) {
+        const videoBytes = await client.downloadRawOutputVideo(videoId);
+        const posterBytes = await extractPosterFrame(videoBytes, videoId);
+        if (posterBytes) {
+          const storedPoster = await storeBinaryFile(posterBytes, `${videoId}-raw-output-poster.jpg`, "image/jpeg");
+          storedPosterUrl = storedPoster.url;
+        }
+      }
+      if (summaryText || storedPosterUrl) {
+        const now = new Date().toISOString();
+        const updated = updateDemoCalendarRobotStatus(event.id, {
+          status: robot.status,
+          rawOutputStatus: "ready",
+          rawOutputPosterUrl: storedPosterUrl,
+          rawOutputSummary: summaryText || robot.rawOutputSummary,
+          rawOutputSyncedAt: now,
+        });
+        await persistDemoStore();
+        return {
+          outcome: "already_synced",
+          httpStatus: 200,
+          event: updated,
+          media: [],
+          rawOutput,
+          metadata: { provider: "local-demo-store", alreadySynced: true, backfilled: true },
+        };
+      }
+      return alreadySyncedResult(event, rawOutput);
     }
 
     const [videoHead, jsonHead, txtHead] = await Promise.all([
