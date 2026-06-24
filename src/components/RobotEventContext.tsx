@@ -196,6 +196,7 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
       : rawVideoUrl
       ? {
           videoUrl: rawVideoUrl,
+          poster: event.robot?.rawOutputPosterUrl,
           duration: "Recorded",
           memoryUrl: event.robot?.rawOutputMemoryId ? `/memory/${event.robot.rawOutputMemoryId}` : undefined,
           summary: event.robot?.rawOutputSummary,

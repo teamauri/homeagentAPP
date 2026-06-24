@@ -400,7 +400,6 @@ function ApiResponseCard({ card }: { card: ChatTurnCard }) {
       window.location.href = card.targetRoute;
       return;
     }
-    window.alert(`${card.title} detail placeholder`);
   };
 
   return (

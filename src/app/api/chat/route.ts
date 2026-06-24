@@ -51,6 +51,43 @@ function normalizeTimeLabel(value: unknown) {
   return trimmed;
 }
 
+function nowTimeLabel() {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Shanghai",
+  }).format(new Date(Date.now() + 60_000));
+}
+
+function cameraCaptureTitle(request: ChatRequestBody) {
+  const raw = request.message?.trim() || "视频拍摄请求";
+  return raw
+    .replace(/给我|现在|立刻|马上|today|tonight|now/gi, "")
+    .replace(/\s+/g, " ")
+    .trim() || "视频拍摄请求";
+}
+
+function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
+  const timeLabel = /现在|立刻|马上|\bnow\b/i.test(request.message ?? "") ? nowTimeLabel() : "8:00 PM";
+  return {
+    type: "reminder_draft",
+    payload: {
+      title: cameraCaptureTitle(request),
+      timeLabel,
+      dateLabel: "Today",
+      person: "mia",
+      agent: "cameraman",
+      recordingMode: "cameraman_highlight",
+      note: request.message,
+    },
+  };
+}
+
+function hasDraftObject(objects: ObjectToCreate[] | undefined) {
+  return Boolean(objects?.some((object) => object.type === "reminder_draft" || object.type === "calendar_draft"));
+}
+
 function forceHelperAgent(response: ChatAIResponse, agent: Extract<TeamMemberId, "cameraman" | "companion" | "homekeeper">): ChatAIResponse {
   const helperName = agent === "cameraman" ? "Cameraman" : agent === "companion" ? "Companion" : "Homekeeper";
   if (!response.helper) return response;
@@ -67,8 +104,34 @@ function forceHelperAgent(response: ChatAIResponse, agent: Extract<TeamMemberId,
   };
 }
 
+function ensureCameraCaptureJob(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
+  const helper = response.helper ?? {
+    teamMemberId: "cameraman" as TeamMemberId,
+    name: "Cameraman",
+    reply: "收到，我这就去拍一段视频，马上发给你。",
+    cards: [],
+    objectsToCreate: [],
+  };
+  const objectsToCreate = hasDraftObject(helper.objectsToCreate)
+    ? objectsWithAgent(helper.objectsToCreate, "cameraman")
+    : [cameraDraftObject(request), ...objectsWithAgent(helper.objectsToCreate, "cameraman")];
+  const cards = synthesizeCardsFromObjects(objectsToCreate);
+
+  return {
+    ...response,
+    intent: "photo_video",
+    helper: {
+      ...helper,
+      teamMemberId: "cameraman",
+      name: "Cameraman",
+      cards,
+      objectsToCreate,
+    },
+  };
+}
+
 function normalizeRouting(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
-  if (wantsCameraCapture(request)) return forceHelperAgent(response, "cameraman");
+  if (wantsCameraCapture(request)) return ensureCameraCaptureJob(forceHelperAgent(response, "cameraman"), request);
   return response;
 }
 

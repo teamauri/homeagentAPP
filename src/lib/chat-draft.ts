@@ -141,6 +141,32 @@ function normalizeRecordingMode(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function cardForDraft(card: ChatResponseCard, object: ObjectToCreate | undefined): ChatResponseCard {
+  const type = object?.type;
+  if (type !== "reminder_draft" && type !== "calendar_draft") return card;
+
+  const payload = object?.payload ?? {};
+  const merged = { ...(card.metadata ?? {}), ...payload } as Record<string, unknown>;
+  const title = String(payload.title ?? card.title);
+  const { id, label } = normalizePerson(merged.recipient ?? merged.person ?? merged.assignee);
+  const { dateLabel, timeLabel } = humanizeWhen(merged);
+  const metadata = {
+    ...card.metadata,
+    ...payload,
+    person: id,
+    dateLabel,
+    timeLabel,
+  };
+
+  return {
+    ...card,
+    type: type === "reminder_draft" ? "reminder" : "calendar_draft",
+    title,
+    subtitle: card.subtitle ?? [dateLabel, timeLabel, label].filter(Boolean).join(" · "),
+    metadata,
+  };
+}
+
 export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | undefined, createdId?: string): DraftInfo | undefined {
   const objType = object?.type;
   const isReminder = objType === "reminder_draft" || card.type === "reminder";
@@ -189,5 +215,8 @@ export function enrichCards(
   offset: number
 ): ChatTurnCard[] {
   if (!cards) return [];
-  return cards.map((card, i) => ({ ...card, draft: buildDraft(card, objects?.[i], createdFlat?.[offset + i]?.id) }));
+  return cards.map((card, i) => {
+    const normalizedCard = cardForDraft(card, objects?.[i]);
+    return { ...normalizedCard, draft: buildDraft(normalizedCard, objects?.[i], createdFlat?.[offset + i]?.id) };
+  });
 }

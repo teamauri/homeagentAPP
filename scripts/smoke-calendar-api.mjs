@@ -167,7 +167,8 @@ function cleanupSmokeSnapshot() {
       const isSmoke = isSmokeCapture(item?.metadata?.captureTaskId);
       if (isSmoke) {
         if (typeof item.url === "string") removedUrls.push(item.url);
-        for (const key of ["transcriptJsonUrl", "transcriptTxtUrl"]) {
+        if (typeof item.thumbnailUrl === "string") removedUrls.push(item.thumbnailUrl);
+        for (const key of ["posterUrl", "thumbnailUrl", "rawOutputPosterUrl", "transcriptJsonUrl", "transcriptTxtUrl"]) {
           if (typeof item.metadata?.[key] === "string") removedUrls.push(item.metadata[key]);
         }
       }
