@@ -135,6 +135,14 @@ function labelFromIso(value: string) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(date);
 }
 
+function durationLabel(seconds?: number) {
+  if (!seconds || !Number.isFinite(seconds)) return "Edited highlight";
+  const rounded = Math.round(seconds);
+  const minutes = Math.floor(rounded / 60);
+  const rest = rounded % 60;
+  return minutes ? `${minutes}:${String(rest).padStart(2, "0")}` : `${rest}s`;
+}
+
 function agentFromIcon(icon: string): TeamAgentId {
   if (icon === "camera-note") return "iris";
   if (icon === "book") return "lumi";
@@ -143,6 +151,7 @@ function agentFromIcon(icon: string): TeamAgentId {
 
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
   const rawVideoUrl = event.robot?.rawOutputVideoUrl;
+  const highlightVideoUrl = event.robot?.highlightVideoUrl;
   const icon = (event.icon && event.icon !== "spark") ? event.icon : deriveCalendarEventIcon(event.title, event.person);
   // Prefer the durable absolute time. Legacy events (no scheduledAt) fall back
   // to parsing the labels; refreshCreatedEvents purges those separately.
@@ -168,9 +177,19 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     voiceUrl: event.voiceUrl,
     voiceDuration: event.voiceDuration,
     robot: event.robot,
-    status: rawVideoUrl ? "done" : statusFromApi(event.status),
-    completedAtLabel: event.robot?.rawOutputReadyAt ? labelFromIso(event.robot.rawOutputReadyAt) : undefined,
-    result: rawVideoUrl
+    status: rawVideoUrl || highlightVideoUrl ? "done" : statusFromApi(event.status),
+    completedAtLabel: event.robot?.highlightSyncedAt
+      ? labelFromIso(event.robot.highlightSyncedAt)
+      : event.robot?.rawOutputReadyAt
+        ? labelFromIso(event.robot.rawOutputReadyAt)
+        : undefined,
+    result: highlightVideoUrl
+      ? {
+          videoUrl: highlightVideoUrl,
+          duration: durationLabel(event.robot?.durationSeconds),
+          memoryUrl: event.robot?.highlightMemoryId ? `/memory/${event.robot.highlightMemoryId}` : undefined,
+        }
+      : rawVideoUrl
       ? {
           videoUrl: rawVideoUrl,
           duration: "Recorded",
@@ -332,6 +351,30 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     for (const event of candidates) {
       syncingTasks.current.add(event.id);
       fetch(`/api/robot/capture-tasks/${encodeURIComponent(event.id)}/raw-output/sync`, { method: "POST" })
+        .then(() => refreshCreatedEvents())
+        .catch(() => undefined)
+        .finally(() => {
+          syncingTasks.current.delete(event.id);
+        });
+    }
+  }, [events, ready, refreshCreatedEvents]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const candidates = events.filter(
+      (event) =>
+        event.forRobot &&
+        (event.agent === "iris" || event.robot?.recordingMode === "cameraman_highlight") &&
+        event.robot?.auriVideoId &&
+        event.robot?.vlogId &&
+        !event.robot.highlightVideoUrl &&
+        !event.robot.highlightMemoryId &&
+        !syncingTasks.current.has(event.id)
+    );
+
+    for (const event of candidates) {
+      syncingTasks.current.add(event.id);
+      fetch(`/api/robot/capture-tasks/${encodeURIComponent(event.id)}/highlight/sync`, { method: "POST" })
         .then(() => refreshCreatedEvents())
         .catch(() => undefined)
         .finally(() => {

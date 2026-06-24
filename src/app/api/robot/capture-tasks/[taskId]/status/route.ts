@@ -17,6 +17,10 @@ function cleanString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function cleanPositiveNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 function normalizePayload(body: unknown): { input?: DemoRobotCaptureStatusInput; error?: string } {
   if (!body || typeof body !== "object") return { error: "Request body must be an object" };
   const payload = body as Record<string, unknown>;
@@ -32,6 +36,8 @@ function normalizePayload(body: unknown): { input?: DemoRobotCaptureStatusInput;
       auriVideoId: cleanString(payload.auriVideoId),
       auriClientVideoUuid: cleanString(payload.auriClientVideoUuid),
       recordingMode: cleanString(payload.recordingMode),
+      vlogId: cleanString(payload.vlogId),
+      durationSeconds: cleanPositiveNumber(payload.durationSeconds),
       startedAt: cleanString(payload.startedAt),
       uploadedAt: cleanString(payload.uploadedAt),
       failedAt: cleanString(payload.failedAt),
@@ -74,6 +80,8 @@ export async function POST(request: Request, { params }: { params: { taskId: str
       provider: "local-demo-store",
       captureTaskId: event.id,
       auriVideoId: event.robot?.auriVideoId,
+      vlogId: event.robot?.vlogId,
+      durationSeconds: event.robot?.durationSeconds,
       rawOutputStatus: event.robot?.rawOutputStatus,
     },
   });

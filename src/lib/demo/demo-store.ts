@@ -320,6 +320,12 @@ export interface DemoRobotCaptureStatusInput {
   auriVideoId?: string;
   auriClientVideoUuid?: string;
   recordingMode?: string;
+  vlogId?: string;
+  durationSeconds?: number;
+  highlightVideoUrl?: string;
+  highlightMemoryId?: string;
+  highlightSyncedAt?: string;
+  highlightError?: string;
   startedAt?: string;
   uploadedAt?: string;
   failedAt?: string;
@@ -368,6 +374,12 @@ export function updateDemoCalendarRobotStatus(taskId: string, input: DemoRobotCa
     auriVideoId: input.auriVideoId ?? event.robot?.auriVideoId,
     auriClientVideoUuid,
     recordingMode: input.recordingMode ?? event.robot?.recordingMode,
+    vlogId: input.vlogId ?? event.robot?.vlogId,
+    durationSeconds: input.durationSeconds ?? event.robot?.durationSeconds,
+    highlightVideoUrl: input.highlightVideoUrl ?? event.robot?.highlightVideoUrl,
+    highlightMemoryId: input.highlightMemoryId ?? event.robot?.highlightMemoryId,
+    highlightSyncedAt: input.highlightSyncedAt ?? event.robot?.highlightSyncedAt,
+    highlightError: input.highlightError ?? event.robot?.highlightError,
     rawOutputStatus: rawOutputStatusFor(input, event.robot),
     rawOutputMemoryId: input.rawOutputMemoryId ?? event.robot?.rawOutputMemoryId,
     rawOutputVideoUrl: input.rawOutputVideoUrl ?? event.robot?.rawOutputVideoUrl,
