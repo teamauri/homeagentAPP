@@ -512,7 +512,10 @@ function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boo
       <span className="h-8 w-px shrink-0 bg-line" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{item.title}</h3>
-        <div className="mt-0.5 flex items-center gap-2 text-[12.5px] leading-[18px] tracking-[0] text-muted">
+        <div className="mt-0.5 flex items-center gap-1.5 text-[12.5px] leading-[18px] tracking-[0] text-muted">
+          <span className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border border-line/70 bg-white text-[11px]" aria-hidden="true">
+            <DoodleIcon name={agent?.icon ?? item.iconName} className="h-[14px] w-[14px]" />
+          </span>
           <span><span className="font-semibold text-ink/75">{agent?.name}</span> {item.meta}</span>
         </div>
       </div>
