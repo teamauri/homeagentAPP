@@ -13,19 +13,19 @@ import { TeamBadge } from "./TeamBadge";
 type Template = { type: JobType; agent: TeamAgentId; label: string; blurb: string; sched: "window" | "alarm" };
 
 const TEMPLATES: Template[] = [
-  { type: "highlight", agent: "iris", label: "Highlight", blurb: "Catch real moments", sched: "window" },
-  { type: "watch", agent: "iris", label: "Home watch", blurb: "Eye on a room", sched: "window" },
-  { type: "reading", agent: "lumi", label: "Reading", blurb: "Read with your kid", sched: "window" },
-  { type: "activity", agent: "lumi", label: "Activity", blurb: "A daily activity", sched: "window" },
-  { type: "routine", agent: "vita", label: "Routine", blurb: "A checklist to done", sched: "alarm" },
-  { type: "checkin", agent: "vita", label: "Check-in", blurb: "Confirm it got done", sched: "alarm" },
+  { type: "highlight", agent: "cameraman", label: "Highlight", blurb: "Catch real moments", sched: "window" },
+  { type: "watch", agent: "cameraman", label: "Home watch", blurb: "Eye on a room", sched: "window" },
+  { type: "reading", agent: "companion", label: "Reading", blurb: "Read with your kid", sched: "window" },
+  { type: "activity", agent: "companion", label: "Activity", blurb: "A daily activity", sched: "window" },
+  { type: "routine", agent: "homekeeper", label: "Routine", blurb: "A checklist to done", sched: "alarm" },
+  { type: "checkin", agent: "homekeeper", label: "Check-in", blurb: "Confirm it got done", sched: "alarm" },
   { type: "workout", agent: "nova", label: "Workout", blurb: "A home workout", sched: "window" },
 ];
 
 // Group templates under the teammate that runs them — so "two jobs per agent"
-// reads as intentional (Iris does Highlight + Home watch) instead of looking
+// reads as intentional (Cameraman does Highlight + Home watch) instead of looking
 // like duplicate cards. Each job card leads with its own distinct job icon.
-const AGENT_ORDER: TeamAgentId[] = ["iris", "lumi", "vita", "nova"];
+const AGENT_ORDER: TeamAgentId[] = ["cameraman", "companion", "homekeeper", "nova"];
 const TEMPLATE_GROUPS = AGENT_ORDER.map((agent) => ({ agent, items: TEMPLATES.filter((t) => t.agent === agent) })).filter((g) => g.items.length);
 
 function fmtTime(hhmm: string) {
@@ -46,7 +46,7 @@ export function NewJobView({
   editJob?: StandingJob;
   onClose: () => void;
   onSubmitStanding: (job: StandingJob, isEdit: boolean) => void;
-  onSubmitOnce: (input: { title: string; person: PersonId; scheduledAt: number; forRobot: boolean }) => void;
+  onSubmitOnce: (input: { title: string; person: PersonId; scheduledAt: number; forRobot: boolean; agent?: TeamAgentId; recordingMode?: string }) => void;
   onDelete?: (id: string) => void;
 }) {
   const isEdit = !!editJob;
@@ -87,6 +87,8 @@ export function NewJobView({
         scheduledAt: parseDateTime(onceDate, onceTime),
         // Every calendar event is a robot task.
         forRobot: true,
+        agent: tpl.agent,
+        recordingMode: tpl.type === "highlight" ? "cameraman_highlight" : undefined,
       });
       return;
     }

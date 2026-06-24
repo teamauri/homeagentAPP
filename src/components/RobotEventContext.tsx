@@ -19,6 +19,7 @@ export interface RobotEventResult {
   poster?: string;
   duration: string;
   memoryUrl?: string;
+  summary?: string;
   transcriptJsonUrl?: string;
   transcriptTxtUrl?: string;
 }
@@ -36,6 +37,7 @@ export interface RobotEvent {
   timeLabel: string;
   icon: string;
   agent?: TeamAgentId;
+  recordingMode?: string;
   // When true the robot shows a reminder + captures it; when false it's just a
   // plain calendar event the family planned (still shown on the calendar).
   forRobot: boolean;
@@ -66,6 +68,7 @@ export interface NewRobotEventInput {
   timeLabel?: string;
   forRobot: boolean;
   agent?: TeamAgentId;
+  recordingMode?: string;
   photoUrl?: string;
   voiceUrl?: string;
   voiceDuration?: number;
@@ -135,14 +138,23 @@ function labelFromIso(value: string) {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(date);
 }
 
+function durationLabel(seconds?: number) {
+  if (!seconds || !Number.isFinite(seconds)) return "Edited highlight";
+  const rounded = Math.round(seconds);
+  const minutes = Math.floor(rounded / 60);
+  const rest = rounded % 60;
+  return minutes ? `${minutes}:${String(rest).padStart(2, "0")}` : `${rest}s`;
+}
+
 function agentFromIcon(icon: string): TeamAgentId {
-  if (icon === "camera-note") return "iris";
-  if (icon === "book") return "lumi";
-  return "vita";
+  if (icon === "camera-note") return "cameraman";
+  if (icon === "book") return "companion";
+  return "homekeeper";
 }
 
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
   const rawVideoUrl = event.robot?.rawOutputVideoUrl;
+  const highlightVideoUrl = event.robot?.highlightVideoUrl;
   const icon = (event.icon && event.icon !== "spark") ? event.icon : deriveCalendarEventIcon(event.title, event.person);
   // Prefer the durable absolute time. Legacy events (no scheduledAt) fall back
   // to parsing the labels; refreshCreatedEvents purges those separately.
@@ -162,19 +174,32 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     dateLabel: deriveDateLabel(scheduledAt),
     timeLabel: deriveTimeLabel(scheduledAt),
     icon,
-    agent: agentFromIcon(icon),
+    agent: event.agent ?? agentFromIcon(icon),
+    recordingMode: event.recordingMode ?? event.robot?.recordingMode,
     forRobot: event.forRobot,
     photoUrl: event.photoUrl,
     voiceUrl: event.voiceUrl,
     voiceDuration: event.voiceDuration,
     robot: event.robot,
-    status: rawVideoUrl ? "done" : statusFromApi(event.status),
-    completedAtLabel: event.robot?.rawOutputReadyAt ? labelFromIso(event.robot.rawOutputReadyAt) : undefined,
-    result: rawVideoUrl
+    status: rawVideoUrl || highlightVideoUrl ? "done" : statusFromApi(event.status),
+    completedAtLabel: event.robot?.highlightSyncedAt
+      ? labelFromIso(event.robot.highlightSyncedAt)
+      : event.robot?.rawOutputReadyAt
+        ? labelFromIso(event.robot.rawOutputReadyAt)
+        : undefined,
+    result: highlightVideoUrl
+      ? {
+          videoUrl: highlightVideoUrl,
+          duration: durationLabel(event.robot?.durationSeconds),
+          memoryUrl: event.robot?.highlightMemoryId ? `/memory/${event.robot.highlightMemoryId}` : undefined,
+        }
+      : rawVideoUrl
       ? {
           videoUrl: rawVideoUrl,
+          poster: event.robot?.rawOutputPosterUrl,
           duration: "Recorded",
           memoryUrl: event.robot?.rawOutputMemoryId ? `/memory/${event.robot.rawOutputMemoryId}` : undefined,
+          summary: event.robot?.rawOutputSummary,
           transcriptJsonUrl: event.robot?.transcriptJsonUrl,
           transcriptTxtUrl: event.robot?.transcriptTxtUrl,
         }
@@ -212,6 +237,7 @@ function persistEventToCalendarApi(event: RobotEvent) {
       forRobot: event.forRobot,
       icon: event.icon,
       agent: event.agent,
+      recordingMode: event.recordingMode ?? event.robot?.recordingMode,
       photoUrl: event.photoUrl,
       voiceUrl: event.voiceUrl,
       voiceDuration: event.voiceDuration,
@@ -340,6 +366,30 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     }
   }, [events, ready, refreshCreatedEvents]);
 
+  useEffect(() => {
+    if (!ready) return;
+    const candidates = events.filter(
+      (event) =>
+        event.forRobot &&
+        event.robot?.recordingMode === "cameraman_highlight" &&
+        event.robot?.auriVideoId &&
+        event.robot?.vlogId &&
+        !event.robot.highlightVideoUrl &&
+        !event.robot.highlightMemoryId &&
+        !syncingTasks.current.has(event.id)
+    );
+
+    for (const event of candidates) {
+      syncingTasks.current.add(event.id);
+      fetch(`/api/robot/capture-tasks/${encodeURIComponent(event.id)}/highlight/sync`, { method: "POST" })
+        .then(() => refreshCreatedEvents())
+        .catch(() => undefined)
+        .finally(() => {
+          syncingTasks.current.delete(event.id);
+        });
+    }
+  }, [events, ready, refreshCreatedEvents]);
+
   // Clear any pending demo transitions if the app unmounts.
   useEffect(() => {
     const pending = timers.current;
@@ -364,7 +414,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       timeLabel: deriveTimeLabel(scheduledAt),
       forRobot: input.forRobot,
       icon: deriveEventIcon(input.title, input.person),
-      agent: input.agent ?? "vita",
+      agent: input.agent ?? "homekeeper",
+      recordingMode: input.recordingMode,
       photoUrl: input.photoUrl,
       voiceUrl: input.voiceUrl,
       voiceDuration: input.voiceDuration,
@@ -455,7 +506,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
         dateLabel: "Today",
         timeLabel: nowLabel(),
         icon: "camera-note",
-        agent: "iris" as TeamAgentId,
+        agent: "cameraman" as TeamAgentId,
+        recordingMode: "cameraman_highlight",
         forRobot: true,
         kind: "highlight",
         highlight: { clipTarget, photoTarget },

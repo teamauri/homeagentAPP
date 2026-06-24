@@ -1,8 +1,5 @@
-// AI teammates — aligned with the AURI product site.
-// Iris (the eye), Lumi (the companion), Vita (the keeper) live in the family group.
-// Nova (the coach) works with you privately, outside the group.
-// Auri is the device itself / the router that brings in the right teammate.
-export type TeamAgentId = "iris" | "lumi" | "vita" | "nova" | "auri";
+// Functional robot agents. Keep IDs literal so routing is obvious in logs/API data.
+export type TeamAgentId = "cameraman" | "companion" | "homekeeper" | "nova" | "auri";
 
 export type TeamAgentScope = "group" | "private" | "device";
 
@@ -19,7 +16,7 @@ export type TeamAgent = {
 
 export const teamAgents: TeamAgent[] = [
   {
-    id: "iris",
+    id: "cameraman",
     name: "Cameraman",
     role: "The eye — films the firsts",
     shortRole: "The eye",
@@ -29,7 +26,7 @@ export const teamAgents: TeamAgent[] = [
     scope: "group",
   },
   {
-    id: "lumi",
+    id: "companion",
     name: "Companion",
     role: "The companion — reads with your kids",
     shortRole: "Reads along",
@@ -39,10 +36,10 @@ export const teamAgents: TeamAgent[] = [
     scope: "group",
   },
   {
-    id: "vita",
-    name: "Keeper",
-    role: "The keeper — logs, calendar, reminders, receipts",
-    shortRole: "Keeps things",
+    id: "homekeeper",
+    name: "Homekeeper",
+    role: "Reminders, calendar check-ins, and video receipts",
+    shortRole: "Reminders",
     icon: "calendar",
     tone: "bg-[#C8EDD8]",
     accent: "text-[#1F5C42]",

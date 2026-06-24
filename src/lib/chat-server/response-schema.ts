@@ -32,7 +32,7 @@ export const chatResponseJsonSchema = {
   type: "object",
   properties: {
     // The primary voice is always Auri (the home agent that frames/answers).
-    handledByTeamMemberId: { type: "string", enum: ["iris", "lumi", "vita", "nova", "auri"] },
+    handledByTeamMemberId: { type: "string", enum: ["cameraman", "companion", "homekeeper", "nova", "auri"] },
     handledByName: { type: "string" },
     intent: {
       type: "string",
@@ -45,7 +45,7 @@ export const chatResponseJsonSchema = {
     helper: {
       type: "object",
       properties: {
-        teamMemberId: { type: "string", enum: ["iris", "lumi", "vita", "nova"] },
+        teamMemberId: { type: "string", enum: ["cameraman", "companion", "homekeeper", "nova"] },
         name: { type: "string" },
         reply: { type: "string" },
         ...voiceProps,

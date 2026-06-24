@@ -1,5 +1,6 @@
 import type { PersonId } from "@/lib/types";
 import type { ChatResponseCard, CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
+import type { TeamAgentId } from "@/lib/team";
 
 // A reminder / calendar card Auri proposes in chat that the user can confirm
 // inline (no navigation). Confirming turns it into a real calendar event.
@@ -11,6 +12,8 @@ export type DraftInfo = {
   personLabel: string;
   dateLabel: string;
   timeLabel: string;
+  agent?: TeamAgentId;
+  recordingMode?: string;
   note?: string;
 };
 
@@ -50,7 +53,7 @@ function formatTimeUTC(d: Date): string {
   return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-const TIME_RE = /\d{1,2}:\d{2}\s*(AM|PM)/i;
+const TIME_RE = /(\d{1,2}):(\d{2})\s*(AM|PM)/i;
 const DAY_WORDS = ["today", "tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
 function pickFromCompound(label: string): { dateLabel?: string; timeLabel?: string } {
@@ -77,7 +80,13 @@ function formatTimeField(value: unknown): string | undefined {
     return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
       .format(new Date(Date.now() + 60_000));
   }
-  if (TIME_RE.test(v)) return v.match(TIME_RE)![0];
+  const friendly = v.match(TIME_RE);
+  if (friendly) {
+    const h = parseInt(friendly[1], 10);
+    const period = friendly[3].toUpperCase();
+    const h12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+    return `${h12}:${friendly[2]} ${period}`;
+  }
   const m = v.match(TIME_24_RE);
   if (m) {
     const h = parseInt(m[1], 10);
@@ -116,6 +125,47 @@ function humanizeWhen(payload: Record<string, unknown>): { dateLabel: string; ti
 }
 
 const BOILERPLATE = /draft ready|ready for review/i;
+const JOB_AGENT_IDS = new Set<TeamAgentId>(["cameraman", "companion", "homekeeper"]);
+
+function normalizeAgent(value: unknown): TeamAgentId | undefined {
+  const raw = String(value || "").trim().toLowerCase();
+  const agent =
+    raw === "iris" ? "cameraman" :
+    raw === "lumi" ? "companion" :
+    raw === "vita" || raw === "reminder" ? "homekeeper" :
+    raw;
+  return JOB_AGENT_IDS.has(agent as TeamAgentId) ? (agent as TeamAgentId) : undefined;
+}
+
+function normalizeRecordingMode(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function cardForDraft(card: ChatResponseCard, object: ObjectToCreate | undefined): ChatResponseCard {
+  const type = object?.type;
+  if (type !== "reminder_draft" && type !== "calendar_draft") return card;
+
+  const payload = object?.payload ?? {};
+  const merged = { ...(card.metadata ?? {}), ...payload } as Record<string, unknown>;
+  const title = String(payload.title ?? card.title);
+  const { id, label } = normalizePerson(merged.recipient ?? merged.person ?? merged.assignee);
+  const { dateLabel, timeLabel } = humanizeWhen(merged);
+  const metadata = {
+    ...card.metadata,
+    ...payload,
+    person: id,
+    dateLabel,
+    timeLabel,
+  };
+
+  return {
+    ...card,
+    type: type === "reminder_draft" ? "reminder" : "calendar_draft",
+    title,
+    subtitle: card.subtitle ?? [dateLabel, timeLabel, label].filter(Boolean).join(" · "),
+    metadata,
+  };
+}
 
 export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | undefined, createdId?: string): DraftInfo | undefined {
   const objType = object?.type;
@@ -139,6 +189,8 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
   }
   const { dateLabel, timeLabel } = humanizeWhen(merged);
   const noteRaw = (payload.note ?? (card.body && !BOILERPLATE.test(card.body) ? card.body : undefined)) as string | undefined;
+  const agent = normalizeAgent(merged.agent);
+  const recordingMode = normalizeRecordingMode(merged.recordingMode);
 
   return {
     kind: isReminder ? "reminder" : "calendar",
@@ -148,6 +200,8 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
     personLabel: label,
     dateLabel,
     timeLabel,
+    agent,
+    recordingMode,
     note: noteRaw ? String(noteRaw) : undefined,
   };
 }
@@ -161,5 +215,8 @@ export function enrichCards(
   offset: number
 ): ChatTurnCard[] {
   if (!cards) return [];
-  return cards.map((card, i) => ({ ...card, draft: buildDraft(card, objects?.[i], createdFlat?.[offset + i]?.id) }));
+  return cards.map((card, i) => {
+    const normalizedCard = cardForDraft(card, objects?.[i]);
+    return { ...normalizedCard, draft: buildDraft(normalizedCard, objects?.[i], createdFlat?.[offset + i]?.id) };
+  });
 }

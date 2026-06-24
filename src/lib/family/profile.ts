@@ -44,10 +44,10 @@ export function ageAt(birthday: string | undefined, atISO: string): { years: num
 }
 
 export type ObservationSource =
-  | "album_organize" // Task ② — Iris organizing phone photos
+  | "album_organize" // Task ② — Cameraman organizing phone photos
   | "reminder_receipt" // Task ③ — a video receipt completing a reminder
   | "robot_clip" // an Auri cameraman clip
-  | "reading_session" // Lumi reading with a kid
+  | "reading_session" // Companion reading with a kid
   | "manual"; // a parent note
 
 export type Observation = {
@@ -114,7 +114,7 @@ export const seedObservations: Observation[] = [
     id: "obs_seed_1",
     memberId: "mia",
     source: "reading_session",
-    note: "Read Goodnight Moon with Lumi — asked where the mouse went.",
+    note: "Read Goodnight Moon with Companion — asked where the mouse went.",
     tags: ["books", "bedtime"],
     observedAt: "2026-06-16T20:10:00.000Z",
   },
@@ -122,7 +122,7 @@ export const seedObservations: Observation[] = [
     id: "obs_seed_2",
     memberId: "leo",
     source: "robot_clip",
-    note: "Iris filmed first three steps to the couch — big milestone.",
+    note: "Cameraman filmed first three steps to the couch — big milestone.",
     tags: ["milestone"],
     observedAt: "2026-06-15T17:12:00.000Z",
   },

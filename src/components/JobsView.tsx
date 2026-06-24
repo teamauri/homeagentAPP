@@ -9,6 +9,8 @@ import { DoodleIcon } from "./Icons";
 import { NewJobView } from "./NewJobView";
 import { EventDetailSheet } from "./EventDetailSheet";
 import { useRobotEvents } from "./RobotEventContext";
+import { TeamBadge } from "./TeamBadge";
+import type { TeamAgentId } from "@/lib/team";
 
 const STATUS_LABEL: Record<string, string> = { scheduled: "Scheduled", recording: "Recording", done: "Done" };
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -28,6 +30,7 @@ type UpcomingItem = {
   title: string;
   scheduledAt: number; // canonical time — drives ordering + the derived labels
   iconName: string;
+  agent: TeamAgentId;
   meta: string;
   forRobot: boolean;
 };
@@ -83,6 +86,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         title: e.title,
         scheduledAt: e.scheduledAt,
         iconName: e.icon,
+        agent: e.agent ?? "homekeeper",
         meta: personLabel(e.person),
         forRobot: true,
       })),
@@ -94,7 +98,8 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         title: job.title,
         scheduledAt: standingNextOccurrence(job),
         iconName: jobIcon[job.type],
-        meta: `${teamAgentById[job.agent]?.name ?? ""} · ${personLabel(job.person)}`,
+        agent: job.agent,
+        meta: personLabel(job.person),
         forRobot: true,
       })),
   ].sort((a, b) => a.scheduledAt - b.scheduledAt);
@@ -207,6 +212,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
             detail={{
               title: sel.title,
               icon: sel.iconName,
+              agent: created?.agent ?? sel.agent,
               whenLine,
               note: created?.note,
               quoteNote: !!created,
@@ -223,10 +229,11 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   );
 }
 
-function RobotBadge() {
+function AgentLabel({ agentId }: { agentId: TeamAgentId }) {
+  const agent = teamAgentById[agentId];
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-[#e3f3f3] px-1.5 py-0.5 text-[10.5px] font-semibold leading-3 text-[#0a7d7d]">
-      <DoodleIcon name="robot" className="h-3 w-3" /> Auri Robot
+      <TeamBadge agentId={agentId} size="xs" /> {agent.name}
     </span>
   );
 }
@@ -239,13 +246,11 @@ function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boo
         <div className="text-[14px] font-semibold leading-4 text-ink">{deriveTimeLabel(item.scheduledAt).replace(/\s?[AP]M$/i, "")}</div>
       </div>
       <span className="h-8 w-px shrink-0 bg-line" aria-hidden="true" />
-      <div className="grid h-[40px] w-[40px] shrink-0 place-items-center">
-        <DoodleIcon name={item.iconName} className="h-8 w-8" />
-      </div>
+      <TeamBadge agentId={item.agent} size="sm" />
       <div className="min-w-0 flex-1">
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{item.title}</h3>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-          {item.forRobot ? <RobotBadge /> : null}
+          {item.forRobot ? <AgentLabel agentId={item.agent} /> : null}
           <span className="text-[12.5px] leading-[18px] tracking-[0] text-muted">{item.meta}</span>
         </div>
       </div>

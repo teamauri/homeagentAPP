@@ -552,7 +552,7 @@ function OrganizingPanel({ count }: { count: number }) {
   return (
     <div className="mt-4 rounded-[16px] border border-line bg-white p-4 text-center shadow-[0_2px_10px_rgba(8,8,8,0.04)]">
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#ffe6dd] text-[22px]">📷</div>
-      <p className="mt-2 font-display text-[18px] text-ink">Iris is organizing {count} photos…</p>
+      <p className="mt-2 font-display text-[18px] text-ink">Cameraman is organizing {count} photos…</p>
       <p className="mt-1 text-[12px] text-muted">Keeping the real moments · placing them by age · writing the story</p>
       <div className="mx-auto mt-3 h-1.5 w-40 overflow-hidden rounded-full bg-[#eee]">
         <div className="h-full w-2/3 animate-pulse rounded-full bg-ink" />

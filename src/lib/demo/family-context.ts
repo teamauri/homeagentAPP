@@ -47,17 +47,17 @@ export const demoFamilyContext = {
   },
   teamMembers: [
     {
-      id: "iris",
+      id: "cameraman",
       name: "Cameraman",
       handles: ["films firsts", "robot clips", "family album", "photo highlights", "video receipts"],
     },
     {
-      id: "lumi",
+      id: "companion",
       name: "Companion",
       handles: ["reading", "books", "questions", "reading moments"],
     },
     {
-      id: "vita",
+      id: "homekeeper",
       name: "Housekeeper",
       handles: ["calendar", "reminders", "school emails", "logs", "meds", "naps", "appointments", "family logistics"],
     },

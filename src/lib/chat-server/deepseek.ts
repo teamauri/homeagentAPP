@@ -14,7 +14,7 @@ const cardContract = {
 };
 const objectContract = {
   type: "calendar_draft | reminder_draft | baby_log | memory_item | story_draft | lesson_recap",
-  payload: "object",
+  payload: "object. For scheduled cameraman capture, include payload.agent = \"cameraman\" and payload.recordingMode = \"cameraman_highlight\". For homekeeper reminders, use payload.agent = \"homekeeper\"; do not use \"reminder\" as an agent id.",
 };
 
 const responseContract = {
@@ -24,7 +24,7 @@ const responseContract = {
   reply: "string (Auri speaking)",
   cards: [cardContract],
   objectsToCreate: [objectContract],
-  helper: "optional, only when a helper takes a task: { teamMemberId: iris|lumi|vita|nova, name: string, reply: string, cards: [card], objectsToCreate: [object] }",
+  helper: "optional, only when a helper takes a task: { teamMemberId: cameraman|companion|homekeeper|nova, name: string, reply: string, cards: [card], objectsToCreate: [object] }",
   suggestedFollowups: ["string"],
 };
 

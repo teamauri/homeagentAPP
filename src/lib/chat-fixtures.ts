@@ -2,7 +2,7 @@ import { ChatAIResponse, ChatCard, ChatMessage } from "./chat-contracts";
 
 // The family group = the task board. This mirrors the canonical group-chat
 // story from the AURI product site: Mom/Dad plus the in-group teammates
-// Vita (keeper), Iris (the eye), Lumi (reads).
+// Reminder (keeper), Cameraman (the eye), Companion (reads).
 export const prdV6ChatCardFixtures: ChatCard[] = [
   {
     id: "medicine-receipt",
@@ -66,7 +66,7 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     kind: "memory",
     icon: "book",
     typeLabel: "Reading moment",
-    title: "Goodnight Moon with Lumi",
+    title: "Goodnight Moon with Companion",
     body: "Mia asked where the mouse went 🐭",
     metadata: ["Reading", "Tonight", "Mia"],
     action: { label: "View", intent: "view" },
@@ -90,10 +90,10 @@ export const chatFixtureMessages: ChatMessage[] = [
     text: "Did Mia take her 2pm meds?",
   },
   {
-    id: "vita-meds",
+    id: "homekeeper-meds",
     role: "helper",
-    sender: "Vita",
-    avatar: "vita",
+    sender: "Reminder",
+    avatar: "homekeeper",
     timeLabel: "2:04 PM",
     text: "Yes — 2:04 PM. ✓",
     cards: [cardById["medicine-receipt"]],
@@ -107,10 +107,10 @@ export const chatFixtureMessages: ChatMessage[] = [
     text: "Film her if she does something today 🙏",
   },
   {
-    id: "iris-film",
+    id: "cameraman-film",
     role: "helper",
-    sender: "Iris",
-    avatar: "iris",
+    sender: "Cameraman",
+    avatar: "cameraman",
     timeLabel: "5:12 PM",
     text: "She walked! 🎉 Three steps to the couch.",
     cards: [cardById["first-steps-film"]],
@@ -124,28 +124,28 @@ export const chatFixtureMessages: ChatMessage[] = [
     text: "AHHH 😭 watching now",
   },
   {
-    id: "vita-checkup",
+    id: "homekeeper-checkup",
     role: "helper",
-    sender: "Vita",
-    avatar: "vita",
+    sender: "Reminder",
+    avatar: "homekeeper",
     timeLabel: "5:20 PM",
     text: "📅 Leo’s checkup tomorrow, 9:30 AM — added to your calendar.",
     cards: [cardById["checkup-calendar"]],
   },
   {
-    id: "lumi-reading",
+    id: "companion-reading",
     role: "helper",
-    sender: "Lumi",
-    avatar: "lumi",
+    sender: "Companion",
+    avatar: "companion",
     timeLabel: "8:10 PM",
     text: "Mia and I read Goodnight Moon — she asked where the mouse went 🐭",
     cards: [cardById["reading-moment"]],
   },
   {
-    id: "vita-routine",
+    id: "homekeeper-routine",
     role: "helper",
-    sender: "Vita",
-    avatar: "vita",
+    sender: "Reminder",
+    avatar: "homekeeper",
     timeLabel: "7:33 AM",
     text: "On it — walking Leo through the morning routine.",
     cards: [cardById["morning-routine"]],

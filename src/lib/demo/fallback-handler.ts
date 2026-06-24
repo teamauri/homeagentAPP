@@ -47,6 +47,29 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
   }
 
   // 2) Actionable → Auri frames + a helper takes the task (second voice).
+  if (/拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(input)) {
+    const timeMatch = request.message?.match(/(\d{1,2})[:：](\d{2})/) ?? null;
+    const timeLabel = timeMatch ? `${timeMatch[1]}:${timeMatch[2]} PM` : "8:00 PM";
+    const title = request.message?.replace(/今晚|今天|today|tonight/gi, "").replace(/\d{1,2}[:：]\d{2}/, "").trim() || "Capture family moment";
+    const helper: ChatHelperSegment = {
+      teamMemberId: "cameraman",
+      name: "Cameraman",
+      reply: `收到，我会在今晚${timeLabel.replace(" PM", "")}拍下这个瞬间。`,
+      cards: [
+        {
+          type: "reminder",
+          title,
+          subtitle: `Today · ${timeLabel} · Mia`,
+          body: "Scheduled camera capture",
+          cta: "Edit",
+          metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "mia", agent: "cameraman", recordingMode: "cameraman_highlight" },
+        },
+      ],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title, timeLabel, dateLabel: "Today", person: "mia", agent: "cameraman", recordingMode: "cameraman_highlight", note: request.message } }],
+    };
+    return auri("交给 Cameraman 来拍这个瞬间。", { intent: "photo_video", helper, suggestedFollowups: ["改时间", "拍完自动保存到 Memory"] });
+  }
+
   if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {
     // Detect "now / 现在" — use the current time rather than the hardcoded 2 PM slot.
     const isNow = input.includes("now") || input.includes("现在") || input.includes("立刻") || input.includes("马上");
@@ -61,11 +84,11 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       auriReply = `好的，我来帮Mia设置吃药提醒。她正在完成10天的疗程，现在该吃${timeLabel}的药了。`;
     } else {
       timeLabel = "2:00 PM";
-      auriReply = "Of course — I'll have Vita keep this on the radar.";
+      auriReply = "Of course — I'll have Homekeeper keep this on the radar.";
     }
     const helper: ChatHelperSegment = {
-      teamMemberId: "vita",
-      name: "Vita the keeper",
+      teamMemberId: "homekeeper",
+      name: "Homekeeper",
       reply: `已为您创建提醒：Mia${isNow ? "现在" : "下午2点"}吃药。`,
       cards: [
         {
@@ -84,8 +107,8 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
 
   if (input.includes("calendar") || input.includes("appointment") || input.includes("basketball") || input.includes("checkup") || input.includes("5:30")) {
     const helper: ChatHelperSegment = {
-      teamMemberId: "vita",
-      name: "Vita the keeper",
+      teamMemberId: "homekeeper",
+      name: "Homekeeper",
       reply: "I created a calendar draft for the whole family to confirm.",
       cards: [
         {
@@ -99,13 +122,13 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "calendar_draft", payload: { title: "Basketball game", person: "leo", dateLabel: "Friday", timeLabel: "5:30 PM" } }],
     };
-    return auri("Got it — Vita will add it to the family calendar.", { intent: "calendar_event", helper, suggestedFollowups: ["Add Dad as pickup", "Add a reminder"] });
+    return auri("Got it — Homekeeper will add it to the family calendar.", { intent: "calendar_event", helper, suggestedFollowups: ["Add Dad as pickup", "Add a reminder"] });
   }
 
   if (input.includes("read") || input.includes("book") || input.includes("dinosaur")) {
     const helper: ChatHelperSegment = {
-      teamMemberId: "lumi",
-      name: "Lumi the companion",
+      teamMemberId: "companion",
+      name: "Companion",
       reply: "I saved this as a reading moment — Mia's really into dinosaurs and volcanoes lately.",
       cards: [
         {
@@ -119,13 +142,13 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "memory_item", payload: { person: "mia", title: "Dinosaur Day", sourceType: "reading", topics: ["dinosaurs"] } }],
     };
-    return auri("Lovely — Lumi will keep that with Mia's reading.", { intent: "reading", helper, suggestedFollowups: ["Find another dinosaur book", "Add to Memory"] });
+    return auri("Lovely — Companion will keep that with Mia's reading.", { intent: "reading", helper, suggestedFollowups: ["Find another dinosaur book", "Add to Memory"] });
   }
 
   if (input.includes("photo") || input.includes("album") || input.includes("video") || input.includes("clip")) {
     const helper: ChatHelperSegment = {
-      teamMemberId: "iris",
-      name: "Iris the eye",
+      teamMemberId: "cameraman",
+      name: "Cameraman",
       reply: "I pulled together the best moments and made a warm draft to share.",
       cards: [
         {
@@ -139,7 +162,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "story_draft", payload: { audience: "family", clips: 2, photos: 14, title: "This week with the kids" } }],
     };
-    return auri("On it — Iris will put the best bits together.", { intent: "photo_video", helper, suggestedFollowups: ["Make it shorter", "Add the soccer clip"] });
+    return auri("On it — Cameraman will put the best bits together.", { intent: "photo_video", helper, suggestedFollowups: ["Make it shorter", "Add the soccer clip"] });
   }
 
   // 3) Default — warm, not a menu of tasks.

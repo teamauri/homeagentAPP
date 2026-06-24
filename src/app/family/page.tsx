@@ -185,7 +185,7 @@ export default function FamilySettingsPage() {
               <div className="mt-6 border-t border-line pt-5">
                 <p className="text-[13px] font-semibold text-ink">Journey</p>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                  Add photos from your camera roll to Journey. Iris will organize them by child and day.
+                  Add photos from your camera roll to Journey. Cameraman will organize them by child and day.
                 </p>
                 <button
                   onClick={() => organizeRef.current?.click()}

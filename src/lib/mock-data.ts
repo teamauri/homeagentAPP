@@ -2,7 +2,7 @@ import type { FamilyMemberProfile } from "./family/profile";
 import { CalendarEvent, Moment, NeedItem, Suggestion } from "./types";
 
 // Seed content for the calm "Today" inbox and the "Memory" timeline.
-// Aligned with the AURI teammates: Iris (films/album), Lumi (reads), Vita (keeper).
+// Aligned with the AURI teammates: Cameraman (films/album), Companion (reads), Reminder (keeper).
 // All exports are getter functions that accept children from the live family store.
 
 function childByProfile(
@@ -23,8 +23,8 @@ export function getMockNeeds(children: FamilyMemberProfile[]): NeedItem[] {
       id: "medicine-receipt",
       icon: "bell",
       title: `${mc}'s medicine — confirm`,
-      body: "Vita set the daily 2pm reminder. Approve the video receipt.",
-      helper: "Vita",
+      body: "Homekeeper set the daily 2pm reminder. Approve the video receipt.",
+      helper: "Reminder",
       actionLabel: "Review",
       status: "needs-review",
     },
@@ -32,8 +32,8 @@ export function getMockNeeds(children: FamilyMemberProfile[]): NeedItem[] {
       id: "family-album",
       icon: "camera-note",
       title: "This week's album is ready",
-      body: "Iris pulled the best moments from your photos.",
-      helper: "Iris",
+      body: "Cameraman pulled the best moments from your photos.",
+      helper: "Cameraman",
       actionLabel: "Open draft",
       status: "draft",
     },
@@ -41,8 +41,8 @@ export function getMockNeeds(children: FamilyMemberProfile[]): NeedItem[] {
       id: "checkup",
       icon: "calendar",
       title: `${sc}'s checkup`,
-      body: "Vita found an appointment waiting for your decision.",
-      helper: "Vita",
+      body: "Reminder found an appointment waiting for your decision.",
+      helper: "Reminder",
       actionLabel: "Review",
       status: "needs-review",
     },
@@ -54,9 +54,9 @@ export function getMockSuggestions(children: FamilyMemberProfile[]): Suggestion[
   const bc = booksChild?.name ?? "your child";
   return [
     { id: "pick-photo", helper: "You", icon: "person", text: "Pick one family photo for Friday" },
-    { id: "make-album", helper: "Iris", icon: "spark", text: "Make a family album from this week's photos" },
-    { id: "dino-insight", helper: "Lumi", icon: "book", text: `${bc} keeps choosing dinosaur books — suggest one more` },
-    { id: "family-conflicts", helper: "Vita", icon: "calendar", text: "Check if this week has any family conflicts" },
+    { id: "make-album", helper: "Cameraman", icon: "spark", text: "Make a family album from this week's photos" },
+    { id: "dino-insight", helper: "Companion", icon: "book", text: `${bc} keeps choosing dinosaur books — suggest one more` },
+    { id: "family-conflicts", helper: "Reminder", icon: "calendar", text: "Check if this week has any family conflicts" },
   ];
 }
 
@@ -112,7 +112,7 @@ export function getMockUpcoming(children: FamilyMemberProfile[]): CalendarEvent[
       person: bcId,
       dateLabel: "Saturday",
       timeLabel: "10:00 AM",
-      body: "Lumi lined up two dinosaur picks for after.",
+      body: "Companion lined up two dinosaur picks for after.",
       icon: "book",
       status: "prepared",
       statusLabel: "Prepared",
@@ -134,7 +134,7 @@ export function getMockUpcoming(children: FamilyMemberProfile[]): CalendarEvent[
       person: "family",
       dateLabel: "Sunday",
       timeLabel: "7:30 PM",
-      body: "Iris has 2 clips from this week ready to share.",
+      body: "Cameraman has 2 clips from this week ready to share.",
       icon: "video-heart",
       status: "ready",
       statusLabel: "Ready",
@@ -183,7 +183,7 @@ export function getMockMoments(children: FamilyMemberProfile[]): Moment[] {
       sourceLabel: "Auri Robot",
       sourceType: "auri",
       title: "She walked!",
-      body: "Three steps to the couch. Iris caught the whole thing.",
+      body: "Three steps to the couch. Cameraman caught the whole thing.",
       person: bcId,
       status: "ready",
       statusLabel: "Ready",
@@ -196,7 +196,7 @@ export function getMockMoments(children: FamilyMemberProfile[]): Moment[] {
       sourceLabel: "Phone",
       sourceType: "phone",
       title: "This week with the kids",
-      body: "Iris organized 24 photos into one warm album.",
+      body: "Cameraman organized 24 photos into one warm album.",
       person: "family",
       status: "draft",
       statusLabel: "Draft",
