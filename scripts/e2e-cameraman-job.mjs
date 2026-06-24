@@ -108,7 +108,32 @@ async function withFakeAuriVlogServer(fn) {
   const videoBytes = Buffer.from("fake cameraman highlight mp4 bytes");
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, "http://localhost");
+    if (req.method === "GET" && url.pathname === "/v1/videos/video-e2e-recovered/vlogs") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        video_id: "video-e2e-recovered",
+        items: [{
+          vlog_id: "vlog-e2e-recovered",
+          video_id: "video-e2e-recovered",
+          timeline_id: "timeline-e2e-recovered",
+          status: "READY",
+          stage: "ready",
+          progress: 1,
+          expected_clips: 1,
+          received_clips: 1,
+        }],
+        count: 1,
+        limit: 20,
+        filters: {},
+      }));
+      return;
+    }
     if (req.method === "GET" && url.pathname === "/v1/videos/video-e2e-cameraman/vlogs/vlog-e2e-cameraman/download") {
+      res.writeHead(200, { "content-type": "video/mp4", "content-length": String(videoBytes.length) });
+      res.end(videoBytes);
+      return;
+    }
+    if (req.method === "GET" && url.pathname === "/v1/videos/video-e2e-recovered/vlogs/vlog-e2e-recovered/download") {
       res.writeHead(200, { "content-type": "video/mp4", "content-length": String(videoBytes.length) });
       res.end(videoBytes);
       return;
@@ -158,6 +183,7 @@ process.on("uncaughtException", async (error) => {
 const cameramanTaskId = `${e2ePrefix}_highlight`;
 const agentOnlyTaskId = `${e2ePrefix}_agent_only`;
 const missingIdsTaskId = `${e2ePrefix}_missing_ids`;
+const recoveredVlogTaskId = `${e2ePrefix}_recovered_vlog`;
 
 try {
   const createCameramanResponse = await postJson(calendarRoute, "http://localhost/api/calendar", {
@@ -290,10 +316,55 @@ try {
   assert(agentOnlySyncResponse.status === 409, "cameraman e2e: agent-only task must not enter highlight sync", agentOnlySyncPayload);
   assert(agentOnlySyncPayload.outcome === "not_cameraman", "cameraman e2e: expected not_cameraman for agent-only task", agentOnlySyncPayload);
 
+  const createRecoveredVlogResponse = await postJson(calendarRoute, "http://localhost/api/calendar", {
+    id: recoveredVlogTaskId,
+    title: "E2E cameraman recovered vlog",
+    note: "HomeAgent should recover vlogId from Auri when DockKit only reports videoId.",
+    person: "mia",
+    dateLabel: "Today",
+    timeLabel: "11:56 PM",
+    forRobot: true,
+    agent: "cameraman",
+    recordingMode: "cameraman_highlight",
+  });
+  const createRecoveredVlogPayload = await jsonFromResponse(createRecoveredVlogResponse);
+  cleanupIds.push(recoveredVlogTaskId);
+  assert(createRecoveredVlogResponse.status === 201, "cameraman e2e: expected recovered-vlog create 201", createRecoveredVlogPayload);
+
+  const recoveredVlogStatusResponse = await postJson(
+    robotStatusRoute,
+    `http://localhost/api/robot/capture-tasks/${encodeURIComponent(recoveredVlogTaskId)}/status`,
+    {
+      status: "uploaded",
+      robotId: "dockkit_e2e",
+      auriVideoId: "video-e2e-recovered",
+      recordingMode: "cameraman_highlight",
+      durationSeconds: 17,
+      startedAt: "2026-06-24T04:04:00Z",
+      uploadedAt: "2026-06-24T04:05:00Z",
+    },
+    { taskId: recoveredVlogTaskId }
+  );
+  assert(recoveredVlogStatusResponse.status === 200, "cameraman e2e: expected recovered-vlog status 200", await jsonFromResponse(recoveredVlogStatusResponse));
+
+  await withFakeAuriVlogServer(async () => {
+    const recoveredVlogSyncResponse = await postJson(
+      highlightSyncRoute,
+      `http://localhost/api/robot/capture-tasks/${encodeURIComponent(recoveredVlogTaskId)}/highlight/sync`,
+      {},
+      { taskId: recoveredVlogTaskId }
+    );
+    const recoveredVlogSyncPayload = await jsonFromResponse(recoveredVlogSyncResponse);
+    assert(recoveredVlogSyncResponse.status === 200, "cameraman e2e: expected recovered-vlog sync 200", recoveredVlogSyncPayload);
+    assert(recoveredVlogSyncPayload.outcome === "ready", "cameraman e2e: expected recovered-vlog ready", recoveredVlogSyncPayload);
+    assert(recoveredVlogSyncPayload.event?.robot?.vlogId === "vlog-e2e-recovered", "cameraman e2e: expected sync to persist recovered vlogId", recoveredVlogSyncPayload.event);
+    assert(recoveredVlogSyncPayload.metadata?.recoveredVlogId === true, "cameraman e2e: expected recoveredVlogId metadata", recoveredVlogSyncPayload);
+  });
+
   const createMissingIdsResponse = await postJson(calendarRoute, "http://localhost/api/calendar", {
     id: missingIdsTaskId,
     title: "E2E cameraman missing ids",
-    note: "Cameraman pipeline should wait for both videoId and vlogId.",
+    note: "Cameraman pipeline should wait for a videoId before querying Auri.",
     person: "mia",
     dateLabel: "Today",
     timeLabel: "11:57 PM",
@@ -305,21 +376,6 @@ try {
   cleanupIds.push(missingIdsTaskId);
   assert(createMissingIdsResponse.status === 201, "cameraman e2e: expected missing-ids create 201", createMissingIdsPayload);
 
-  const missingIdsStatusResponse = await postJson(
-    robotStatusRoute,
-    `http://localhost/api/robot/capture-tasks/${encodeURIComponent(missingIdsTaskId)}/status`,
-    {
-      status: "uploaded",
-      robotId: "dockkit_e2e",
-      auriVideoId: "video-e2e-missing-ids",
-      recordingMode: "cameraman_highlight",
-      startedAt: "2026-06-24T04:04:00Z",
-      uploadedAt: "2026-06-24T04:05:00Z",
-    },
-    { taskId: missingIdsTaskId }
-  );
-  assert(missingIdsStatusResponse.status === 200, "cameraman e2e: expected missing-ids status 200", await jsonFromResponse(missingIdsStatusResponse));
-
   const missingIdsSyncResponse = await postJson(
     highlightSyncRoute,
     `http://localhost/api/robot/capture-tasks/${encodeURIComponent(missingIdsTaskId)}/highlight/sync`,
@@ -327,8 +383,8 @@ try {
     { taskId: missingIdsTaskId }
   );
   const missingIdsSyncPayload = await jsonFromResponse(missingIdsSyncResponse);
-  assert(missingIdsSyncResponse.status === 409, "cameraman e2e: missing vlog id should block highlight sync", missingIdsSyncPayload);
-  assert(missingIdsSyncPayload.outcome === "missing_ids", "cameraman e2e: expected missing_ids without vlogId", missingIdsSyncPayload);
+  assert(missingIdsSyncResponse.status === 409, "cameraman e2e: missing video id should block highlight sync", missingIdsSyncPayload);
+  assert(missingIdsSyncPayload.outcome === "missing_ids", "cameraman e2e: expected missing_ids without videoId", missingIdsSyncPayload);
 
   await cleanup();
   console.log(JSON.stringify({
@@ -340,7 +396,8 @@ try {
       "highlight sync downloads fake rendered vlog and creates Memory media",
       "highlight sync is idempotent",
       "agent-only cameraman task is rejected by highlight sync",
-      "cameraman_highlight task without vlogId returns missing_ids",
+      "cameraman_highlight task without vlogId recovers a READY backend vlog",
+      "cameraman_highlight task without videoId returns missing_ids",
     ],
   }, null, 2));
 } catch (error) {

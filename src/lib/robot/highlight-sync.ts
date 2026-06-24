@@ -34,7 +34,7 @@ function isRetryableHighlightLookupError(error: unknown) {
 }
 
 function isCameramanEvent(event: CalendarApiEvent) {
-  return event.robot?.recordingMode === "cameraman_highlight";
+  return event.recordingMode === "cameraman_highlight" || event.robot?.recordingMode === "cameraman_highlight";
 }
 
 function alreadySyncedResult(event: CalendarApiEvent): HighlightSyncResult {
@@ -47,6 +47,29 @@ function alreadySyncedResult(event: CalendarApiEvent): HighlightSyncResult {
     mediaUrl: event.robot?.highlightVideoUrl,
     metadata: { provider: "local-demo-store", alreadySynced: true },
   };
+}
+
+async function resolveVlogIdForHighlight(event: CalendarApiEvent, videoId: string, client: AuriClient) {
+  const storedVlogId = event.robot?.vlogId;
+  if (storedVlogId) return { vlogId: storedVlogId, event, recovered: false };
+
+  const vlogs = await client.listVlogs(videoId, { limit: 20 });
+  const ready = vlogs.find((vlog) => vlog.status === "READY" && vlog.vlogId.trim());
+  if (!ready) return { vlogId: undefined, event, recovered: false };
+
+  const updated = updateDemoCalendarRobotStatus(event.id, {
+    status: event.robot?.status ?? "uploaded",
+    auriVideoId: videoId,
+    auriClientVideoUuid: event.robot?.auriClientVideoUuid ?? event.auriClientVideoUuid,
+    recordingMode: "cameraman_highlight",
+    vlogId: ready.vlogId,
+    durationSeconds: event.robot?.durationSeconds ?? ready.storyBudgetSeconds,
+    startedAt: event.robot?.startedAt,
+    uploadedAt: event.robot?.uploadedAt ?? new Date().toISOString(),
+  });
+  await persistDemoStore();
+
+  return { vlogId: ready.vlogId, event: updated ?? event, recovered: true };
 }
 
 export async function syncHighlightForTask(taskId: string, client = new AuriClient()): Promise<HighlightSyncResult> {
@@ -73,35 +96,55 @@ async function syncHighlightForTaskUnlocked(taskId: string, client: AuriClient):
     return { outcome: "not_cameraman", httpStatus: 409, event, error: "Capture task is not a cameraman highlight job" };
   }
 
-  const robot = event.robot;
+  let robot = event.robot;
   const videoId = robot?.auriVideoId;
-  const vlogId = robot?.vlogId;
-  if (!videoId || !vlogId) {
-    return { outcome: "missing_ids", httpStatus: 409, event, error: "Capture task has no Auri video id or vlog id" };
+  if (!videoId) {
+    return { outcome: "missing_ids", httpStatus: 409, event, error: "Capture task has no Auri video id" };
   }
   if (robot?.highlightMemoryId && robot.highlightVideoUrl) {
     return alreadySyncedResult(event);
   }
 
   try {
+    const resolved = await resolveVlogIdForHighlight(event, videoId, client);
+    const vlogId = resolved.vlogId;
+    const syncEvent = resolved.event;
+    robot = syncEvent.robot;
+    if (!vlogId) {
+      const updated = updateDemoCalendarRobotStatus(event.id, {
+        status: robot?.status ?? "uploaded",
+        highlightError: "Auri cameraman highlight is not ready yet",
+        highlightSyncedAt: new Date().toISOString(),
+      });
+      await persistDemoStore();
+
+      return {
+        outcome: "pending",
+        httpStatus: 202,
+        event: updated ?? syncEvent,
+        error: "Auri cameraman highlight is not ready yet",
+        metadata: { provider: "local-demo-store", missingVlogId: true },
+      };
+    }
+
     const result = await ingestRenderedVlog({
       videoId,
       vlogId,
       durationSeconds: robot?.durationSeconds,
-      title: event.title,
-      person: event.person,
+      title: syncEvent.title,
+      person: syncEvent.person,
       body: "An Auri Cameraman highlight is ready.",
       tags: ["auri-cameraman", "highlight"],
       ingestMode: "auri-cameraman",
       metadata: {
-        captureTaskId: event.id,
+        captureTaskId: syncEvent.id,
         recordingMode: robot?.recordingMode,
       },
       client,
     });
 
     const now = new Date().toISOString();
-    const updated = updateDemoCalendarRobotStatus(event.id, {
+    const updated = updateDemoCalendarRobotStatus(syncEvent.id, {
       status: "done",
       highlightMemoryId: result.memoryId,
       highlightVideoUrl: result.mediaUrl,
@@ -117,7 +160,7 @@ async function syncHighlightForTaskUnlocked(taskId: string, client: AuriClient):
       media: result.media,
       memoryId: result.memoryId,
       mediaUrl: result.mediaUrl,
-      metadata: { provider: "local-demo-store" },
+      metadata: { provider: "local-demo-store", recoveredVlogId: resolved.recovered },
     };
   } catch (error) {
     const retryable = isRetryableHighlightLookupError(error);

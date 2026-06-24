@@ -127,6 +127,13 @@ export interface VlogStatusResponse {
   error?: unknown;
 }
 
+interface RawVlogList {
+  video_id: string;
+  items?: RawVlog[];
+  count?: number;
+  limit?: number;
+}
+
 export type RawOutputTranscriptFormat = "json" | "txt";
 export type RawOutputJobStatus = "pending" | "processing" | "ready" | "failed" | (string & {});
 
@@ -363,6 +370,15 @@ export class AuriClient {
   /** GET /v1/videos/{id}/vlogs/{vlogId} */
   async fetchVlogStatus(videoId: string, vlogId: string, includeDiagnostics = false): Promise<VlogStatusResponse> {
     return mapVlog(await this.requestJSON<RawVlog>("GET", this.v1(`/videos/${videoId}/vlogs/${vlogId}`, { include_diagnostics: includeDiagnostics })));
+  }
+
+  /** GET /v1/videos/{id}/vlogs */
+  async listVlogs(videoId: string, opts: { limit?: number; status?: VlogStatus } = {}): Promise<VlogStatusResponse[]> {
+    const data = await this.requestJSON<RawVlogList>(
+      "GET",
+      this.v1(`/videos/${videoId}/vlogs`, { limit: opts.limit ?? 20, status: opts.status }),
+    );
+    return (data.items ?? []).map(mapVlog);
   }
 
   /** GET /v1/videos/{id}/vlogs/{vlogId}/download → mp4 bytes */
