@@ -1,5 +1,5 @@
 // Functional robot agents. Keep IDs literal so routing is obvious in logs/API data.
-export type TeamAgentId = "cameraman" | "companion" | "homekeeper" | "nova" | "auri";
+export type TeamAgentId = "cameraman" | "companion" | "homekeeper" | "coach" | "auri";
 
 export type TeamAgentScope = "group" | "private" | "device";
 
@@ -46,7 +46,7 @@ export const teamAgents: TeamAgent[] = [
     scope: "group",
   },
   {
-    id: "nova",
+    id: "coach",
     name: "Coach",
     role: "The coach — your home workout",
     shortRole: "Your coach",
@@ -69,3 +69,14 @@ export const teamAgents: TeamAgent[] = [
 
 export const teamAgentById = Object.fromEntries(teamAgents.map((agent) => [agent.id, agent])) as Record<TeamAgentId, TeamAgent>;
 export const teamAgentByName = Object.fromEntries(teamAgents.map((agent) => [agent.name, agent])) as Record<string, TeamAgent>;
+
+export function normalizeTeamAgentId(value: unknown): TeamAgentId | undefined {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "iris") return "cameraman";
+  if (raw === "lumi") return "companion";
+  if (raw === "vita" || raw === "keeper" || raw === "reminder") return "homekeeper";
+  if (raw === "nova") return "coach";
+  if (raw === "coach") return "coach";
+  if (raw === "cameraman" || raw === "companion" || raw === "homekeeper" || raw === "auri") return raw;
+  return undefined;
+}

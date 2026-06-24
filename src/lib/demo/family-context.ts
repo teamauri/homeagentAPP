@@ -62,7 +62,7 @@ export const demoFamilyContext = {
       handles: ["calendar", "reminders", "school emails", "logs", "meds", "naps", "appointments", "family logistics"],
     },
     {
-      id: "nova",
+      id: "coach",
       name: "Coach",
       handles: ["home workout", "quick sets", "form", "reps"],
     },

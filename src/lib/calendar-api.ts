@@ -5,7 +5,7 @@ export type CalendarApiEventSource = "seed" | "created";
 export type CalendarApiEventStatus = Status | "scheduled" | "recording" | "uploading" | "uploaded" | "done" | "failed";
 export type CalendarRobotCaptureStatus = "scheduled" | "recording" | "uploading" | "uploaded" | "done" | "failed";
 export type CalendarRawOutputStatus = "pending" | "processing" | "ready" | "failed";
-export type CalendarJobAgentId = Extract<TeamAgentId, "cameraman" | "companion" | "homekeeper">;
+export type CalendarJobAgentId = Exclude<TeamAgentId, "auri">;
 
 export interface CalendarRobotCaptureState {
   status: CalendarRobotCaptureStatus;

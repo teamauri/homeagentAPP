@@ -19,13 +19,13 @@ const TEMPLATES: Template[] = [
   { type: "activity", agent: "companion", label: "Activity", blurb: "A daily activity", sched: "window" },
   { type: "routine", agent: "homekeeper", label: "Routine", blurb: "A checklist to done", sched: "alarm" },
   { type: "checkin", agent: "homekeeper", label: "Check-in", blurb: "Confirm it got done", sched: "alarm" },
-  { type: "workout", agent: "nova", label: "Workout", blurb: "A home workout", sched: "window" },
+  { type: "workout", agent: "coach", label: "Workout", blurb: "A home workout", sched: "window" },
 ];
 
 // Group templates under the teammate that runs them — so "two jobs per agent"
 // reads as intentional (Cameraman does Highlight + Home watch) instead of looking
 // like duplicate cards. Each job card leads with its own distinct job icon.
-const AGENT_ORDER: TeamAgentId[] = ["cameraman", "companion", "homekeeper", "nova"];
+const AGENT_ORDER: TeamAgentId[] = ["cameraman", "companion", "homekeeper", "coach"];
 const TEMPLATE_GROUPS = AGENT_ORDER.map((agent) => ({ agent, items: TEMPLATES.filter((t) => t.agent === agent) })).filter((g) => g.items.length);
 
 function fmtTime(hhmm: string) {

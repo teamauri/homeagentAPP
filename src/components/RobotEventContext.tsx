@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deriveCalendarEventIcon, type CalendarApiEvent } from "@/lib/calendar-api";
 import type { PersonId } from "@/lib/types";
-import type { TeamAgentId } from "@/lib/team";
+import { normalizeTeamAgentId, type TeamAgentId } from "@/lib/team";
 import { deriveDateLabel, deriveTimeLabel, scheduledAtFromLabels } from "@/lib/job-time";
 
 // A "robot event" is a calendar event the parent hands to the Auri Robot: the
@@ -149,7 +149,13 @@ function durationLabel(seconds?: number) {
 function agentFromIcon(icon: string): TeamAgentId {
   if (icon === "camera-note") return "cameraman";
   if (icon === "book") return "companion";
+  if (icon === "soccer") return "coach";
   return "homekeeper";
+}
+
+function normalizeRobotAgent(value: unknown, icon: string): TeamAgentId {
+  const agent = normalizeTeamAgentId(value);
+  return agent && agent !== "auri" ? agent : agentFromIcon(icon);
 }
 
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
@@ -174,7 +180,7 @@ function eventFromApi(event: CalendarApiEvent): RobotEvent {
     dateLabel: deriveDateLabel(scheduledAt),
     timeLabel: deriveTimeLabel(scheduledAt),
     icon,
-    agent: event.agent ?? agentFromIcon(icon),
+    agent: normalizeRobotAgent(event.agent, icon),
     recordingMode: event.recordingMode ?? event.robot?.recordingMode,
     forRobot: event.forRobot,
     photoUrl: event.photoUrl,
@@ -293,7 +299,16 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
             ? e.scheduledAt
             : scheduledAtFromLabels(e.dateLabel, e.timeLabel) ?? Date.now();
           // Re-derive labels so a frozen "Today" from a prior day shows correctly.
-          return { ...e, status, scheduledAt, dateLabel: deriveDateLabel(scheduledAt), timeLabel: deriveTimeLabel(scheduledAt) };
+          const icon = e.icon || deriveEventIcon(e.title, e.person);
+          return {
+            ...e,
+            status,
+            scheduledAt,
+            dateLabel: deriveDateLabel(scheduledAt),
+            timeLabel: deriveTimeLabel(scheduledAt),
+            icon,
+            agent: normalizeRobotAgent(e.agent, icon),
+          };
         });
         // Keep every job — a past scheduled time is NOT a reason to delete. The
         // robot (DockKit) needs the job to stay on the server through and past
@@ -414,7 +429,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       timeLabel: deriveTimeLabel(scheduledAt),
       forRobot: input.forRobot,
       icon: deriveEventIcon(input.title, input.person),
-      agent: input.agent ?? "homekeeper",
+      agent: normalizeRobotAgent(input.agent, deriveEventIcon(input.title, input.person)),
       recordingMode: input.recordingMode,
       photoUrl: input.photoUrl,
       voiceUrl: input.voiceUrl,

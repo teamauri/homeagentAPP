@@ -7,6 +7,7 @@
     "build": "next build",
     "e2e:cameraman-job": "node scripts/e2e-cameraman-job.mjs",
     "smoke:calendar": "node scripts/smoke-calendar-api.mjs",
+    "smoke:chat-contract": "node scripts/smoke-chat-contract.mjs",
     "smoke:mvp": "node scripts/smoke-mvp.mjs",
     "start": "next start"
   },

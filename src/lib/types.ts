@@ -1,5 +1,5 @@
 export type TabKey = "today" | "chat" | "memory";
-export type Helper = "Cameraman" | "Companion" | "Reminder" | "Nova" | "You";
+export type Helper = "Cameraman" | "Companion" | "Reminder" | "Coach" | "You";
 export type PersonId = string;
 export type SourceType = "auri" | "phone" | "reading" | "calendar" | "photos" | "external";
 export type Status = "ready" | "prepared" | "needs-review" | "draft" | "saved" | "suggested" | "connected";

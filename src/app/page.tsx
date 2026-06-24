@@ -5,8 +5,8 @@ import { AppShell, TabKey } from "@/components/AppShell";
 import { JobsView } from "@/components/JobsView";
 import { ChatView, LiveChatTurn } from "@/components/ChatView";
 import { MomentsView } from "@/components/MomentsView";
-import { ChatApiResponse, TeamMemberId } from "@/lib/chat-server/types";
-import { teamAgentById } from "@/lib/team";
+import { ChatApiResponse } from "@/lib/chat-server/types";
+import { normalizeTeamAgentId, teamAgentById, type TeamAgentId } from "@/lib/team";
 import { FamilyProvider, useFamilyMember } from "@/components/FamilyContext";
 import { enrichCards } from "@/lib/chat-draft";
 
@@ -20,6 +20,21 @@ function nowLabel() {
 
 function displayHelperName(name: string) {
   return name.split(" the ")[0] || name;
+}
+
+function normalizeLiveAvatar(value: unknown): "mom" | "dad" | TeamAgentId {
+  if (value === "mom" || value === "dad") return value;
+  return normalizeTeamAgentId(value) ?? "auri";
+}
+
+function normalizeLiveTurn(turn: LiveChatTurn): LiveChatTurn {
+  const avatar = normalizeLiveAvatar(turn.avatar);
+  const agent = avatar === "mom" || avatar === "dad" ? undefined : teamAgentById[avatar];
+  return {
+    ...turn,
+    avatar,
+    sender: agent ? agent.name : turn.sender,
+  };
 }
 
 function HomeInner() {
@@ -43,7 +58,11 @@ function HomeInner() {
       const raw = sessionStorage.getItem("auri.liveTurns.v1");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setLiveTurns(parsed);
+        if (Array.isArray(parsed)) {
+          const migrated = parsed.map((turn) => normalizeLiveTurn(turn as LiveChatTurn));
+          sessionStorage.setItem("auri.liveTurns.v1", JSON.stringify(migrated));
+          setLiveTurns(migrated);
+        }
       }
     } catch {
       // ignore malformed storage
@@ -160,11 +179,12 @@ function HomeInner() {
         // where there is no helper.
         if (payload.helper) {
           const helper = payload.helper;
+          const helperAgent = normalizeLiveAvatar(helper.teamMemberId);
           const helperTurn: LiveChatTurn = {
             id: `helper-${sentAt}`,
-            sender: teamAgentById[helper.teamMemberId]?.name ?? displayHelperName(helper.name),
+            sender: helperAgent === "mom" || helperAgent === "dad" ? displayHelperName(helper.name) : teamAgentById[helperAgent].name,
             time: nowLabel(),
-            avatar: helper.teamMemberId,
+            avatar: helperAgent,
             text: helper.reply,
             cards: enrichCards(helper.cards, helper.objectsToCreate, payload.createdLocalObjects, payload.objectsToCreate?.length ?? 0),
             createdAt: sentAt,
@@ -173,17 +193,18 @@ function HomeInner() {
         }
 
         // No helper → Auri is the sole voice (advice / general question).
+        const handledAvatar = normalizeLiveAvatar(payload.handledByTeamMemberId);
         return current.map((turn) =>
           turn.id === pendingId
-            ? {
+            ? normalizeLiveTurn({
                 id: `auri-${sentAt}`,
-                sender: teamAgentById[payload.handledByTeamMemberId]?.name ?? displayHelperName(payload.handledByName),
+                sender: handledAvatar === "mom" || handledAvatar === "dad" ? displayHelperName(payload.handledByName) : teamAgentById[handledAvatar].name,
                 time: nowLabel(),
-                avatar: payload.handledByTeamMemberId,
+                avatar: handledAvatar,
                 text: payload.reply,
                 cards: enrichCards(payload.cards, payload.objectsToCreate, payload.createdLocalObjects, 0),
                 createdAt: sentAt,
-              }
+              })
             : turn
         );
       });

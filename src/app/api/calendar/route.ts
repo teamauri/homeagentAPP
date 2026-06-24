@@ -2,21 +2,17 @@ import { NextResponse } from "next/server";
 import { CalendarApiEvent, CalendarEventInput, type CalendarJobAgentId } from "@/lib/calendar-api";
 import { listDemoCalendarEvents, persistDemoStore, removeDemoCalendarEvent, upsertDemoCalendarEvent } from "@/lib/demo/demo-store";
 import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
+import { normalizeTeamAgentId } from "@/lib/team";
 import type { PersonId } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const personIds = new Set<PersonId>(["mia", "leo", "baby", "mom", "dad", "grandma", "family"]);
-const calendarAgentIds = new Set<CalendarJobAgentId>(["cameraman", "companion", "homekeeper"]);
+const calendarAgentIds = new Set<CalendarJobAgentId>(["cameraman", "companion", "homekeeper", "coach"]);
 
 function normalizeAgent(value: unknown): CalendarJobAgentId | undefined {
-  const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
-  const agent =
-    raw === "iris" ? "cameraman" :
-    raw === "lumi" ? "companion" :
-    raw === "vita" || raw === "reminder" ? "homekeeper" :
-    raw;
+  const agent = normalizeTeamAgentId(value);
   return calendarAgentIds.has(agent as CalendarJobAgentId) ? (agent as CalendarJobAgentId) : undefined;
 }
 

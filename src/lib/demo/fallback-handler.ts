@@ -70,6 +70,29 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     return auri("交给 Cameraman 来拍这个瞬间。", { intent: "photo_video", helper, suggestedFollowups: ["改时间", "拍完自动保存到 Memory"] });
   }
 
+  if (/记录|记一下|记下|log|logged|刚刚|刚才|已经|喝了|吃了|睡了|尿布|diaper|nap|slept|feed|fed|drank|temperature|体温/.test(input)) {
+    const person = input.includes("leo") || input.includes("里奥") ? "leo" : input.includes("mia") || input.includes("阿丽塔") ? "mia" : "baby";
+    const title = /fruit|水果/.test(input) ? "Snack: Fruit" : /water|喝水/.test(input) ? "Drink: Water" : "Care note";
+    const description = request.message?.trim() || "Care note";
+    const helper: ChatHelperSegment = {
+      teamMemberId: "homekeeper",
+      name: "Homekeeper",
+      reply: "已记录这条照护日志。",
+      cards: [
+        {
+          type: "baby_log",
+          title,
+          subtitle: person,
+          body: description,
+          cta: "Review",
+          metadata: { childId: person, type: "snack", description },
+        },
+      ],
+      objectsToCreate: [{ type: "baby_log", payload: { childId: person, type: "snack", description, timestamp: new Date().toISOString() } }],
+    };
+    return auri("我会让 Homekeeper 记下这条照护记录。", { intent: "baby_log", helper, suggestedFollowups: ["补充数量", "查看今天记录"] });
+  }
+
   if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {
     // Detect "now / 现在" — use the current time rather than the hardcoded 2 PM slot.
     const isNow = input.includes("now") || input.includes("现在") || input.includes("立刻") || input.includes("马上");

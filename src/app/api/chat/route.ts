@@ -5,6 +5,7 @@ import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
 import { ChatAIResponse, ChatApiResponse, ChatRequestBody, ChatResponseCard, ObjectToCreate, type TeamMemberId } from "@/lib/chat-server/types";
+import { normalizeTeamAgentId } from "@/lib/team";
 
 export const runtime = "nodejs";
 // Real model calls (DeepSeek/Gemini) can exceed the 10s default; raise it
@@ -29,6 +30,26 @@ function requestText(request: ChatRequestBody) {
 
 function wantsCameraCapture(request: ChatRequestBody) {
   return /拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(requestText(request));
+}
+
+function wantsExplicitCareLog(request: ChatRequestBody) {
+  const text = requestText(request);
+  return /记录|记一下|记下|log|logged|刚刚|刚才|已经|喝了|吃了|睡了|尿布|diaper|nap|slept|feed|fed|drank|temperature|体温/.test(text);
+}
+
+function wantsHomekeeperReminder(request: ChatRequestBody) {
+  const text = requestText(request);
+  if (wantsCameraCapture(request) || wantsExplicitCareLog(request)) return false;
+  return /提醒|记得|叫|让|该|去吃|去喝|吃水果|喝水|吃药|remind|reminder|should|time to|water|fruit|medicine|meds/.test(text);
+}
+
+function inferPersonFromRequest(request: ChatRequestBody) {
+  const text = requestText(request);
+  if (/leo|里奥/.test(text)) return "leo";
+  if (/mia|阿丽塔|alita/.test(text)) return "mia";
+  if (/mom|妈妈/.test(text)) return "mom";
+  if (/dad|爸爸/.test(text)) return "dad";
+  return "family";
 }
 
 function normalizeTimeLabel(value: unknown) {
@@ -68,6 +89,14 @@ function cameraCaptureTitle(request: ChatRequestBody) {
     .trim() || "视频拍摄请求";
 }
 
+function reminderTitle(request: ChatRequestBody) {
+  const raw = request.message?.trim() || "Reminder";
+  return raw
+    .replace(/^(请)?(帮我)?(提醒|记得|叫|让)\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim() || "Reminder";
+}
+
 function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
   const timeLabel = /现在|立刻|马上|\bnow\b/i.test(request.message ?? "") ? nowTimeLabel() : "8:00 PM";
   return {
@@ -79,6 +108,20 @@ function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
       person: "mia",
       agent: "cameraman",
       recordingMode: "cameraman_highlight",
+      note: request.message,
+    },
+  };
+}
+
+function homekeeperReminderObject(request: ChatRequestBody): ObjectToCreate {
+  return {
+    type: "reminder_draft",
+    payload: {
+      title: reminderTitle(request),
+      timeLabel: nowTimeLabel(),
+      dateLabel: "Today",
+      person: inferPersonFromRequest(request),
+      agent: "homekeeper",
       note: request.message,
     },
   };
@@ -132,7 +175,36 @@ function ensureCameraCaptureJob(response: ChatAIResponse, request: ChatRequestBo
 
 function normalizeRouting(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
   if (wantsCameraCapture(request)) return ensureCameraCaptureJob(forceHelperAgent(response, "cameraman"), request);
+  if (wantsHomekeeperReminder(request)) return ensureHomekeeperReminderJob(response, request);
   return response;
+}
+
+function ensureHomekeeperReminderJob(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
+  const helper = response.helper ?? {
+    teamMemberId: "homekeeper" as TeamMemberId,
+    name: "Homekeeper",
+    reply: "收到，我会把这个作为提醒来处理。",
+    cards: [],
+    objectsToCreate: [],
+  };
+  const draftObjects = helper.objectsToCreate.filter((object) => object.type === "reminder_draft" || object.type === "calendar_draft");
+  const objectsToCreate = draftObjects.length
+    ? objectsWithAgent(draftObjects, "homekeeper")
+    : [homekeeperReminderObject(request)];
+
+  return {
+    ...response,
+    intent: "reminder",
+    cards: [],
+    objectsToCreate: [],
+    helper: {
+      ...helper,
+      teamMemberId: "homekeeper",
+      name: "Homekeeper",
+      cards: synthesizeCardsFromObjects(objectsToCreate),
+      objectsToCreate,
+    },
+  };
 }
 
 async function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
@@ -162,10 +234,11 @@ function synthesizeCardsFromObjects(objects: ObjectToCreate[] | undefined): Chat
 }
 
 function objectsWithAgent(objects: ChatAIResponse["objectsToCreate"], agent?: TeamMemberId) {
-  if (!agent || !["cameraman", "companion", "homekeeper"].includes(agent)) return objects;
+  const helperAgent = normalizeAgentId(agent);
+  if (!helperAgent || helperAgent === "auri") return objects;
   return objects.map((object) => {
     if (object.type !== "reminder_draft" && object.type !== "calendar_draft") return object;
-    const normalizedAgent = normalizeAgentId(object.payload.agent) ?? agent;
+    const normalizedAgent = normalizeAgentId(object.payload.agent) ?? helperAgent;
     return {
       ...object,
       payload: {
@@ -184,12 +257,8 @@ function objectsWithAgent(objects: ChatAIResponse["objectsToCreate"], agent?: Te
 }
 
 function normalizeAgentId(value: unknown): TeamMemberId | undefined {
-  const raw = String(value || "").trim().toLowerCase();
-  if (raw === "iris") return "cameraman";
-  if (raw === "lumi") return "companion";
-  if (raw === "vita" || raw === "reminder") return "homekeeper";
-  if (["cameraman", "companion", "homekeeper"].includes(raw)) return raw as TeamMemberId;
-  return undefined;
+  const agent = normalizeTeamAgentId(value);
+  return agent === "auri" ? undefined : agent;
 }
 
 function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"], agent?: TeamMemberId) {

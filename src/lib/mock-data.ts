@@ -100,7 +100,7 @@ export function getMockUpcoming(children: FamilyMemberProfile[]): CalendarEvent[
       person: "family",
       dateLabel: "Friday",
       timeLabel: "6:30 PM",
-      body: "Nova can build a meal plan from your week.",
+      body: "Coach can build a meal plan from your week.",
       icon: "meal",
       status: "suggested",
       statusLabel: "Suggested",

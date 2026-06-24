@@ -1,5 +1,5 @@
 import type { PersonId } from "./types";
-import type { TeamAgentId } from "./team";
+import { normalizeTeamAgentId, type TeamAgentId } from "./team";
 import { todayAt } from "./job-time";
 
 // A "job" is something the family has set Auri to do. Two shapes:
@@ -12,7 +12,7 @@ import { todayAt } from "./job-time";
 
 // Each job type maps to the teammate that runs it: Cameraman (the eye) captures and
 // watches, Companion (the companion) reads and runs activities, Reminder (the keeper)
-// runs routines and check-ins, Nova (the coach) runs workouts.
+// runs routines and check-ins, Coach runs workouts.
 export type JobType = "highlight" | "watch" | "reading" | "activity" | "routine" | "checkin" | "workout" | "nudge";
 export type JobSource = "auri" | "todo" | "gcal";
 
@@ -54,11 +54,25 @@ export function loadStandingJobs(): StandingJob[] {
   try {
     const raw = localStorage.getItem(STANDING_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(parsed) && parsed.length) return parsed as StandingJob[];
+    if (Array.isArray(parsed) && parsed.length) {
+      const migrated = parsed.map((job) => ({
+        ...job,
+        agent: normalizeTeamAgentId(job.agent) ?? agentForJobType(job.type),
+      })) as StandingJob[];
+      localStorage.setItem(STANDING_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
   } catch {
     // ignore malformed storage
   }
   return seedStanding;
+}
+
+export function agentForJobType(type: JobType): TeamAgentId {
+  if (type === "highlight" || type === "watch") return "cameraman";
+  if (type === "reading" || type === "activity") return "companion";
+  if (type === "workout") return "coach";
+  return "homekeeper";
 }
 
 // The time a standing job's daily instance starts (window start, or the alarm).
@@ -72,7 +86,7 @@ export function standingScheduledAtToday(job: StandingJob, now: number = Date.no
 }
 
 // One standing job per teammate (at least). Cameraman ×2 (capture + watch),
-// Companion ×2 (reading + activity), Reminder ×2 (routine + check-in), Nova ×1 (workout).
+// Companion ×2 (reading + activity), Reminder ×2 (routine + check-in), Coach ×1 (workout).
 export const seedStanding: StandingJob[] = [
   {
     id: "evening-highlights",
@@ -137,7 +151,7 @@ export const seedStanding: StandingJob[] = [
   {
     id: "home-workout",
     type: "workout",
-    agent: "nova",
+    agent: "coach",
     title: "Home workout",
     trigger: "7 AM · Mom",
     person: "mom",

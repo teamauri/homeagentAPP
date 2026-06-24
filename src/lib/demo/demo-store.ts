@@ -9,6 +9,7 @@ import {
   deriveCalendarEventIcon,
 } from "@/lib/calendar-api";
 import { moments } from "@/lib/mock-data";
+import { normalizeTeamAgentId } from "@/lib/team";
 import { PersonId, SourceType, Status } from "@/lib/types";
 import { persistStore, registerStore } from "./persistence";
 
@@ -16,7 +17,7 @@ type StoredObject = CreatedLocalObject & { payload: Record<string, unknown>; cre
 type DemoObjectAction = "add" | "save" | "send" | "log" | "complete";
 type DemoMediaSource = "phone" | "auri";
 type DemoMediaType = "photo" | "video" | "clip";
-const calendarAgentIds = new Set<CalendarJobAgentId>(["cameraman", "companion", "homekeeper"]);
+const calendarAgentIds = new Set<CalendarJobAgentId>(["cameraman", "companion", "homekeeper", "coach"]);
 
 export interface DemoMediaInput {
   id?: string;
@@ -440,12 +441,7 @@ function toPersonId(value: unknown): PersonId {
 }
 
 function toCalendarJobAgent(value: unknown): CalendarJobAgentId | undefined {
-  const raw = String(value || "").trim().toLowerCase();
-  const agent =
-    raw === "iris" ? "cameraman" :
-    raw === "lumi" ? "companion" :
-    raw === "vita" || raw === "reminder" ? "homekeeper" :
-    raw;
+  const agent = normalizeTeamAgentId(value);
   return calendarAgentIds.has(agent as CalendarJobAgentId) ? (agent as CalendarJobAgentId) : undefined;
 }
 
