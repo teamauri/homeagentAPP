@@ -148,7 +148,7 @@ function HomeInner() {
         sender: "Auri",
         time: nowLabel(),
         avatar: "auri",
-        text: "Auri is thinking…",
+        text: "Just a second...",
         pending: true,
         createdAt: sentAt,
       },
@@ -214,10 +214,10 @@ function HomeInner() {
           turn.id === pendingId
             ? {
                 id: `helper-error-${sentAt}`,
-                sender: "Auri",
+                sender: "System",
                 time: nowLabel(),
                 avatar: "auri",
-                text: "I couldn’t reach the helper service. Try again in a moment.",
+                text: "Something took too long. Try again in a moment.",
                 createdAt: sentAt,
               }
             : turn

@@ -1,3 +1,5 @@
+import { helperTeamAgentIds, teamAgents } from "@/lib/team";
+
 const voiceProps = {
   cards: {
     type: "array",
@@ -32,7 +34,7 @@ export const chatResponseJsonSchema = {
   type: "object",
   properties: {
     // The primary voice is always Auri (the home agent that frames/answers).
-    handledByTeamMemberId: { type: "string", enum: ["cameraman", "companion", "homekeeper", "coach", "auri"] },
+    handledByTeamMemberId: { type: "string", enum: teamAgents.map((agent) => agent.id) },
     handledByName: { type: "string" },
     intent: {
       type: "string",
@@ -45,7 +47,7 @@ export const chatResponseJsonSchema = {
     helper: {
       type: "object",
       properties: {
-        teamMemberId: { type: "string", enum: ["cameraman", "companion", "homekeeper", "coach"] },
+        teamMemberId: { type: "string", enum: [...helperTeamAgentIds] },
         name: { type: "string" },
         reply: { type: "string" },
         ...voiceProps,

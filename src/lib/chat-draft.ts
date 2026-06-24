@@ -1,6 +1,6 @@
 import type { PersonId } from "@/lib/types";
 import type { ChatResponseCard, CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
-import { normalizeTeamAgentId, type TeamAgentId } from "@/lib/team";
+import { helperTeamAgentIds, normalizeTeamAgentId, type TeamAgentId } from "@/lib/team";
 
 // A reminder / calendar card Auri proposes in chat that the user can confirm
 // inline (no navigation). Confirming turns it into a real calendar event.
@@ -125,7 +125,7 @@ function humanizeWhen(payload: Record<string, unknown>): { dateLabel: string; ti
 }
 
 const BOILERPLATE = /draft ready|ready for review/i;
-const JOB_AGENT_IDS = new Set<TeamAgentId>(["cameraman", "companion", "homekeeper", "coach"]);
+const JOB_AGENT_IDS = new Set<TeamAgentId>(helperTeamAgentIds);
 
 function normalizeAgent(value: unknown): TeamAgentId | undefined {
   const agent = normalizeTeamAgentId(value);

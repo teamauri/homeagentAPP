@@ -1,7 +1,8 @@
 import { ChatAIResponse, ChatHelperSegment } from "./types";
+import { helperTeamAgentIds, teamAgents } from "@/lib/team";
 
-const teamMemberIds = new Set(["cameraman", "companion", "homekeeper", "coach", "auri"]);
-const helperIds = new Set(["cameraman", "companion", "homekeeper", "coach"]);
+const teamMemberIds: Set<string> = new Set(teamAgents.map((agent) => agent.id));
+const helperIds: Set<string> = new Set(helperTeamAgentIds);
 const intents = new Set(["calendar_event", "reminder", "baby_log", "lesson_recap", "memory_story", "reading", "photo_video", "general_question", "unknown"]);
 const cardTypes = new Set(["calendar_draft", "reminder", "baby_log", "lesson_recap", "memory", "story_draft", "text"]);
 const objectTypes = new Set(["calendar_draft", "reminder_draft", "baby_log", "memory_item", "story_draft", "lesson_recap"]);

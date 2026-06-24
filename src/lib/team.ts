@@ -1,5 +1,5 @@
 // Functional robot agents. Keep IDs literal so routing is obvious in logs/API data.
-export type TeamAgentId = "cameraman" | "companion" | "homekeeper" | "coach" | "auri";
+export type TeamAgentId = "cameraman" | "watcher" | "companion" | "coach" | "homekeeper" | "baby_logger" | "auri";
 
 export type TeamAgentScope = "group" | "private" | "device";
 
@@ -8,28 +8,57 @@ export type TeamAgent = {
   name: string;
   role: string;
   shortRole: string;
+  summary: string;
+  responsibilities: string[];
+  portrait: string;
+  portraitPosition: string;
   icon: string;
   tone: string;
   accent: string;
   scope: TeamAgentScope;
 };
 
+export const helperTeamAgentIds = ["cameraman", "watcher", "companion", "coach", "homekeeper", "baby_logger"] as const satisfies readonly TeamAgentId[];
+export type HelperTeamAgentId = (typeof helperTeamAgentIds)[number];
+
 export const teamAgents: TeamAgent[] = [
   {
     id: "cameraman",
     name: "Cameraman",
-    role: "The eye — films the firsts",
-    shortRole: "The eye",
+    role: "Captures family highlights and keepsake video moments",
+    shortRole: "Highlights",
+    summary: "Films the moments worth saving, sharing, and turning into warm family memories.",
+    responsibilities: ["Family highlights", "Photo and video memories", "Video receipts", "Album drafts"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "8% 48%",
     icon: "camera-note",
     tone: "bg-[#FFCFC4]",
     accent: "text-[#C0492C]",
     scope: "group",
   },
   {
+    id: "watcher",
+    name: "Watcher",
+    role: "Checks in on the room at intervals and summarizes what is happening",
+    shortRole: "Observes",
+    summary: "Takes short recurring clips, recognizes activity, and builds an observation timeline.",
+    responsibilities: ["Every X minutes", "10-second clips", "Activity recognition", "Observation timeline"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "25% 48%",
+    icon: "home",
+    tone: "bg-[#CFE8F7]",
+    accent: "text-[#236A8A]",
+    scope: "device",
+  },
+  {
     id: "companion",
     name: "Companion",
-    role: "The companion — reads with your kids",
+    role: "Reads, learns, and plays alongside the kids",
     shortRole: "Reads along",
+    summary: "Supports reading, questions, and kid activities without turning them into chores.",
+    responsibilities: ["Reading moments", "Book notes", "Learning questions", "Kid activities"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "43% 48%",
     icon: "book",
     tone: "bg-[#DDD0FC]",
     accent: "text-[#6B43B5]",
@@ -38,8 +67,12 @@ export const teamAgents: TeamAgent[] = [
   {
     id: "homekeeper",
     name: "Homekeeper",
-    role: "Reminders, calendar check-ins, and video receipts",
-    shortRole: "Reminders",
+    role: "Keeps the family calendar, reminders, and home logistics moving",
+    shortRole: "Logistics",
+    summary: "Handles reminders, appointments, checklists, and the everyday coordination layer.",
+    responsibilities: ["Reminders", "Calendar drafts", "Appointments", "Home checklists"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "73% 48%",
     icon: "calendar",
     tone: "bg-[#C8EDD8]",
     accent: "text-[#1F5C42]",
@@ -48,18 +81,40 @@ export const teamAgents: TeamAgent[] = [
   {
     id: "coach",
     name: "Coach",
-    role: "The coach — your home workout",
-    shortRole: "Your coach",
+    role: "The parent's home workout coach",
+    shortRole: "Workout",
+    summary: "Plans quick home workouts and helps with reps, form, and momentum for parents.",
+    responsibilities: ["Home workouts", "Quick sets", "Form cues", "Reps"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "58% 48%",
     icon: "spark",
     tone: "bg-[#F5D87A]",
     accent: "text-[#8A6800]",
     scope: "private",
   },
   {
+    id: "baby_logger",
+    name: "Baby Logger",
+    role: "Records baby care routines as structured logs",
+    shortRole: "Baby logs",
+    summary: "Tracks care events the family explicitly records: feeding, sleep, diapers, meds, and temperature.",
+    responsibilities: ["Feeding logs", "Sleep and naps", "Diapers", "Medicine taken"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "91% 48%",
+    icon: "baby",
+    tone: "bg-[#F8D7E8]",
+    accent: "text-[#9D3C6A]",
+    scope: "group",
+  },
+  {
     id: "auri",
     name: "Home",
     role: "The home robot that sees",
     shortRole: "Robot",
+    summary: "The primary home voice that understands the family and delegates real work to helpers.",
+    responsibilities: ["Family context", "Warm answers", "Task routing", "Robot presence"],
+    portrait: "/agents/auri-agent-team.png",
+    portraitPosition: "50% 48%",
     icon: "robot",
     tone: "bg-[#A8DEC0]",
     accent: "text-[#1A6B47]",
@@ -73,10 +128,12 @@ export const teamAgentByName = Object.fromEntries(teamAgents.map((agent) => [age
 export function normalizeTeamAgentId(value: unknown): TeamAgentId | undefined {
   const raw = String(value || "").trim().toLowerCase();
   if (raw === "iris") return "cameraman";
+  if (raw === "watch" || raw === "watcher" || raw === "monitor") return "watcher";
   if (raw === "lumi") return "companion";
   if (raw === "vita" || raw === "keeper" || raw === "reminder") return "homekeeper";
+  if (raw === "baby logger" || raw === "baby_logger" || raw === "babylog" || raw === "baby-log" || raw === "logger") return "baby_logger";
   if (raw === "nova") return "coach";
   if (raw === "coach") return "coach";
-  if (raw === "cameraman" || raw === "companion" || raw === "homekeeper" || raw === "auri") return raw;
+  if (raw === "cameraman" || raw === "watcher" || raw === "companion" || raw === "homekeeper" || raw === "coach" || raw === "baby_logger" || raw === "auri") return raw;
   return undefined;
 }

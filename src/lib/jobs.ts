@@ -10,10 +10,10 @@ import { todayAt } from "./job-time";
 //    projects one instance per day onto Upcoming and the calendar.
 // Both map onto the same underlying Session model (see docs/REPOSITION_DESIGN.md).
 
-// Each job type maps to the teammate that runs it: Cameraman (the eye) captures and
-// watches, Companion (the companion) reads and runs activities, Reminder (the keeper)
-// runs routines and check-ins, Coach runs workouts.
-export type JobType = "highlight" | "watch" | "reading" | "activity" | "routine" | "checkin" | "workout" | "nudge";
+// Each job type maps to the teammate that runs it: Cameraman captures highlights,
+// Watcher observes rooms, Companion reads and runs activities, Homekeeper runs
+// logistics, Baby Logger records care routines, and Coach runs workouts.
+export type JobType = "highlight" | "watch" | "reading" | "activity" | "routine" | "checkin" | "baby_log" | "workout" | "nudge";
 export type JobSource = "auri" | "todo" | "gcal";
 
 // DoodleIcon name per job type — reuse the existing hand-drawn set.
@@ -24,6 +24,7 @@ export const jobIcon: Record<JobType, string> = {
   activity: "pencil",
   routine: "backpack",
   checkin: "bell",
+  baby_log: "baby",
   workout: "soccer",
   nudge: "shield",
 };
@@ -69,9 +70,11 @@ export function loadStandingJobs(): StandingJob[] {
 }
 
 export function agentForJobType(type: JobType): TeamAgentId {
-  if (type === "highlight" || type === "watch") return "cameraman";
+  if (type === "highlight") return "cameraman";
+  if (type === "watch") return "watcher";
   if (type === "reading" || type === "activity") return "companion";
   if (type === "workout") return "coach";
+  if (type === "baby_log") return "baby_logger";
   return "homekeeper";
 }
 
@@ -85,8 +88,9 @@ export function standingScheduledAtToday(job: StandingJob, now: number = Date.no
   return todayAt(standingStartHHMM(job), now);
 }
 
-// One standing job per teammate (at least). Cameraman ×2 (capture + watch),
-// Companion ×2 (reading + activity), Reminder ×2 (routine + check-in), Coach ×1 (workout).
+// One standing job per teammate (at least). Cameraman captures, Watcher observes,
+// Companion reads/plays, Homekeeper handles logistics, Baby Logger records care,
+// and Coach runs workouts.
 export const seedStanding: StandingJob[] = [
   {
     id: "evening-highlights",
@@ -101,7 +105,7 @@ export const seedStanding: StandingJob[] = [
   {
     id: "home-watch",
     type: "watch",
-    agent: "cameraman",
+    agent: "watcher",
     title: "Home watch",
     trigger: "8 AM–8 PM · Family",
     person: "family",
@@ -147,6 +151,16 @@ export const seedStanding: StandingJob[] = [
     person: "grandma",
     schedule: { kind: "alarm", alarm: "12:00" },
     enabled: false,
+  },
+  {
+    id: "baby-routine-log",
+    type: "baby_log",
+    agent: "baby_logger",
+    title: "Baby routine log",
+    trigger: "Alarm 9 PM · Mia",
+    person: "mia",
+    schedule: { kind: "alarm", alarm: "21:00" },
+    enabled: true,
   },
   {
     id: "home-workout",

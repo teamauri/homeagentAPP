@@ -148,8 +148,10 @@ function durationLabel(seconds?: number) {
 
 function agentFromIcon(icon: string): TeamAgentId {
   if (icon === "camera-note") return "cameraman";
+  if (icon === "home") return "watcher";
   if (icon === "book") return "companion";
   if (icon === "soccer") return "coach";
+  if (icon === "baby") return "baby_logger";
   return "homekeeper";
 }
 

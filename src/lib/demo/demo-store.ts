@@ -9,7 +9,7 @@ import {
   deriveCalendarEventIcon,
 } from "@/lib/calendar-api";
 import { moments } from "@/lib/mock-data";
-import { normalizeTeamAgentId } from "@/lib/team";
+import { helperTeamAgentIds, normalizeTeamAgentId } from "@/lib/team";
 import { PersonId, SourceType, Status } from "@/lib/types";
 import { persistStore, registerStore } from "./persistence";
 
@@ -17,7 +17,7 @@ type StoredObject = CreatedLocalObject & { payload: Record<string, unknown>; cre
 type DemoObjectAction = "add" | "save" | "send" | "log" | "complete";
 type DemoMediaSource = "phone" | "auri";
 type DemoMediaType = "photo" | "video" | "clip";
-const calendarAgentIds = new Set<CalendarJobAgentId>(["cameraman", "companion", "homekeeper", "coach"]);
+const calendarAgentIds = new Set<CalendarJobAgentId>(helperTeamAgentIds);
 
 export interface DemoMediaInput {
   id?: string;

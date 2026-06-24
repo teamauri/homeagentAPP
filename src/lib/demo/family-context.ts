@@ -52,14 +52,24 @@ export const demoFamilyContext = {
       handles: ["films firsts", "robot clips", "family album", "photo highlights", "video receipts"],
     },
     {
+      id: "watcher",
+      name: "Watcher",
+      handles: ["interval room checks", "10-second clips", "activity recognition", "observation timeline"],
+    },
+    {
       id: "companion",
       name: "Companion",
       handles: ["reading", "books", "questions", "reading moments"],
     },
     {
       id: "homekeeper",
-      name: "Housekeeper",
-      handles: ["calendar", "reminders", "school emails", "logs", "meds", "naps", "appointments", "family logistics"],
+      name: "Homekeeper",
+      handles: ["calendar", "reminders", "school emails", "appointments", "family logistics", "home checklists"],
+    },
+    {
+      id: "baby_logger",
+      name: "Baby Logger",
+      handles: ["feeding logs", "sleep and naps", "diapers", "temperature", "medicine taken"],
     },
     {
       id: "coach",

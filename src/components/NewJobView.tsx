@@ -14,18 +14,19 @@ type Template = { type: JobType; agent: TeamAgentId; label: string; blurb: strin
 
 const TEMPLATES: Template[] = [
   { type: "highlight", agent: "cameraman", label: "Highlight", blurb: "Catch real moments", sched: "window" },
-  { type: "watch", agent: "cameraman", label: "Home watch", blurb: "Eye on a room", sched: "window" },
+  { type: "watch", agent: "watcher", label: "Home watch", blurb: "Every X minutes", sched: "window" },
   { type: "reading", agent: "companion", label: "Reading", blurb: "Read with your kid", sched: "window" },
   { type: "activity", agent: "companion", label: "Activity", blurb: "A daily activity", sched: "window" },
   { type: "routine", agent: "homekeeper", label: "Routine", blurb: "A checklist to done", sched: "alarm" },
   { type: "checkin", agent: "homekeeper", label: "Check-in", blurb: "Confirm it got done", sched: "alarm" },
+  { type: "baby_log", agent: "baby_logger", label: "Baby log", blurb: "Feeding, sleep, diapers", sched: "alarm" },
   { type: "workout", agent: "coach", label: "Workout", blurb: "A home workout", sched: "window" },
 ];
 
 // Group templates under the teammate that runs them — so "two jobs per agent"
 // reads as intentional (Cameraman does Highlight + Home watch) instead of looking
 // like duplicate cards. Each job card leads with its own distinct job icon.
-const AGENT_ORDER: TeamAgentId[] = ["cameraman", "companion", "homekeeper", "coach"];
+const AGENT_ORDER: TeamAgentId[] = ["cameraman", "watcher", "companion", "coach", "homekeeper", "baby_logger"];
 const TEMPLATE_GROUPS = AGENT_ORDER.map((agent) => ({ agent, items: TEMPLATES.filter((t) => t.agent === agent) })).filter((g) => g.items.length);
 
 function fmtTime(hhmm: string) {
@@ -88,7 +89,7 @@ export function NewJobView({
         // Every calendar event is a robot task.
         forRobot: true,
         agent: tpl.agent,
-        recordingMode: tpl.type === "highlight" ? "cameraman_highlight" : undefined,
+        recordingMode: tpl.type === "highlight" ? "cameraman_highlight" : tpl.type === "watch" ? "watcher_interval" : undefined,
       });
       return;
     }

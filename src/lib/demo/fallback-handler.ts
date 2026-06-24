@@ -47,7 +47,29 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
   }
 
   // 2) Actionable → Auri frames + a helper takes the task (second voice).
+  if (/每\s*\d+\s*(分钟|分)|每隔|定时看|定期看|看一下.*在干嘛|观察|监控|watch|watcher|monitor|check.*every|every\s+\d+\s+(min|minute|minutes)|10s|10 seconds/.test(input)) {
+    const title = request.message?.trim() || "Home watch";
+    const helper: ChatHelperSegment = {
+      teamMemberId: "watcher",
+      name: "Watcher",
+      reply: "收到，我会按间隔拍短片并记录家里的状态。",
+      cards: [
+        {
+          type: "reminder",
+          title,
+          subtitle: "Today · interval watch",
+          body: "Recurring observation task",
+          cta: "Edit",
+          metadata: { dateLabel: "Today", person: "family", agent: "watcher", recordingMode: "watcher_interval" },
+        },
+      ],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title, dateLabel: "Today", person: "family", agent: "watcher", recordingMode: "watcher_interval", note: request.message } }],
+    };
+    return auri("交给 Watcher 来持续观察。", { intent: "photo_video", helper, suggestedFollowups: ["改观察频率", "只观察客厅"] });
+  }
+
   if (/拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(input)) {
+
     const timeMatch = request.message?.match(/(\d{1,2})[:：](\d{2})/) ?? null;
     const timeLabel = timeMatch ? `${timeMatch[1]}:${timeMatch[2]} PM` : "8:00 PM";
     const title = request.message?.replace(/今晚|今天|today|tonight/gi, "").replace(/\d{1,2}[:：]\d{2}/, "").trim() || "Capture family moment";
@@ -75,8 +97,8 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const title = /fruit|水果/.test(input) ? "Snack: Fruit" : /water|喝水/.test(input) ? "Drink: Water" : "Care note";
     const description = request.message?.trim() || "Care note";
     const helper: ChatHelperSegment = {
-      teamMemberId: "homekeeper",
-      name: "Homekeeper",
+      teamMemberId: "baby_logger",
+      name: "Baby Logger",
       reply: "已记录这条照护日志。",
       cards: [
         {
@@ -90,7 +112,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "baby_log", payload: { childId: person, type: "snack", description, timestamp: new Date().toISOString() } }],
     };
-    return auri("我会让 Homekeeper 记下这条照护记录。", { intent: "baby_log", helper, suggestedFollowups: ["补充数量", "查看今天记录"] });
+    return auri("我会让 Baby Logger 记下这条照护记录。", { intent: "baby_log", helper, suggestedFollowups: ["补充数量", "查看今天记录"] });
   }
 
   if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {

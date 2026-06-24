@@ -5,7 +5,7 @@ import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
 import { ChatAIResponse, ChatApiResponse, ChatRequestBody, ChatResponseCard, ObjectToCreate, type TeamMemberId } from "@/lib/chat-server/types";
-import { normalizeTeamAgentId } from "@/lib/team";
+import { helperTeamAgentIds, normalizeTeamAgentId, teamAgentById, type HelperTeamAgentId } from "@/lib/team";
 
 export const runtime = "nodejs";
 // Real model calls (DeepSeek/Gemini) can exceed the 10s default; raise it
@@ -29,7 +29,12 @@ function requestText(request: ChatRequestBody) {
 }
 
 function wantsCameraCapture(request: ChatRequestBody) {
+  if (wantsWatcherObservation(request)) return false;
   return /拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(requestText(request));
+}
+
+function wantsWatcherObservation(request: ChatRequestBody) {
+  return /每\s*\d+\s*(分钟|分)|每隔|定时看|定期看|看一下.*在干嘛|观察|监控|watch|watcher|monitor|check.*every|every\s+\d+\s+(min|minute|minutes)|10s|10 seconds/.test(requestText(request));
 }
 
 function wantsExplicitCareLog(request: ChatRequestBody) {
@@ -127,12 +132,39 @@ function homekeeperReminderObject(request: ChatRequestBody): ObjectToCreate {
   };
 }
 
+function watcherObject(request: ChatRequestBody): ObjectToCreate {
+  return {
+    type: "reminder_draft",
+    payload: {
+      title: cameraCaptureTitle(request) || "Home watch",
+      timeLabel: nowTimeLabel(),
+      dateLabel: "Today",
+      person: inferPersonFromRequest(request),
+      agent: "watcher",
+      recordingMode: "watcher_interval",
+      note: request.message,
+    },
+  };
+}
+
+function babyLogObject(request: ChatRequestBody): ObjectToCreate {
+  return {
+    type: "baby_log",
+    payload: {
+      childId: inferPersonFromRequest(request),
+      type: "care",
+      description: request.message?.trim() || "Baby care log",
+      timestamp: new Date().toISOString(),
+    },
+  };
+}
+
 function hasDraftObject(objects: ObjectToCreate[] | undefined) {
   return Boolean(objects?.some((object) => object.type === "reminder_draft" || object.type === "calendar_draft"));
 }
 
-function forceHelperAgent(response: ChatAIResponse, agent: Extract<TeamMemberId, "cameraman" | "companion" | "homekeeper">): ChatAIResponse {
-  const helperName = agent === "cameraman" ? "Cameraman" : agent === "companion" ? "Companion" : "Homekeeper";
+function forceHelperAgent(response: ChatAIResponse, agent: HelperTeamAgentId): ChatAIResponse {
+  const helperName = teamAgentById[agent].name;
   if (!response.helper) return response;
   return {
     ...response,
@@ -174,9 +206,82 @@ function ensureCameraCaptureJob(response: ChatAIResponse, request: ChatRequestBo
 }
 
 function normalizeRouting(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
+  if (wantsWatcherObservation(request)) return ensureWatcherJob(forceHelperAgent(response, "watcher"), request);
   if (wantsCameraCapture(request)) return ensureCameraCaptureJob(forceHelperAgent(response, "cameraman"), request);
+  if (wantsExplicitCareLog(request)) return ensureBabyLoggerJob(response, request);
   if (wantsHomekeeperReminder(request)) return ensureHomekeeperReminderJob(response, request);
   return response;
+}
+
+function emptyAuriResponse(intent: ChatAIResponse["intent"]): ChatAIResponse {
+  return {
+    handledByTeamMemberId: "auri",
+    handledByName: "Auri",
+    intent,
+    reply: "",
+    cards: [],
+    objectsToCreate: [],
+    suggestedFollowups: [],
+  };
+}
+
+function fastRouteResponse(request: ChatRequestBody): ChatAIResponse | undefined {
+  if (wantsWatcherObservation(request)) return normalizeRouting(emptyAuriResponse("photo_video"), request);
+  if (wantsCameraCapture(request)) return normalizeRouting(emptyAuriResponse("photo_video"), request);
+  if (wantsHomekeeperReminder(request)) return normalizeRouting(emptyAuriResponse("reminder"), request);
+  return undefined;
+}
+
+function ensureWatcherJob(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
+  const helper = response.helper ?? {
+    teamMemberId: "watcher" as TeamMemberId,
+    name: "Watcher",
+    reply: "收到，我会按间隔观察并记录家里的状态。",
+    cards: [],
+    objectsToCreate: [],
+  };
+  const objectsToCreate = hasDraftObject(helper.objectsToCreate)
+    ? objectsWithAgent(helper.objectsToCreate, "watcher")
+    : [watcherObject(request), ...objectsWithAgent(helper.objectsToCreate, "watcher")];
+
+  return {
+    ...response,
+    intent: "photo_video",
+    helper: {
+      ...helper,
+      teamMemberId: "watcher",
+      name: "Watcher",
+      cards: synthesizeCardsFromObjects(objectsToCreate),
+      objectsToCreate,
+    },
+  };
+}
+
+function ensureBabyLoggerJob(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
+  const helper = response.helper ?? {
+    teamMemberId: "baby_logger" as TeamMemberId,
+    name: "Baby Logger",
+    reply: "已记录这条宝宝照护日志。",
+    cards: [],
+    objectsToCreate: [],
+  };
+  const objectsToCreate = helper.objectsToCreate.some((object) => object.type === "baby_log")
+    ? helper.objectsToCreate
+    : [babyLogObject(request), ...helper.objectsToCreate];
+
+  return {
+    ...response,
+    intent: "baby_log",
+    cards: [],
+    objectsToCreate: [],
+    helper: {
+      ...helper,
+      teamMemberId: "baby_logger",
+      name: "Baby Logger",
+      cards: helper.cards?.length ? helper.cards : synthesizeCardsFromObjects(objectsToCreate),
+      objectsToCreate,
+    },
+  };
 }
 
 function ensureHomekeeperReminderJob(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
@@ -226,6 +331,10 @@ function synthesizeCardsFromObjects(objects: ObjectToCreate[] | undefined): Chat
   for (const obj of objects) {
     const p = (obj.payload ?? {}) as Record<string, unknown>;
     const title = typeof p.title === "string" && p.title ? p.title : undefined;
+    if (obj.type === "baby_log") {
+      out.push({ type: "baby_log", title: title ?? "Baby care log", body: typeof p.description === "string" ? p.description : undefined });
+      continue;
+    }
     if (!title) continue;
     if (obj.type === "reminder_draft") out.push({ type: "reminder", title });
     else if (obj.type === "calendar_draft") out.push({ type: "calendar_draft", title });
@@ -258,7 +367,7 @@ function objectsWithAgent(objects: ChatAIResponse["objectsToCreate"], agent?: Te
 
 function normalizeAgentId(value: unknown): TeamMemberId | undefined {
   const agent = normalizeTeamAgentId(value);
-  return agent === "auri" ? undefined : agent;
+  return agent && helperTeamAgentIds.includes(agent as HelperTeamAgentId) ? agent : undefined;
 }
 
 function attachRoutes<T extends { targetRoute?: string }>(cards: T[], objects: ChatAIResponse["objectsToCreate"], agent?: TeamMemberId) {
@@ -313,6 +422,11 @@ export async function POST(request: Request) {
 
   if (!chatRequest.message && !chatRequest.attachments?.length) {
     return NextResponse.json({ error: "message or attachments are required" }, { status: 400 });
+  }
+
+  const fastResponse = fastRouteResponse(chatRequest);
+  if (fastResponse) {
+    return NextResponse.json(await withCreatedObjects(fastResponse, { provider: "local", fallbackUsed: false, model: "deterministic-router" }));
   }
 
   if (process.env.DEEPSEEK_API_KEY) {

@@ -87,7 +87,7 @@ export interface ChatAIResponse {
 export interface ChatApiResponse extends ChatAIResponse {
   createdLocalObjects: CreatedLocalObject[];
   metadata: {
-    provider: "deepseek" | "gemini" | "openai-compatible" | "fallback";
+    provider: "deepseek" | "gemini" | "openai-compatible" | "fallback" | "local";
     fallbackUsed: boolean;
     fallbackReason?: string;
     model?: string;

@@ -326,6 +326,14 @@ function Avatar({ avatar }: { avatar: ChatTurn["avatar"] }) {
 
 function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
   const displayName = useParentDisplayName(turn.avatar, turn.sender);
+  if (turn.pending) {
+    return (
+      <div className="pl-[54px]">
+        <p className="inline-block max-w-[98%] rounded-[16px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-muted">{turn.text}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
       <LiveAvatar avatar={turn.avatar} sender={turn.sender} />
