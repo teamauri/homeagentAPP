@@ -55,7 +55,7 @@ function HomeInner() {
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
-  const [showCover, setShowCover] = useState(true);
+  const [showCover, setShowCover] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<TabKey>("chat");
   const returningHomeRef = useRef(false);
@@ -109,7 +109,15 @@ function HomeInner() {
   };
 
   useEffect(() => {
-    const id = window.setTimeout(() => setShowCover(false), 3000);
+    try {
+      const seenCover = sessionStorage.getItem("auri.coverSeen.v1") === "1";
+      if (seenCover) return;
+      sessionStorage.setItem("auri.coverSeen.v1", "1");
+      setShowCover(true);
+    } catch {
+      setShowCover(true);
+    }
+    const id = window.setTimeout(() => setShowCover(false), 900);
     return () => window.clearTimeout(id);
   }, []);
 
@@ -399,18 +407,18 @@ function HomeInner() {
         <div className={tab === "memory" ? "" : "hidden"}>
           <MomentsView />
         </div>
-        {showCover && tab === "chat" ? <AuriCover /> : null}
+        {showCover && tab === "chat" ? <AuriCover onDismiss={() => setShowCover(false)} /> : null}
       </AppShell>
     </div>
   );
 }
 
-function AuriCover() {
+function AuriCover({ onDismiss }: { onDismiss: () => void }) {
   return (
-    <div className="absolute inset-0 z-20 bg-paper">
+    <button type="button" onClick={onDismiss} className="absolute inset-0 z-20 bg-paper text-left" aria-label="Enter Auri">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/agents/auri-app-cover.png" alt="" className="h-full w-full object-cover" style={{ objectPosition: "50% 50%" }} />
-    </div>
+    </button>
   );
 }
 

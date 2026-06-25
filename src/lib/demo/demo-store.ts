@@ -431,6 +431,13 @@ export function updateDemoCalendarRobotStatus(taskId: string, input: DemoRobotCa
 
   const now = new Date().toISOString();
   const auriClientVideoUuid = input.auriClientVideoUuid ?? event.auriClientVideoUuid ?? event.robot?.auriClientVideoUuid ?? randomUUID();
+  const hasVideoArtifact = Boolean(
+    input.highlightVideoUrl ||
+    input.rawOutputVideoUrl ||
+    event.robot?.highlightVideoUrl ||
+    event.robot?.rawOutputVideoUrl
+  );
+  const publicStatus = input.status === "done" && !hasVideoArtifact ? "uploaded" : input.status;
   event.auriClientVideoUuid = auriClientVideoUuid;
   event.robot = {
     ...event.robot,
@@ -461,8 +468,8 @@ export function updateDemoCalendarRobotStatus(taskId: string, input: DemoRobotCa
     error: input.error ?? event.robot?.error,
     updatedAt: now,
   };
-  event.status = input.status;
-  event.statusLabel = statusLabelFromRobotStatus(input.status);
+  event.status = publicStatus;
+  event.statusLabel = statusLabelFromRobotStatus(publicStatus);
   event.updatedAt = now;
   return event;
 }

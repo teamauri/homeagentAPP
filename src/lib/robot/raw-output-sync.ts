@@ -96,6 +96,30 @@ function alreadySyncedResult(event: CalendarApiEvent, rawOutput?: RawOutputStatu
   };
 }
 
+function cleanSummaryValue(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim();
+  return text || undefined;
+}
+
+function summaryTextFromJson(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const data = value as Record<string, unknown>;
+  for (const key of ["summary_text", "receipt_text", "narrative_summary", "diary_summary", "response_text", "summary"]) {
+    const text = cleanSummaryValue(data[key]);
+    if (text) return text;
+  }
+  for (const key of ["receipt", "job_receipt", "diary", "narrative"]) {
+    const text = summaryTextFromJson(data[key]);
+    if (text) return text;
+  }
+  return undefined;
+}
+
+function summaryTextFromRawOutput(rawOutput: RawOutputStatusResponse): string | undefined {
+  return cleanSummaryValue(rawOutput.summaryText) ?? summaryTextFromJson(rawOutput.summaryJson);
+}
+
 async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient): Promise<RawOutputSyncResult> {
   const event = getDemoCalendarEvent(taskId);
   if (!event || !event.forRobot) {
@@ -154,8 +178,9 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
       return { outcome: "pending", httpStatus: 202, event: updated, rawOutput };
     }
 
+    const summaryText = summaryTextFromRawOutput(rawOutput);
+
     if (robot?.rawOutputVideoUrl) {
-      const summaryText = rawOutput.summaryText?.trim();
       let storedPosterUrl = robot.rawOutputPosterUrl;
       if (!storedPosterUrl) {
         const videoBytes = await client.downloadRawOutputVideo(videoId);
@@ -197,10 +222,27 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
       client.downloadRawOutputTranscript(videoId, "json"),
       client.downloadRawOutputTranscript(videoId, "txt"),
     ]);
-    const summaryText = rawOutput.summaryText?.trim();
 
     const latestEvent = getDemoCalendarEvent(taskId);
     if (latestEvent?.robot?.rawOutputVideoUrl) {
+      if (summaryText && !latestEvent.robot.rawOutputSummary) {
+        const now = new Date().toISOString();
+        const updated = updateDemoCalendarRobotStatus(latestEvent.id, {
+          status: latestEvent.robot.status,
+          rawOutputStatus: "ready",
+          rawOutputSummary: summaryText,
+          rawOutputSyncedAt: now,
+        });
+        await persistDemoStore();
+        return {
+          outcome: "already_synced",
+          httpStatus: 200,
+          event: updated,
+          media: [],
+          rawOutput,
+          metadata: { provider: "local-demo-store", alreadySynced: true, backfilled: true },
+        };
+      }
       return alreadySyncedResult(latestEvent, rawOutput);
     }
 

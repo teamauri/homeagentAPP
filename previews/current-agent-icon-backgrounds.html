@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Current Agent Icon Backgrounds</title>
+    <style>
+      :root {
+        color: #111;
+        background: #f8f6f2;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        width: 1120px;
+        min-height: 1120px;
+        background: #f8f6f2;
+        padding: 36px 42px;
+      }
+      .card {
+        min-height: 1048px;
+        border: 1px solid #e5e0d8;
+        border-radius: 30px;
+        background: #fffefb;
+        padding: 50px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+      .sub {
+        margin-top: 12px;
+        color: #555;
+        font-size: 24px;
+      }
+      .section {
+        margin-top: 44px;
+      }
+      .section h2 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: 0.12em;
+      }
+      .note {
+        margin-top: 10px;
+        color: #666;
+        font-size: 15px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 16px;
+        margin-top: 26px;
+      }
+      .agent {
+        text-align: center;
+      }
+      .badge {
+        display: grid;
+        place-items: center;
+        width: 84px;
+        height: 84px;
+        margin: 0 auto;
+        border: 1px solid #e6e1da;
+        border-radius: 999px;
+        box-shadow: 0 14px 26px rgba(17, 17, 17, 0.08);
+        font-size: 42px;
+        line-height: 1;
+      }
+      .name {
+        margin-top: 18px;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .tone {
+        margin-top: 8px;
+        color: #666;
+        font-size: 14px;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid #e5e0d8;
+        margin: 34px 0 0;
+      }
+      .knobs {
+        display: none;
+      }
+      .knob b {
+        display: inline-block;
+        width: 90px;
+      }
+      .knob span {
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>CURRENT AGENT ICON + BACKGROUND</h1>
+      <div class="sub">Shown as real icon combinations from the current app data</div>
+
+      <section class="section">
+        <h2>CHAT PAGE CURRENT BADGE</h2>
+        <div class="note">After the last change: agent icon sits on a white circular background in chat.</div>
+        <div class="grid">
+          <div class="agent"><div class="badge" style="background:#fff">📷</div><div class="name">Cameraman</div><div class="tone">bg white</div></div>
+          <div class="agent"><div class="badge" style="background:#fff">🏠</div><div class="name">Observer</div><div class="tone">bg white</div></div>
+          <div class="agent"><div class="badge" style="background:#fff">📖</div><div class="name">Companion</div><div class="tone">bg white</div></div>
+          <div class="agent"><div class="badge" style="background:#fff">🗓️</div><div class="name">Homekeeper</div><div class="tone">bg white</div></div>
+          <div class="agent"><div class="badge" style="background:#fff">✨</div><div class="name">Coach</div><div class="tone">bg white</div></div>
+          <div class="agent"><div class="badge" style="background:#fff">👶</div><div class="name">Baby Rhythm</div><div class="tone">bg white</div></div>
+          <div class="agent"><div class="badge" style="background:#fff">🤖</div><div class="name">Home</div><div class="tone">bg white</div></div>
+        </div>
+      </section>
+
+      <hr />
+
+      <section class="section">
+        <h2>GLOBAL CURRENT TEAMBADGE COLORS</h2>
+        <div class="note">These are the current tone values in src/lib/team.ts.</div>
+        <div class="grid">
+          <div class="agent"><div class="badge" style="background:#FFCFC4">📷</div><div class="name">Cameraman</div><div class="tone">#FFCFC4</div></div>
+          <div class="agent"><div class="badge" style="background:#CFE8F7">🏠</div><div class="name">Observer</div><div class="tone">#CFE8F7</div></div>
+          <div class="agent"><div class="badge" style="background:#DDD0FC">📖</div><div class="name">Companion</div><div class="tone">#DDD0FC</div></div>
+          <div class="agent"><div class="badge" style="background:#C8EDD8">🗓️</div><div class="name">Homekeeper</div><div class="tone">#C8EDD8</div></div>
+          <div class="agent"><div class="badge" style="background:#F5D87A">✨</div><div class="name">Coach</div><div class="tone">#F5D87A</div></div>
+          <div class="agent"><div class="badge" style="background:#F8D7E8">👶</div><div class="name">Baby Rhythm</div><div class="tone">#F8D7E8</div></div>
+          <div class="agent"><div class="badge" style="background:#A8DEC0">🤖</div><div class="name">Home</div><div class="tone">#A8DEC0</div></div>
+        </div>
+      </section>
+
+    </main>
+  </body>
+</html>

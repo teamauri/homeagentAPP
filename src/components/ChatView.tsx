@@ -68,12 +68,15 @@ const avatarStyles = {
 };
 
 const chatBubbleBg = "bg-[#DDEEE4]";
+const chatAvatarOffset = "pl-[54px]";
+const chatRowShell = "relative min-w-0";
+const chatRowAvatar = "absolute left-0 top-0";
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
   const { completions, events } = useRobotEvents();
-  // Highlight jobs that are mid-capture: Cameraman shows a live counter card that
-  // climbs as the run catches real clips/photos, then hands off to the keepsake.
-  const runningHighlights = events.filter((event) => event.kind === "highlight" && event.status === "recording");
+  // Jobs that are mid-run land as fresh agent messages. The card shows the same
+  // job receipt shape as the final response, just without the returned media yet.
+  const runningEvents = events.filter((event) => event.forRobot && event.status === "recording");
   // Merge live chat turns with robot-event activity (completions + in-flight
   // highlights) into one timeline sorted oldest → newest, so the latest item is
   // always at the bottom no matter which source it came from.
@@ -88,10 +91,10 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
       at: epochFromId(event.id),
       node: <RobotCompletionRow key={`done-${event.id}`} event={event} />,
     })),
-    ...runningHighlights.map((event) => ({
+    ...runningEvents.map((event) => ({
       key: `live-${event.id}`,
       at: epochFromId(event.id),
-      node: <HighlightProgressRow key={`live-${event.id}`} event={event} />,
+      node: <RobotRunningRow key={`live-${event.id}`} event={event} />,
     })),
   ].sort((a, b) => a.at - b.at);
 
@@ -107,38 +110,26 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
   );
 }
 
-// A highlight job catching moments right now. Counters are bound to the event's
-// live run state — no fixture, no fake timer in the view.
-function HighlightProgressRow({ event }: { event: RobotEvent }) {
-  const progress = event.highlightProgress ?? { clips: 0, photos: 0 };
-  const target = event.highlight ?? { clipTarget: 0, photoTarget: 0 };
+function RobotRunningRow({ event }: { event: RobotEvent }) {
+  const agentId = event.agent ?? "homekeeper";
+  const agentName = teamAgentById[agentId]?.name ?? "Auri";
   return (
-    <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <ChatAgentBadge agentId="cameraman" size="sm" />
+    <div className={chatRowShell}>
+      <div className={chatRowAvatar}>
+        <ChatAgentBadge agentId={agentId} size="sm" />
+      </div>
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{teamAgentById["cameraman"].name}</span>
+          <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{agentName}</span>
           <span className="text-[13px] text-muted">{event.timeLabel}</span>
         </div>
-        <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>Catching the highlights — eyes up.</p>
-        <div className="mt-2 w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
-          <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
-            <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
-              <DoodleIcon name="camera-note" className="h-8 w-8" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">Highlight</div>
-              <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{event.title}</div>
-            </div>
-            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#C0492C]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#C0492C]">
-              <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-[#C0492C]" aria-hidden="true" />
-              capturing
-            </span>
-          </div>
-          <div className="border-t border-line/70 px-3.5 pb-3 pt-2">
-            <CounterRow label="Clips · 30s" done={progress.clips} total={target.clipTarget} />
-            <CounterRow label="Photos" done={progress.photos} total={target.photoTarget} />
-          </div>
+        <div className={chatAvatarOffset}>
+          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
+            I’m starting this job now.
+          </p>
+        </div>
+        <div className="mt-2">
+          <AgentJobReceiptCard event={event} phase="running" />
         </div>
       </div>
     </div>
@@ -168,24 +159,75 @@ function RobotCompletionRow({ event }: { event: RobotEvent }) {
   const agentId = event.agent ?? "homekeeper";
   const agentName = teamAgentById[agentId]?.name ?? "Reminder";
   return (
-    <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <ChatAgentBadge agentId={agentId} size="sm" />
+    <div className={chatRowShell}>
+      <div className={chatRowAvatar}>
+        <ChatAgentBadge agentId={agentId} size="sm" />
+      </div>
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{agentName}</span>
+          <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{agentName}</span>
           <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
         </div>
-        <JobDoneCard event={event} />
+        <div className={clsx(chatAvatarOffset, "mb-2")}>
+          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
+            Done — here’s the video and summary.
+          </p>
+        </div>
+        <AgentJobReceiptCard event={event} phase="completed" />
       </div>
     </div>
   );
 }
 
-function JobDoneCard({ event }: { event: RobotEvent }) {
+type AgentJobReceiptPhase = "created" | "running" | "completed";
+
+type AgentJobReceiptInput = {
+  title: string;
+  agentId: TeamAgentId;
+  dateLabel: string;
+  timeLabel: string;
+  personLabel?: string;
+  note?: string;
+  status: RobotEvent["status"];
+  result?: RobotEvent["result"];
+  highlight?: RobotEvent["highlight"];
+  highlightProgress?: RobotEvent["highlightProgress"];
+  kept?: boolean;
+  eventId?: string;
+};
+
+function AgentJobReceiptCard({ event, draft, phase }: { event?: RobotEvent; draft?: DraftInfo; phase: AgentJobReceiptPhase }) {
   const { keepEvent } = useRobotEvents();
-  const result = event.result;
+  const agentId = event?.agent ?? draft?.agent ?? "homekeeper";
+  const personLabel = draft?.personLabel;
+  const job: AgentJobReceiptInput = event
+    ? {
+        title: event.title,
+        agentId,
+        dateLabel: event.dateLabel,
+        timeLabel: event.timeLabel,
+        note: event.note,
+        status: event.status,
+        result: event.result,
+        highlight: event.highlight,
+        highlightProgress: event.highlightProgress,
+        kept: event.kept,
+        eventId: event.id,
+      }
+    : {
+        title: draft?.title ?? "Job",
+        agentId,
+        dateLabel: draft?.dateLabel ?? "Today",
+        timeLabel: draft?.timeLabel ?? "",
+        personLabel,
+        note: draft?.note,
+        status: "scheduled",
+      };
+  const agent = teamAgentById[job.agentId];
+  const result = job.result;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const statusMeta = statusForJobPhase(phase);
 
   const play = () => {
     if (videoRef.current) {
@@ -204,22 +246,42 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
-      {/* Job card header */}
+    <div className="w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
       <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{event.dateLabel} · {event.timeLabel}</div>
-          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{event.title}</div>
+        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
+          <DoodleIcon name={agent.icon} className="h-8 w-8" />
         </div>
-        <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#2f9d5b]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#2f9d5b]">
-          <svg viewBox="0 0 24 24" className="h-[10px] w-[10px]" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="m5 12 4.5 4.5L19 7" />
-          </svg>
-          Done
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">
+            {agent.name} · {[job.dateLabel, job.timeLabel, job.personLabel].filter(Boolean).join(" · ")}
+          </div>
+          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{job.title}</div>
+        </div>
+        <span className={clsx("flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-4", statusMeta.className)}>
+          {phase === "running" ? <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-current" aria-hidden="true" /> : null}
+          {statusMeta.label}
         </span>
       </div>
 
-      {/* Embedded video */}
+      <div className="border-t border-line/70 px-3.5 py-2">
+        <JobStepRow label="Created" done active={phase === "created"} detail={createdDetail(job)} />
+        <JobStepRow label="Started" done={phase === "completed"} active={phase === "running"} detail={startedDetail(job, phase)} />
+        <JobStepRow label="Replied" done={phase === "completed"} active={phase === "completed"} detail={repliedDetail(job, phase)} />
+      </div>
+
+      {phase === "running" && job.highlight ? (
+        <div className="border-t border-line/70 px-3.5 pb-3 pt-2">
+          <CounterRow label="Clips" done={job.highlightProgress?.clips ?? 0} total={job.highlight.clipTarget} />
+          <CounterRow label="Photos" done={job.highlightProgress?.photos ?? 0} total={job.highlight.photoTarget} />
+        </div>
+      ) : null}
+
+      {job.note && phase !== "completed" ? (
+        <p className="border-t border-line/70 px-3.5 py-2.5 text-[13px] leading-[18px] tracking-[0] text-ink/70">
+          “{job.note}”
+        </p>
+      ) : null}
+
       {result ? (
         <div className="border-t border-line/70">
           {result.summary ? (
@@ -255,20 +317,57 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
         </div>
       ) : null}
 
-      {/* Keep button */}
-      <div className="flex items-center justify-end gap-2 border-t border-line px-3.5 py-2.5">
-        {event.kept ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold">
-            <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
-            Kept
-          </span>
-        ) : (
-          <button onClick={() => keepEvent(event.id)} className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold active:opacity-60">
-            Keep
-            <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
-          </button>
-        )}
-      </div>
+      {phase === "completed" ? (
+        <div className="flex items-center justify-end gap-2 border-t border-line px-3.5 py-2.5">
+          {job.kept ? (
+            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold">
+              <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
+              Kept
+            </span>
+          ) : (
+            <button onClick={() => job.eventId && keepEvent(job.eventId)} className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold active:opacity-60">
+              Keep
+              <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
+            </button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function statusForJobPhase(phase: AgentJobReceiptPhase) {
+  if (phase === "completed") return { label: "Done", className: "bg-[#2f9d5b]/10 text-[#2f9d5b]" };
+  if (phase === "running") return { label: "Running", className: "bg-[#C0492C]/10 text-[#C0492C]" };
+  return { label: "Created", className: "bg-[#c08a2b]/[0.14] text-[#9a7a1e]" };
+}
+
+function createdDetail(job: AgentJobReceiptInput) {
+  return [job.dateLabel, job.timeLabel].filter(Boolean).join(" · ");
+}
+
+function startedDetail(job: AgentJobReceiptInput, phase: AgentJobReceiptPhase) {
+  if (phase === "completed") return "Recorded by Auri";
+  if (phase === "running") return job.agentId === "cameraman" ? "Capturing now" : "Recording now";
+  return "Waiting for start";
+}
+
+function repliedDetail(job: AgentJobReceiptInput, phase: AgentJobReceiptPhase) {
+  if (phase === "completed") return job.result?.summary ? "Video and summary ready" : "Video ready";
+  return "Waiting for reply";
+}
+
+function JobStepRow({ label, detail, done, active }: { label: string; detail: string; done: boolean; active?: boolean }) {
+  return (
+    <div className={clsx("flex items-center gap-2.5 py-1.5", active && !done && "-mx-1 rounded-[10px] bg-[#C0492C]/10 px-1")}>
+      <span className={clsx(
+        "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border text-[11px] font-semibold",
+        done ? "border-[#2f9d5b] bg-[#2f9d5b] text-white" : active ? "border-[#C0492C] text-[#C0492C]" : "border-line text-transparent"
+      )}>
+        {done ? "✓" : active ? <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-current" /> : ""}
+      </span>
+      <span className={clsx("min-w-0 flex-1 truncate text-[13px] leading-4", done ? "font-medium text-ink" : active ? "font-medium text-[#C0492C]" : "text-ink/65")}>{label}</span>
+      <span className="max-w-[45%] shrink-0 truncate text-right text-[12px] leading-4 text-muted">{detail}</span>
     </div>
   );
 }
@@ -284,14 +383,18 @@ function useParentDisplayName(avatar: string, fallback: string): string {
 function ChatTurnRow({ turn }: { turn: ChatTurn }) {
   const displayName = useParentDisplayName(turn.avatar, turn.sender);
   return (
-    <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <Avatar avatar={turn.avatar} />
+    <div className={chatRowShell}>
+      <div className={chatRowAvatar}>
+        <Avatar avatar={turn.avatar} />
+      </div>
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
+          <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{displayName}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
-        <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>{turn.text}</p>
+        <div className={chatAvatarOffset}>
+          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>{turn.text}</p>
+        </div>
         {turn.cards ? (
           <div className="mt-2">
             <ChatCardList cards={turn.cards} />
@@ -330,28 +433,32 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
   const displayName = useParentDisplayName(turn.avatar, turn.sender);
   if (turn.pending) {
     return (
-      <div className="pl-[54px]">
-        <p className={clsx("inline-block max-w-[98%] rounded-[16px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-muted", chatBubbleBg)}>{turn.text}</p>
+      <div className={chatAvatarOffset}>
+        <p className={clsx("inline-block max-w-full rounded-[16px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-muted", chatBubbleBg)}>{turn.text}</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <LiveAvatar avatar={turn.avatar} sender={turn.sender} />
+    <div className={chatRowShell}>
+      <div className={chatRowAvatar}>
+        <LiveAvatar avatar={turn.avatar} sender={turn.sender} />
+      </div>
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
-          <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
+          <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{displayName}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
         {turn.imageUrl ? (
-          <div className="mb-2 mt-1 overflow-hidden rounded-[16px] border border-line">
+          <div className={clsx(chatAvatarOffset, "mb-2 mt-1")}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={turn.imageUrl} alt="Shared photo" className="max-h-64 w-full object-cover" />
+            <img src={turn.imageUrl} alt="Shared photo" className="max-h-64 w-full rounded-[16px] border border-line object-cover" />
           </div>
         ) : null}
         {turn.text ? (
-          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0]", chatBubbleBg, turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+          <div className={chatAvatarOffset}>
+            <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0]", chatBubbleBg, turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+          </div>
         ) : null}
         {turn.cards?.length ? (
           <div className="mt-2 space-y-2">
@@ -611,23 +718,21 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
     }
 
     return (
-      <div className="w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
-        <button
-          onClick={() => setEditing(true)}
-          className="flex w-full items-start gap-2.5 px-3 py-3 text-left"
-        >
-          <ChatAgentBadge agentId={agentId} size="xs" />
-          <div className="min-w-0 flex-1">
-            <div className="text-[12px] leading-4 text-muted">
-              {agent.name}
-            </div>
-            <div className="text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">
-              {liveTitle}
-            </div>
-            <div className="mt-0.5 text-[12.5px] leading-[18px] text-muted">{whenLine}</div>
-          </div>
+      <div className="w-full">
+        <button onClick={() => setEditing(true)} className="block w-full text-left">
+          <AgentJobReceiptCard
+            phase="created"
+            draft={{
+              ...draft,
+              title: liveTitle,
+              timeLabel: liveTime,
+              person: livePerson,
+              personLabel: livePersonLabel,
+              agent: agentId,
+            }}
+          />
         </button>
-        <div className="border-t border-line px-3 py-2">
+        <div className="px-3 py-2">
           <button
             onClick={() => { window.__auriMarkHomeReturn?.(); window.location.href = "/calendar"; }}
             className="w-full rounded-full border border-line py-1.5 text-[12.5px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]"

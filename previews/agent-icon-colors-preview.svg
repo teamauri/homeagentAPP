@@ -1,0 +1,103 @@
+<svg width="1200" height="1000" viewBox="0 0 1200 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="softShadow" x="-25%" y="-25%" width="150%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#111111" flood-opacity="0.10"/>
+    </filter>
+    <linearGradient id="paper" x1="0" y1="0" x2="1200" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBFAF7"/>
+      <stop offset="1" stop-color="#F7F5F2"/>
+    </linearGradient>
+    <linearGradient id="babyGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFB13B"/>
+      <stop offset="0.35" stop-color="#FF5F93"/>
+      <stop offset="0.68" stop-color="#8A63FF"/>
+      <stop offset="1" stop-color="#46A8FF"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="1000" rx="26" fill="url(#paper)"/>
+  <rect x="34" y="30" width="1132" height="940" rx="28" fill="#FFFEFB" stroke="#E5E0D8"/>
+
+  <text x="74" y="86" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="3">AGENT ICON BACKGROUND PREVIEW</text>
+  <text x="74" y="124" fill="#555555" font-family="Inter, Arial, sans-serif" font-size="22">Brighter backgrounds based on the Auri design guide palette</text>
+
+  <text x="74" y="184" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2">CURRENT SOFT VERSION</text>
+
+  <g transform="translate(104 216)">
+    <g transform="translate(0 0)">
+      <circle cx="66" cy="66" r="55" fill="#FFCFC4" stroke="#E6E1DA" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">C</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Cameraman</text>
+    </g>
+    <g transform="translate(330 0)">
+      <circle cx="66" cy="66" r="55" fill="#CFE8F7" stroke="#E6E1DA" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">O</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Observer</text>
+    </g>
+    <g transform="translate(660 0)">
+      <circle cx="66" cy="66" r="55" fill="#DDD0FC" stroke="#E6E1DA" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">C</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Companion</text>
+    </g>
+    <g transform="translate(0 158)">
+      <circle cx="66" cy="66" r="55" fill="#C8EDD8" stroke="#E6E1DA" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">H</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Homekeeper</text>
+    </g>
+    <g transform="translate(330 158)">
+      <circle cx="66" cy="66" r="55" fill="#F5D87A" stroke="#E6E1DA" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">Co</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Coach</text>
+    </g>
+    <g transform="translate(660 158)">
+      <circle cx="66" cy="66" r="55" fill="#F8D7E8" stroke="#E6E1DA" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">B</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Baby Rhythm</text>
+    </g>
+  </g>
+
+  <line x1="74" y1="520" x2="1126" y2="520" stroke="#E5E0D8"/>
+
+  <text x="74" y="578" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2">PROPOSED BRIGHT BRAND VERSION</text>
+
+  <g transform="translate(104 610)">
+    <g transform="translate(0 0)">
+      <circle cx="66" cy="66" r="55" fill="#FFB13B" stroke="#FF9C1E" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">C</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Cameraman</text>
+      <text x="66" y="180" text-anchor="middle" fill="#666666" font-family="Inter, Arial, sans-serif" font-size="13">Heart Orange</text>
+    </g>
+    <g transform="translate(330 0)">
+      <circle cx="66" cy="66" r="55" fill="#46A8FF" stroke="#2A94EF" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">O</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Observer</text>
+      <text x="66" y="180" text-anchor="middle" fill="#666666" font-family="Inter, Arial, sans-serif" font-size="13">Heart Blue</text>
+    </g>
+    <g transform="translate(660 0)">
+      <circle cx="66" cy="66" r="55" fill="#8A63FF" stroke="#7045F7" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">C</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Companion</text>
+      <text x="66" y="180" text-anchor="middle" fill="#666666" font-family="Inter, Arial, sans-serif" font-size="13">Heart Violet</text>
+    </g>
+    <g transform="translate(0 160)">
+      <circle cx="66" cy="66" r="55" fill="#A8CDBA" stroke="#91BFA9" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">H</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Homekeeper</text>
+      <text x="66" y="180" text-anchor="middle" fill="#666666" font-family="Inter, Arial, sans-serif" font-size="13">Deep Mint</text>
+    </g>
+    <g transform="translate(330 160)">
+      <circle cx="66" cy="66" r="55" fill="#FF5F93" stroke="#F74682" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">Co</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Coach</text>
+      <text x="66" y="180" text-anchor="middle" fill="#666666" font-family="Inter, Arial, sans-serif" font-size="13">Heart Pink</text>
+    </g>
+    <g transform="translate(660 160)">
+      <circle cx="66" cy="66" r="55" fill="url(#babyGradient)" stroke="#FF6B90" filter="url(#softShadow)"/>
+      <text x="66" y="83" text-anchor="middle" fill="#111111" font-family="Playfair Display, Georgia, serif" font-size="48">B</text>
+      <text x="66" y="154" text-anchor="middle" fill="#111111" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Baby Rhythm</text>
+      <text x="66" y="180" text-anchor="middle" fill="#666666" font-family="Inter, Arial, sans-serif" font-size="13">Heart Gradient</text>
+    </g>
+  </g>
+
+  <text x="74" y="966" fill="#555555" font-family="Inter, Arial, sans-serif" font-size="15">Mapping: Cameraman #FFB13B · Observer #46A8FF · Companion #8A63FF · Homekeeper #A8CDBA · Coach #FF5F93 · Baby Rhythm gradient</text>
+</svg>

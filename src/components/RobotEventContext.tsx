@@ -87,17 +87,6 @@ type RobotEventContextValue = {
 
 const RobotEventContext = createContext<RobotEventContextValue | null>(null);
 
-// Stand-in capture clips for the demo "Done" state (real app would attach the
-// video the robot actually recorded).
-const DEMO_RESULTS: RobotEventResult[] = [
-  { videoUrl: "/demo-media/2a90a095-6e5f-4463-a0e9-03d52689ca01.mp4", poster: "/demo-media/04b13ae3-ee7b-44f0-b545-602da2aaee88.jpg", duration: "2:14" },
-  { videoUrl: "/demo-media/5f1889cd-9669-4f21-800d-a55dd7aae7b7.mp4", poster: "/demo-media/6a833cf4-0d2e-4503-a294-b032fa63f7eb.jpg", duration: "1:38" },
-];
-
-function nowLabel() {
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date());
-}
-
 // Pick a warm doodle icon from the event's wording, falling back to the child.
 export const deriveEventIcon = deriveCalendarEventIcon;
 
@@ -105,6 +94,10 @@ const STORAGE_KEY = "auri.events.v1";
 // Tombstones: ids the user deleted locally. The 5s server poll must never
 // resurrect these, even if a stale copy still lives in the server snapshot.
 const TOMBSTONE_KEY = "auri.deletedIds.v1";
+
+function nowLabel() {
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date());
+}
 
 function readTombstones(): Set<string> {
   try {
@@ -158,11 +151,6 @@ function agentFromIcon(icon: string): TeamAgentId {
 function normalizeRobotAgent(value: unknown, icon: string): TeamAgentId {
   const agent = normalizeTeamAgentId(value);
   return agent && agent !== "auri" ? agent : agentFromIcon(icon);
-}
-
-function isExternalCaptureEvent(event: RobotEvent) {
-  const mode = event.recordingMode ?? event.robot?.recordingMode;
-  return mode === "story_tracking_raw_transcript" || mode === "cameraman_highlight" || mode === "watcher_interval";
 }
 
 function timestampFromEventId(id: string): number | undefined {
@@ -242,6 +230,10 @@ function mergeEvents(current: RobotEvent[], incoming: RobotEvent[]) {
     // the calendar can show it; Upcoming hides past jobs at the view level.
     if (tombstoned.has(event.id)) continue;
     const existing = byId.get(event.id);
+    if (existing?.status === "done" && event.status === "scheduled" && event.forRobot) {
+      byId.set(event.id, existing);
+      continue;
+    }
     if (existing?.status === "recording" && event.status === "scheduled" && event.forRobot) {
       const robot = event.robot && existing.robot
         ? { ...event.robot, ...existing.robot, status: existing.robot.status }
@@ -296,11 +288,7 @@ function removeEventFromCalendarApi(id: string) {
 export function RobotEventProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<RobotEvent[]>([]);
   const [ready, setReady] = useState(false);
-  const [schedulerTick, setSchedulerTick] = useState(0);
-  const completedCount = useRef(0);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const syncingTasks = useRef<Set<string>>(new Set());
-  const autoStartedEvents = useRef<Set<string>>(new Set());
 
   const refreshCreatedEvents = useCallback(() => {
     return fetch("/api/calendar?source=created")
@@ -314,7 +302,6 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
         // so nothing is lost. Deletion happens only on an explicit user action.
         const apiEvents = payload.items.map(eventFromApi);
         setEvents((current) => mergeEvents(current, apiEvents));
-        completedCount.current = apiEvents.filter((event) => event.status === "done").length;
       })
       .catch(() => undefined);
   }, []);
@@ -355,7 +342,6 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
         // explicit user action (removeEvent) — never on a staleness heuristic.
         localEvents = migrated;
         setEvents(localEvents);
-        completedCount.current = localEvents.filter((e) => e.status === "done").length;
       }
     } catch {
       // ignore malformed storage
@@ -445,12 +431,6 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     }
   }, [events, ready, refreshCreatedEvents]);
 
-  // Clear any pending demo transitions if the app unmounts.
-  useEffect(() => {
-    const pending = timers.current;
-    return () => pending.forEach(clearTimeout);
-  }, []);
-
   const addEvent = useCallback((input: NewRobotEventInput) => {
     const id = `revent_${Date.now()}`;
     // Resolve to a real datetime, then derive the display labels from it so
@@ -525,48 +505,13 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     removeEventFromCalendarApi(id);
   }, []);
 
-  // Demo: walk an event from Scheduled → Recording → Done, attaching a clip at
-  // the end so Chat can surface the keepsake.
+  // Local/manual start only moves a job into Recording. A completed chat receipt
+  // must come from a real robot/backend artifact with a video URL.
   const runEvent = useCallback((id: string) => {
     setEvents((current) => current.map((event) => (event.id === id && event.status === "scheduled" ? { ...event, status: "recording" } : event)));
-    const t = setTimeout(() => {
-      const result = DEMO_RESULTS[completedCount.current % DEMO_RESULTS.length];
-      completedCount.current += 1;
-      setEvents((current) =>
-        current.map((event) =>
-          event.id === id && event.status === "recording" && !isExternalCaptureEvent(event)
-            ? { ...event, status: "done", completedAtLabel: nowLabel(), result }
-            : event
-        )
-      );
-    }, 4200);
-    timers.current.push(t);
   }, []);
 
-  useEffect(() => {
-    if (!ready) return;
-    const now = Date.now();
-    const dueEvents = events.filter((event) =>
-      event.forRobot &&
-      event.status === "scheduled" &&
-      event.scheduledAt <= now &&
-      !autoStartedEvents.current.has(event.id)
-    );
-    for (const event of dueEvents) {
-      autoStartedEvents.current.add(event.id);
-      runEvent(event.id);
-    }
-
-    const nextDueAt = events
-      .filter((event) => event.forRobot && event.status === "scheduled" && !autoStartedEvents.current.has(event.id))
-      .reduce<number | null>((next, event) => (next === null ? event.scheduledAt : Math.min(next, event.scheduledAt)), null);
-    if (nextDueAt === null) return;
-    const delay = Math.max(250, Math.min(nextDueAt - Date.now(), 60_000));
-    const timer = setTimeout(() => setSchedulerTick((tick) => tick + 1), delay);
-    return () => clearTimeout(timer);
-  }, [events, ready, runEvent, schedulerTick]);
-
-  const completions = useMemo(() => events.filter((event) => event.status === "done"), [events]);
+  const completions = useMemo(() => events.filter((event) => event.status === "done" && !!event.result?.videoUrl), [events]);
 
   const value = useMemo<RobotEventContextValue>(
     () => ({ events, completions, ready, addEvent, updateEvent, keepEvent, removeEvent, runEvent }),

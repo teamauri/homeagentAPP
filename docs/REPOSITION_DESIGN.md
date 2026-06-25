@@ -52,7 +52,7 @@ Minimal change: same three bottom-nav keys, repurposed content. `memory`/Journey
 
 | Tab key | New name | Form | Job |
 | --- | --- | --- | --- |
-| `chat` | **首页 / Home** | a living stream | see today · set tasks · receive deliverables |
+| `chat` | **首页 / Home** | a living stream | see today · set tasks · receive updates |
 | `today` | **Jobs** | a control panel | manage what Auri's set to do: upcoming one-offs + on/off standing jobs |
 | `memory` | **相框 / Frame** | a gallery | highlight products accumulate; idle-frame content |
 
@@ -67,7 +67,7 @@ A pure chronological stream + composer. No pinned status strip — determinism l
 - Past sessions collapse to a one-line gray row (e.g. "出门上学 routine · 4/4 闭环 ✓").
 - A `NOW` marker separates done / happening / not-yet.
 - The running session is a live card near the bottom (camera-up highlight capturing, ticking routine checklist).
-- Deliverables land as their own cards (reading recap, the edited highlight set).
+- Finished updates land as their own cards (reading recap, the edited highlight set).
 - You type to set tasks; one-offs ("next Tue capture the recital") are accepted and confirmed inline.
 
 Device/camera status, if surfaced, lives in the top app header line (`Auri · Living Room`), not a separate block.
@@ -81,7 +81,7 @@ A control panel, two zones:
 
 A `清单 | 日历` toggle switches the recurring view to a **read-only week overlay**: Auri sessions colored by type laid over real calendar events, surfacing conflicts (e.g. "Wed: highlight window collides with parent meeting"). Editing happens back in Google Calendar — Auri's calendar view exists only to show how Auri fits your week, not to manage time.
 
-`+ 新建产出` offers the 4 templates (highlight / reading / routine / check-in); each asks only the minimal config so "set once" takes ~30s.
+`+ New Routine` offers the routine templates; each asks only the minimal config so "set once" takes ~30s.
 
 ### 3c. 相框 (`memory`)
 
@@ -92,9 +92,9 @@ Unchanged from the current Journey/Moments screen (already the canonical style).
 Each session is an agent reporting progress. Rule:
 
 - **In-session progress → update in place.** One live card; completed substeps collapse to ticked one-liners so the card never balloons (4 steps = 4 short rows). One live card per session, sits at the stream bottom while running, then **collapses to a single line** and sinks into history when done.
-- **New message → only for** (a) the deliverable/成品 (you'll want to scroll back and find it), and (b) anything needing your eyes (check-in "tap to start", a "not taken" alert).
+- **New message → only for** (a) a finished update you'll want to scroll back and find, and (b) anything needing your eyes (check-in "tap to start", a "not taken" alert).
 
-Rule of thumb: "would you want to find this in history as its own thing?" Yes → new message; "step 2 of 4 done" → in place. This keeps the stream quiet most of the time — a few deliverables + the occasional tap, not dozens of pings. Per type:
+Rule of thumb: "would you want to find this in history as its own thing?" Yes → new message; "step 2 of 4 done" → in place. This keeps the stream quiet most of the time — a few finished updates + the occasional tap, not dozens of pings. Per type:
 
 | Type | In place | New message |
 | --- | --- | --- |

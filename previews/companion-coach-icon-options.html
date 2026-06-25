@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Companion Coach Icon Options</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        width: 1120px;
+        height: 1120px;
+        padding: 36px;
+        background: #f8f6f2;
+        color: #111;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        height: 1048px;
+        border: 1px solid #e5e0d8;
+        border-radius: 30px;
+        background: #fffefb;
+        padding: 48px 54px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 32px;
+        line-height: 1.1;
+      }
+      .sub {
+        margin-top: 10px;
+        color: #555;
+        font-size: 22px;
+      }
+      .panels {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 46px;
+        margin-top: 42px;
+      }
+      section h2 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        letter-spacing: 0.08em;
+      }
+      .note {
+        min-height: 44px;
+        color: #666;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px 18px;
+        margin-top: 22px;
+      }
+      .option {
+        min-width: 0;
+        text-align: center;
+      }
+      .badge {
+        display: grid;
+        place-items: center;
+        width: 76px;
+        height: 76px;
+        margin: 0 auto;
+        border: 2.5px solid #111;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 10px 20px rgba(17, 17, 17, 0.08);
+        font-size: 38px;
+        line-height: 1;
+      }
+      .name {
+        margin-top: 10px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .current {
+        display: inline-block;
+        margin-top: 5px;
+        border-radius: 999px;
+        background: #e7f3ee;
+        padding: 2px 8px;
+        color: #1f5c42;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid #e5e0d8;
+        margin: 42px 0 28px;
+      }
+      .all {
+        color: #555;
+        font-size: 15px;
+        line-height: 1.65;
+      }
+      .all b { color: #111; }
+      code {
+        border-radius: 6px;
+        background: #f4f1ec;
+        padding: 2px 6px;
+        color: #111;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>COMPANION / COACH ICON OPTIONS</h1>
+      <div class="sub">Previewed with the current chat badge style: white background + thick black border</div>
+
+      <div class="panels">
+        <section>
+          <h2>COMPANION</h2>
+          <div class="note">Reading, learning, play, family support. Current icon is <code>book</code>.</div>
+          <div class="grid">
+            <div class="option"><div class="badge">📖</div><div class="name">book</div><span class="current">current</span></div>
+            <div class="option"><div class="badge">🎵</div><div class="name">music</div></div>
+            <div class="option"><div class="badge">🎹</div><div class="name">piano</div></div>
+            <div class="option"><div class="badge">🎒</div><div class="name">backpack</div></div>
+            <div class="option"><div class="badge">✏️</div><div class="name">pencil</div></div>
+            <div class="option"><div class="badge">💌</div><div class="name">mail-heart</div></div>
+            <div class="option"><div class="badge">❤️</div><div class="name">heart</div></div>
+            <div class="option"><div class="badge">👨‍👩‍👧‍👦</div><div class="name">family</div></div>
+            <div class="option"><div class="badge">🧑</div><div class="name">person</div></div>
+          </div>
+        </section>
+
+        <section>
+          <h2>COACH</h2>
+          <div class="note">Movement, guidance, practice, confidence. Current icon is <code>spark</code>.</div>
+          <div class="grid">
+            <div class="option"><div class="badge">✨</div><div class="name">spark</div><span class="current">current</span></div>
+            <div class="option"><div class="badge">⚽</div><div class="name">soccer</div></div>
+            <div class="option"><div class="badge">🛡️</div><div class="name">shield</div></div>
+            <div class="option"><div class="badge">🗺️</div><div class="name">map</div></div>
+            <div class="option"><div class="badge">🔔</div><div class="name">bell</div></div>
+            <div class="option"><div class="badge">📹</div><div class="name">video-heart</div></div>
+            <div class="option"><div class="badge">📷</div><div class="name">camera-note</div></div>
+            <div class="option"><div class="badge">❤️</div><div class="name">heart</div></div>
+            <div class="option"><div class="badge">🧑</div><div class="name">person</div></div>
+          </div>
+        </section>
+      </div>
+
+      <hr />
+
+      <div class="all">
+        <b>All currently supported icon names:</b>
+        <code>piano</code> <code>music</code> <code>book</code> <code>meal</code> <code>bottle</code>
+        <code>backpack</code> <code>soccer</code> <code>video-heart</code> <code>photos</code>
+        <code>camera-note</code> <code>bell</code> <code>calendar</code> <code>spark</code>
+        <code>robot</code> <code>person</code> <code>girl</code> <code>boy</code> <code>baby</code>
+        <code>mom</code> <code>dad</code> <code>grandma</code> <code>home</code> <code>map</code>
+        <code>family</code> <code>heart</code> <code>mail-heart</code> <code>phone</code>
+        <code>shield</code> <code>pencil</code>
+      </div>
+    </main>
+  </body>
+</html>
