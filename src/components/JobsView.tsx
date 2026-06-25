@@ -13,7 +13,8 @@ import type { TeamAgentId } from "@/lib/team";
 
 const STATUS_LABEL: Record<string, string> = { scheduled: "Scheduled", recording: "Recording", done: "Done" };
 const DAY_MS = 24 * 60 * 60 * 1000;
-const AGENT_PROFILE_KEY = "auri.agentProfiles.v1";
+const AGENT_PROFILE_KEY = "auri.agentProfiles.v2";
+const LEGACY_AGENT_PROFILE_KEY = "auri.agentProfiles.v1";
 const SECTION_TITLE_CLASS = "font-display text-[22px] font-normal leading-none tracking-[-0.01em] text-ink";
 const STACKED_SECTION_CLASS = "mt-8 pb-2";
 
@@ -42,7 +43,20 @@ type AgentProfile = Omit<TeamAgent, "id"> & {
   custom?: boolean;
 };
 
-type AgentProfilePatch = Partial<Omit<AgentProfile, "id" | "custom">>;
+type AgentProfilePatch = Partial<Pick<AgentProfile, "enabled">>;
+type StoredAgentProfiles = {
+  patches?: Record<string, Partial<AgentProfile>>;
+  custom?: AgentProfile[];
+};
+
+function sanitizeBuiltInPatches(patches?: Record<string, Partial<AgentProfile>>): Record<string, AgentProfilePatch> {
+  if (!patches) return {};
+  return Object.fromEntries(
+    Object.entries(patches)
+      .map(([id, patch]) => [id, typeof patch.enabled === "boolean" ? { enabled: patch.enabled } : {}] as const)
+      .filter(([, patch]) => typeof patch.enabled === "boolean")
+  );
+}
 
 const SHORT_DAY: Record<string, string> = {
   Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun", Tomorrow: "Tmrw",
@@ -72,12 +86,11 @@ export function JobsView({ onSubpageChange }: { onSubpageChange?: (open: boolean
 
   useEffect(() => {
     try {
-      const parsed = JSON.parse(localStorage.getItem(AGENT_PROFILE_KEY) || "{}") as {
-        patches?: Record<string, AgentProfilePatch>;
-        custom?: AgentProfile[];
-      };
-      setAgentPatches(parsed.patches ?? {});
+      const stored = localStorage.getItem(AGENT_PROFILE_KEY) ?? localStorage.getItem(LEGACY_AGENT_PROFILE_KEY) ?? "{}";
+      const parsed = JSON.parse(stored) as StoredAgentProfiles;
+      setAgentPatches(sanitizeBuiltInPatches(parsed.patches));
       setCustomAgents(Array.isArray(parsed.custom) ? parsed.custom : []);
+      localStorage.removeItem(LEGACY_AGENT_PROFILE_KEY);
     } catch {
       setAgentPatches({});
       setCustomAgents([]);
@@ -107,7 +120,7 @@ export function JobsView({ onSubpageChange }: { onSubpageChange?: (open: boolean
   const agentProfiles = useMemo<AgentProfile[]>(() => {
     const builtIns = helperTeamAgentIds.map((id) => {
       const base = teamAgentById[id];
-      return { ...base, enabled: true, ...(agentPatches[id] ?? {}) };
+      return { ...base, enabled: agentPatches[id]?.enabled ?? true };
     });
     return [...builtIns, ...customAgents];
   }, [agentPatches, customAgents]);
@@ -189,14 +202,7 @@ export function JobsView({ onSubpageChange }: { onSubpageChange?: (open: boolean
     } else {
       setAgentPatches((cur) => ({
         ...cur,
-        [profile.id]: {
-          name: profile.name,
-          role: profile.role,
-          shortRole: profile.shortRole,
-          summary: profile.summary,
-          responsibilities: profile.responsibilities,
-          enabled: profile.enabled,
-        },
+        [profile.id]: { enabled: profile.enabled },
       }));
     }
     closeForm();
@@ -429,48 +435,36 @@ function AgentProfileView({
 }
 
 function AgentConfigurePanel({ agent, onToggle }: { agent: AgentProfile; onToggle: () => void }) {
-  const [mainCharacter, setMainCharacter] = useState("Kids");
-  const [cutPrompt, setCutPrompt] = useState("Best moments");
-  const [storyStyle, setStoryStyle] = useState("Warm");
-  const [feedback, setFeedback] = useState("Keep shorter");
-
   return (
-    <div className="px-3.5 py-3.5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[18px] font-semibold leading-[22px] text-ink">{agent.name}</h3>
-          <p className="mt-0.5 text-[13px] font-semibold leading-5 text-ink/70">{agent.shortRole}</p>
+    <>
+      <div className="aspect-[4/3] bg-[#eee7dc]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={agent.portrait} alt="" className="h-full w-full object-contain" style={{ objectPosition: agent.portraitPosition }} />
+      </div>
+      <div className="space-y-4 px-3.5 py-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[22px] font-semibold leading-[26px] text-ink">{agent.name}</h3>
+            <p className="mt-1 text-[13px] font-semibold leading-5 text-ink/70">{agent.shortRole}</p>
+          </div>
+          <Toggle on={agent.enabled} onClick={onToggle} label={`Turn ${agent.name} ${agent.enabled ? "off" : "on"}`} />
         </div>
-        <Toggle on={agent.enabled} onClick={onToggle} label={`Turn ${agent.name} ${agent.enabled ? "off" : "on"}`} />
+        <div className="border-t border-line pt-4">
+          <p className="text-[14px] leading-5 text-ink">{agent.role}</p>
+          <p className="mt-2 text-[13px] leading-5 text-muted">{agent.summary}</p>
+        </div>
+        <div className="border-t border-line pt-4">
+          <div className="mb-2 text-[12px] font-semibold uppercase leading-4 tracking-[0.12em] text-muted">Focus</div>
+          <div className="flex flex-wrap gap-2">
+            {agent.responsibilities.map((item) => (
+              <span key={item} className="rounded-full border border-line bg-soft px-3 py-1.5 text-[12px] font-semibold leading-4 text-ink/70">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="space-y-4">
-        <OptionGroup label="Main character" value={mainCharacter} options={["Kids", "Family", "Mia", "Leo"]} onChange={setMainCharacter} />
-        <OptionGroup label="Cut prompt" value={cutPrompt} options={["Best moments", "Funny bits", "Milestones", "Shareable"]} onChange={setCutPrompt} />
-        <OptionGroup label="Story style" value={storyStyle} options={["Warm", "Playful", "Cinematic", "Fast"]} onChange={setStoryStyle} />
-        <OptionGroup label="Feedback" value={feedback} options={["Keep shorter", "More faces", "Less shaky", "More context"]} onChange={setFeedback} />
-      </div>
-    </div>
-  );
-}
-
-function OptionGroup({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  return (
-    <div>
-      <div className="mb-2 text-[12px] font-semibold leading-4 text-muted">{label}</div>
-      <div className="grid grid-cols-2 gap-2">
-        {options.map((option) => (
-          <button
-            key={option}
-            onClick={() => onChange(option)}
-            className={`rounded-[8px] border px-3 py-2 text-left text-[13px] font-semibold leading-4 ${
-              value === option ? "border-ink bg-ink text-white" : "border-line bg-white text-ink/70"
-            }`}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
+    </>
   );
 }
 
