@@ -322,6 +322,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
   // Hydrate created events from localStorage so they survive reloads and the
   // full-page navigation to /calendar (which is a separate route).
   useEffect(() => {
+    let cancelled = false;
     let localEvents: RobotEvent[] = [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -364,9 +365,13 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     // on create; re-posting on every load is what made deleted/dead jobs come
     // back. The server keeps created events on its persistent disk.
 
-    void refreshCreatedEvents();
+    void refreshCreatedEvents().finally(() => {
+      if (!cancelled) setReady(true);
+    });
 
-    setReady(true);
+    return () => {
+      cancelled = true;
+    };
   }, [refreshCreatedEvents]);
 
   // Persist after hydration (the `ready` gate avoids clobbering storage with the
