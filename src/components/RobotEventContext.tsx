@@ -49,8 +49,8 @@ export interface RobotEvent {
   result?: RobotEventResult;
   robot?: CalendarApiEvent["robot"];
   // Highlight jobs capture real moments across a window. While "recording" the
-  // counters climb from robot run state; on "done" the edited set lands as the
-  // keepsake.
+  // counters can climb from actual run state; on "done" the edited set lands as
+  // the keepsake.
   kind?: "highlight";
   highlight?: { clipTarget: number; photoTarget: number };
   highlightProgress?: { clips: number; photos: number };

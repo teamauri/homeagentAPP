@@ -40,6 +40,31 @@ function epochFromId(id: string): number {
   return m ? Number(m[1]) : 0;
 }
 
+function epochFromIso(value?: string): number {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function displayTimeFromIso(value?: string): string | undefined {
+  const time = epochFromIso(value);
+  if (!time) return undefined;
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(time));
+}
+
+function robotStartedAt(event: RobotEvent): number {
+  return epochFromIso(event.robot?.startedAt) || epochFromIso(event.robot?.uploadedAt) || epochFromId(event.id);
+}
+
+function robotCompletedAt(event: RobotEvent): number {
+  return (
+    epochFromIso(event.robot?.highlightSyncedAt) ||
+    epochFromIso(event.robot?.rawOutputReadyAt) ||
+    epochFromIso(event.robot?.uploadedAt) ||
+    robotStartedAt(event)
+  );
+}
+
 const chatThreadIds = [
   "mom-meds",
   "homekeeper-meds",
@@ -88,12 +113,12 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
     })),
     ...completions.map((event) => ({
       key: `done-${event.id}`,
-      at: epochFromId(event.id),
+      at: robotCompletedAt(event),
       node: <RobotCompletionRow key={`done-${event.id}`} event={event} />,
     })),
     ...runningEvents.map((event) => ({
       key: `live-${event.id}`,
-      at: epochFromId(event.id),
+      at: robotStartedAt(event),
       node: <RobotRunningRow key={`live-${event.id}`} event={event} />,
     })),
   ].sort((a, b) => a.at - b.at);
@@ -113,6 +138,7 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
 function RobotRunningRow({ event }: { event: RobotEvent }) {
   const agentId = event.agent ?? "homekeeper";
   const agentName = teamAgentById[agentId]?.name ?? "Auri";
+  const startedLabel = displayTimeFromIso(event.robot?.startedAt) ?? displayTimeFromIso(event.robot?.uploadedAt) ?? event.timeLabel;
   return (
     <div className={chatRowShell}>
       <div className={chatRowAvatar}>
@@ -121,7 +147,7 @@ function RobotRunningRow({ event }: { event: RobotEvent }) {
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
           <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{agentName}</span>
-          <span className="text-[13px] text-muted">{event.timeLabel}</span>
+          <span className="text-[13px] text-muted">{startedLabel}</span>
         </div>
         <div className={chatAvatarOffset}>
           <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
