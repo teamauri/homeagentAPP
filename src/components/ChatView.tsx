@@ -207,9 +207,6 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
     <div className="w-full overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
       {/* Job card header */}
       <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
-        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
-          <DoodleIcon name={teamAgentById[event.agent ?? "homekeeper"]?.icon ?? event.icon} className="h-8 w-8" />
-        </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{event.dateLabel} · {event.timeLabel}</div>
           <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{event.title}</div>

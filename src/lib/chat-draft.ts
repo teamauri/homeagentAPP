@@ -136,12 +136,13 @@ function normalizeRecordingMode(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-function cardForDraft(card: ChatResponseCard, object: ObjectToCreate | undefined): ChatResponseCard {
+function cardForDraft(card: ChatResponseCard, object: ObjectToCreate | undefined, defaultAgent?: TeamAgentId): ChatResponseCard {
   const type = object?.type;
   if (type !== "reminder_draft" && type !== "calendar_draft") return card;
 
   const payload = object?.payload ?? {};
   const merged = { ...(card.metadata ?? {}), ...payload } as Record<string, unknown>;
+  const agent = normalizeAgent(merged.agent) ?? defaultAgent;
   const title = String(payload.title ?? card.title);
   const { id, label } = normalizePerson(merged.recipient ?? merged.person ?? merged.assignee);
   const { dateLabel, timeLabel } = humanizeWhen(merged);
@@ -151,6 +152,7 @@ function cardForDraft(card: ChatResponseCard, object: ObjectToCreate | undefined
     person: id,
     dateLabel,
     timeLabel,
+    ...(agent ? { agent } : {}),
   };
 
   return {
@@ -162,7 +164,7 @@ function cardForDraft(card: ChatResponseCard, object: ObjectToCreate | undefined
   };
 }
 
-export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | undefined, createdId?: string): DraftInfo | undefined {
+export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | undefined, createdId?: string, defaultAgent?: TeamAgentId): DraftInfo | undefined {
   const objType = object?.type;
   const isReminder = objType === "reminder_draft" || card.type === "reminder";
   const isCalendar = objType === "calendar_draft" || card.type === "calendar_draft";
@@ -184,7 +186,7 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
   }
   const { dateLabel, timeLabel } = humanizeWhen(merged);
   const noteRaw = (payload.note ?? (card.body && !BOILERPLATE.test(card.body) ? card.body : undefined)) as string | undefined;
-  const agent = normalizeAgent(merged.agent);
+  const agent = normalizeAgent(merged.agent) ?? defaultAgent;
   const recordingMode = normalizeRecordingMode(merged.recordingMode);
 
   return {
@@ -207,11 +209,12 @@ export function enrichCards(
   cards: ChatResponseCard[] | undefined,
   objects: ObjectToCreate[] | undefined,
   createdFlat: CreatedLocalObject[] | undefined,
-  offset: number
+  offset: number,
+  defaultAgent?: TeamAgentId
 ): ChatTurnCard[] {
   if (!cards) return [];
   return cards.map((card, i) => {
-    const normalizedCard = cardForDraft(card, objects?.[i]);
-    return { ...normalizedCard, draft: buildDraft(normalizedCard, objects?.[i], createdFlat?.[offset + i]?.id) };
+    const normalizedCard = cardForDraft(card, objects?.[i], defaultAgent);
+    return { ...normalizedCard, draft: buildDraft(normalizedCard, objects?.[i], createdFlat?.[offset + i]?.id, defaultAgent) };
   });
 }
