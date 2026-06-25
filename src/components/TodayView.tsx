@@ -121,7 +121,7 @@ function RobotEventRow({ event, onRun }: { event: RobotEvent; onRun: () => void 
   return (
     <article className="flex min-h-[72px] items-center gap-3 rounded-[16px] border border-line/85 bg-white px-3.5 py-2.5 shadow-[0_1px_4px_rgba(8,8,8,0.03)]">
       <div className="grid h-[42px] w-[42px] shrink-0 place-items-center">
-        <DoodleIcon name={event.icon} className="h-9 w-9" />
+        <DoodleIcon name={agent.icon} className="h-9 w-9" />
       </div>
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-[15px] font-semibold leading-[17px] text-ink">{event.title}</h3>

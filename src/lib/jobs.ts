@@ -1,5 +1,5 @@
 import type { PersonId } from "./types";
-import { normalizeTeamAgentId, type TeamAgentId } from "./team";
+import { normalizeTeamAgentId, teamAgentById, type TeamAgentId } from "./team";
 import { todayAt } from "./job-time";
 
 // A "job" is something the family has set Auri to do. Two shapes:
@@ -14,19 +14,6 @@ import { todayAt } from "./job-time";
 // for older saved demo data, but new routines expose one fixed capability per agent.
 export type JobType = "highlight" | "watch" | "reading" | "activity" | "routine" | "checkin" | "baby_log" | "workout" | "nudge";
 export type JobSource = "auri" | "todo" | "gcal";
-
-// DoodleIcon name per job type — reuse the existing hand-drawn set.
-export const jobIcon: Record<JobType, string> = {
-  highlight: "camera-note",
-  watch: "home",
-  reading: "book",
-  activity: "pencil",
-  routine: "backpack",
-  checkin: "bell",
-  baby_log: "baby",
-  workout: "soccer",
-  nudge: "shield",
-};
 
 // A standing job's recurrence: a daily window (start–end) or a single alarm.
 // Times are "HH:MM" 24h so a real datetime can be derived for any day.
@@ -76,6 +63,10 @@ export function agentForJobType(type: JobType): TeamAgentId {
   if (type === "workout") return "coach";
   if (type === "baby_log") return "baby_logger";
   return "homekeeper";
+}
+
+export function iconForJobAgent(agent: TeamAgentId): string {
+  return teamAgentById[agent]?.icon ?? "calendar";
 }
 
 // The time a standing job's daily instance starts (window start, or the alarm).

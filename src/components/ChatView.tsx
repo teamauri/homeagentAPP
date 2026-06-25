@@ -208,7 +208,7 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
       {/* Job card header */}
       <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
         <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
-          <DoodleIcon name={event.icon} className="h-8 w-8" />
+          <DoodleIcon name={teamAgentById[event.agent ?? "homekeeper"]?.icon ?? event.icon} className="h-8 w-8" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{event.dateLabel} · {event.timeLabel}</div>
