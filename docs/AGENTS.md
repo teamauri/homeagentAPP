@@ -29,30 +29,28 @@ Custom agents created in the Jobs UI are profile-only until their id is added to
 ## Built-In Helper Agents
 
 `cameraman`
-: Captures polished keepsake media: family highlights, albums, photo/video memories,
-and video receipts. Use `recordingMode = "cameraman_highlight"` for scheduled robot
-highlight jobs.
+: Captures family moments and turns them into highlight stories. Use
+`recordingMode = "cameraman_highlight"` for scheduled robot highlight jobs.
 
 `watcher`
 : Performs recurring observation: every-X-minutes checks, 10-second clips, activity
 recognition, and observation timelines. Use `recordingMode = "watcher_interval"`.
-Watcher is for knowing what happened, not creating a keepsake film.
+Observer is for knowing what happened, not creating a keepsake film.
 
 `companion`
-: Reading, books, reading moments, learning questions, and kid activities.
+: Reads, learns, and plays with kids using real books and toys.
 
 `coach`
-: Parent home workout coach: quick sets, form cues, reps, and workout routines.
+: Makes workouts easier with form cues and rep counts for the parent.
 Coach is not a parenting advice agent.
 
 `homekeeper`
-: Family operations: reminders, calendar drafts, appointments, school logistics,
-and home checklists. Homekeeper may remind someone to feed the baby, but does not
-record completed care events.
+: Keeps family routines moving with reminders, check-ins, and updates. Homekeeper
+may remind someone to feed the baby, but does not record completed care events.
 
 `baby_logger`
-: Structured baby care logs for events that happened or are being recorded now:
-feeding amount, sleep/nap, diapers, temperature, and medicine taken.
+: User-facing name: Baby Rhythm. Tracks feeds, sleep, and diapers, then suggests
+what's likely next.
 
 `auri`
 : Primary home voice. Auri answers general/advice questions and delegates actionable

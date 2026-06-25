@@ -49,32 +49,32 @@ export const demoFamilyContext = {
     {
       id: "cameraman",
       name: "Cameraman",
-      handles: ["films firsts", "robot clips", "family album", "photo highlights", "video receipts"],
+      handles: ["family moments", "highlight stories"],
     },
     {
       id: "watcher",
-      name: "Watcher",
+      name: "Observer",
       handles: ["interval room checks", "10-second clips", "activity recognition", "observation timeline"],
     },
     {
       id: "companion",
       name: "Companion",
-      handles: ["reading", "books", "questions", "reading moments"],
+      handles: ["reading", "learning", "real books", "toys"],
     },
     {
       id: "homekeeper",
       name: "Homekeeper",
-      handles: ["calendar", "reminders", "school emails", "appointments", "family logistics", "home checklists"],
+      handles: ["reminders", "check-ins", "family routines", "updates"],
     },
     {
       id: "baby_logger",
-      name: "Baby Logger",
-      handles: ["feeding logs", "sleep and naps", "diapers", "temperature", "medicine taken"],
+      name: "Baby Rhythm",
+      handles: ["feeds", "sleep", "diapers", "likely next"],
     },
     {
       id: "coach",
       name: "Coach",
-      handles: ["home workout", "quick sets", "form", "reps"],
+      handles: ["workouts", "form cues", "rep counts"],
     },
   ],
   availableLocalActions: [

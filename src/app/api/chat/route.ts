@@ -235,7 +235,7 @@ function fastRouteResponse(request: ChatRequestBody): ChatAIResponse | undefined
 function ensureWatcherJob(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
   const helper = response.helper ?? {
     teamMemberId: "watcher" as TeamMemberId,
-    name: "Watcher",
+    name: "Observer",
     reply: "收到，我会按间隔观察并记录家里的状态。",
     cards: [],
     objectsToCreate: [],
@@ -250,7 +250,7 @@ function ensureWatcherJob(response: ChatAIResponse, request: ChatRequestBody): C
     helper: {
       ...helper,
       teamMemberId: "watcher",
-      name: "Watcher",
+      name: "Observer",
       cards: synthesizeCardsFromObjects(objectsToCreate),
       objectsToCreate,
     },
@@ -260,7 +260,7 @@ function ensureWatcherJob(response: ChatAIResponse, request: ChatRequestBody): C
 function ensureBabyLoggerJob(response: ChatAIResponse, request: ChatRequestBody): ChatAIResponse {
   const helper = response.helper ?? {
     teamMemberId: "baby_logger" as TeamMemberId,
-    name: "Baby Logger",
+    name: "Baby Rhythm",
     reply: "已记录这条宝宝照护日志。",
     cards: [],
     objectsToCreate: [],
@@ -277,7 +277,7 @@ function ensureBabyLoggerJob(response: ChatAIResponse, request: ChatRequestBody)
     helper: {
       ...helper,
       teamMemberId: "baby_logger",
-      name: "Baby Logger",
+      name: "Baby Rhythm",
       cards: helper.cards?.length ? helper.cards : synthesizeCardsFromObjects(objectsToCreate),
       objectsToCreate,
     },
