@@ -49,8 +49,8 @@ const SHORT_DAY: Record<string, string> = {
 };
 const shortDay = (d: string) => SHORT_DAY[d] ?? d;
 
-export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: () => void; onSubpageChange?: (open: boolean) => void } = {}) {
-  const { events, addEvent, removeEvent, startHighlight } = useRobotEvents();
+export function JobsView({ onSubpageChange }: { onSubpageChange?: (open: boolean) => void } = {}) {
+  const { events, addEvent, removeEvent } = useRobotEvents();
   const children = useChildren();
   const personLabel = (id: string) => children.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   const [standing, setStanding] = useState<StandingJob[]>(() => sortStandingJobs(seedStanding));
@@ -173,13 +173,6 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
     setSel(item);
   };
 
-  // Run a highlight job now: it starts capturing for real and the live counter
-  // card shows up in the Home stream, so jump there to watch it.
-  const run = (job: StandingJob) => {
-    if (job.type === "highlight") startHighlight({ title: job.title, person: job.person });
-    onRunActivity?.();
-  };
-
   const closeForm = () => {
     setCreating(false);
     setEditJob(null);
@@ -287,7 +280,6 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
               first={i === 0}
               onToggle={() => toggle(job.id)}
               onEdit={() => setEditJob(job)}
-              onRun={job.type === "highlight" ? () => run(job) : undefined}
             />
           ))}
         </div>
@@ -539,14 +531,12 @@ function StandingRow({
   first,
   onToggle,
   onEdit,
-  onRun,
 }: {
   job: StandingJob;
   agentProfiles: Record<string, AgentProfile>;
   first: boolean;
   onToggle: () => void;
   onEdit: () => void;
-  onRun?: () => void;
 }) {
   const agent = agentProfiles[job.agent] ?? teamAgentById[job.agent];
   return (
@@ -558,17 +548,6 @@ function StandingRow({
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{job.title}</h3>
         <div className="mt-0.5 flex items-center gap-2 text-[12.5px] leading-[18px] tracking-[0] text-muted">
           <span><span className="font-semibold text-ink/75">{agent?.name}</span> · {job.trigger}</span>
-          {onRun && job.enabled ? (
-            <button
-              onClick={onRun}
-              aria-label={`Run ${job.title} now`}
-              className="inline-grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full border border-line text-ink"
-            >
-              <svg viewBox="0 0 24 24" className="h-[10px] w-[10px] translate-x-[0.5px]" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </button>
-          ) : null}
         </div>
       </div>
       <Toggle on={job.enabled} onClick={onToggle} label={`Turn ${job.enabled ? "off" : "on"} ${job.title}`} />
