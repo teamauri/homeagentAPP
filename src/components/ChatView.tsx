@@ -632,7 +632,8 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const isReminder = draft.kind === "reminder";
   const agentId = draft.agent ?? matchingEvent?.agent ?? "homekeeper";
   const agent = teamAgentById[agentId];
-  const effectiveState = matchingEvent ? "confirmed" : state;
+  const hasCreatedObject = Boolean(draft.objectId);
+  const effectiveState = matchingEvent || hasCreatedObject ? "confirmed" : state;
   const activeEventId = confirmedEventId ?? matchingEvent?.id ?? null;
 
   // Use live edits when confirmed so the confirmed card shows what was saved.
@@ -651,7 +652,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
         dateLabel: draft.dateLabel,
         timeLabel: liveTime,
       });
-    } else {
+    } else if (!hasCreatedObject) {
       const id = addEvent({
         title: liveTitle,
         note: draft.note,
