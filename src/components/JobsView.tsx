@@ -358,25 +358,21 @@ export function JobsView({
 
 function AgentCard({ agent, onOpen }: { agent: AgentProfile; onOpen: () => void }) {
   return (
-    <button
-      onClick={onOpen}
-      className="block w-full overflow-hidden rounded-[8px] border border-line bg-white text-left shadow-[0_2px_10px_rgba(8,8,8,0.035)]"
-    >
-      <div className="h-[210px] bg-[#eee7dc]">
+    <article className="overflow-hidden rounded-[8px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
+      <div className="aspect-[4/3] bg-[#eee7dc]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={agent.portrait} alt="" className="h-full w-full object-cover" style={{ objectPosition: agent.portraitPosition }} />
+        <img src={agent.portrait} alt="" className="h-full w-full object-contain" style={{ objectPosition: agent.portraitPosition }} />
       </div>
-      <div className="px-3.5 py-3.5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-[18px] font-semibold leading-[22px] text-ink">{agent.name}</h3>
-            <p className="mt-0.5 text-[13px] font-semibold leading-5 text-ink/70">{agent.shortRole}</p>
-          </div>
-          <span className="mt-0.5 shrink-0 rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold leading-4 text-ink/60">Configure</span>
-        </div>
-        <p className="mt-2 text-[13px] leading-[18px] text-muted">{agent.role}</p>
+      <div className="border-t border-line px-3.5 py-3">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="w-full rounded-[8px] bg-ink px-4 py-2.5 text-center text-[13px] font-semibold leading-4 text-white shadow-[0_1px_2px_rgba(8,8,8,0.16)]"
+        >
+          Configure
+        </button>
       </div>
-    </button>
+    </article>
   );
 }
 
@@ -398,8 +394,8 @@ function AgentProfileView({
     shortRole: "Custom",
     summary: "A custom agent profile for a future capability.",
     responsibilities: ["New responsibility"],
-    portrait: "/agents/auri-agent-team.png",
-    portraitPosition: "50% 48%",
+    portrait: "/agents/auri-app-cover.png",
+    portraitPosition: "50% 50%",
     icon: "robot",
     tone: "bg-[#E7E0D6]",
     accent: "text-ink",

@@ -51,7 +51,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const title = request.message?.trim() || "Home watch";
     const helper: ChatHelperSegment = {
       teamMemberId: "watcher",
-      name: "Watcher",
+      name: "Observer",
       reply: "收到，我会按间隔拍短片并记录家里的状态。",
       cards: [
         {
@@ -65,7 +65,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "reminder_draft", payload: { title, dateLabel: "Today", person: "family", agent: "watcher", recordingMode: "watcher_interval", note: request.message } }],
     };
-    return auri("交给 Watcher 来持续观察。", { intent: "photo_video", helper, suggestedFollowups: ["改观察频率", "只观察客厅"] });
+    return auri("交给 Observer 来持续观察。", { intent: "photo_video", helper, suggestedFollowups: ["改观察频率", "只观察客厅"] });
   }
 
   if (/拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(input)) {
@@ -98,7 +98,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const description = request.message?.trim() || "Care note";
     const helper: ChatHelperSegment = {
       teamMemberId: "baby_logger",
-      name: "Baby Logger",
+      name: "Baby Rhythm",
       reply: "已记录这条照护日志。",
       cards: [
         {
@@ -112,7 +112,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "baby_log", payload: { childId: person, type: "snack", description, timestamp: new Date().toISOString() } }],
     };
-    return auri("我会让 Baby Logger 记下这条照护记录。", { intent: "baby_log", helper, suggestedFollowups: ["补充数量", "查看今天记录"] });
+    return auri("我会让 Baby Rhythm 记下这条照护记录。", { intent: "baby_log", helper, suggestedFollowups: ["补充数量", "查看今天记录"] });
   }
 
   if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {
