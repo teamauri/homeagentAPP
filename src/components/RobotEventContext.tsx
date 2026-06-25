@@ -77,6 +77,7 @@ export interface NewRobotEventInput {
 type RobotEventContextValue = {
   events: RobotEvent[];
   completions: RobotEvent[];
+  ready: boolean;
   addEvent: (input: NewRobotEventInput) => string;
   updateEvent: (id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "dateLabel" | "timeLabel">>) => void;
   keepEvent: (id: string) => void;
@@ -494,7 +495,10 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
 
   const completions = useMemo(() => events.filter((event) => event.status === "done" && !!event.result?.videoUrl), [events]);
 
-  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent }), [events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent]);
+  const value = useMemo<RobotEventContextValue>(
+    () => ({ events, completions, ready, addEvent, updateEvent, keepEvent, removeEvent, runEvent }),
+    [events, completions, ready, addEvent, updateEvent, keepEvent, removeEvent, runEvent]
+  );
 
   return <RobotEventContext.Provider value={value}>{children}</RobotEventContext.Provider>;
 }

@@ -599,7 +599,7 @@ function writeDraftState(key: string, value: DraftState) {
 // settled state — no navigating away, so the thread stays intact. The settled
 // state is persisted so it stays confirmed/dismissed after a page nav.
 function DraftActionCard({ draft }: { draft: DraftInfo }) {
-  const { addEvent, updateEvent, events } = useRobotEvents();
+  const { addEvent, updateEvent, events, ready: eventsReady } = useRobotEvents();
   const key = draftKey(draft);
 
   // Client-side dedup: find a pending event that matches this draft by title.
@@ -632,6 +632,8 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const isReminder = draft.kind === "reminder";
   const agentId = draft.agent ?? matchingEvent?.agent ?? "homekeeper";
   const agent = teamAgentById[agentId];
+  const effectiveState = matchingEvent ? "confirmed" : state;
+  const activeEventId = confirmedEventId ?? matchingEvent?.id ?? null;
 
   // Use live edits when confirmed so the confirmed card shows what was saved.
   const liveTitle = editTitle || draft.title;
@@ -641,9 +643,9 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const whenLine = [draft.dateLabel, liveTime, livePersonLabel].filter(Boolean).join(" · ");
 
   const confirm = () => {
-    if (confirmedEventId) {
+    if (activeEventId) {
       // Update the existing event — don't create a second calendar entry.
-      updateEvent(confirmedEventId, {
+      updateEvent(activeEventId, {
         title: liveTitle,
         person: livePerson,
         dateLabel: draft.dateLabel,
@@ -672,8 +674,9 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
     setState("dismissed");
   };
 
-  if (state === "dismissed") return null;
-  const confirmed = state === "confirmed";
+  if (!eventsReady) return null;
+  if (effectiveState === "dismissed") return null;
+  const confirmed = effectiveState === "confirmed";
 
   if (confirmed) {
     if (editing) {
