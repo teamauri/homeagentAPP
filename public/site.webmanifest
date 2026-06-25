@@ -1,0 +1,22 @@
+{
+  "name": "Auri",
+  "short_name": "Auri",
+  "icons": [
+    {
+      "src": "/auri-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf8f3",
+  "theme_color": "#e6f5ed"
+}
