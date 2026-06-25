@@ -160,6 +160,11 @@ function normalizeRobotAgent(value: unknown, icon: string): TeamAgentId {
   return agent && agent !== "auri" ? agent : agentFromIcon(icon);
 }
 
+function isExternalCaptureEvent(event: RobotEvent) {
+  const mode = event.recordingMode ?? event.robot?.recordingMode;
+  return mode === "story_tracking_raw_transcript" || mode === "cameraman_highlight" || mode === "watcher_interval";
+}
+
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
   const rawVideoUrl = event.robot?.rawOutputVideoUrl;
   const highlightVideoUrl = event.robot?.highlightVideoUrl;
@@ -224,6 +229,20 @@ function mergeEvents(current: RobotEvent[], incoming: RobotEvent[]) {
     // the calendar can show it; Upcoming hides past jobs at the view level.
     if (tombstoned.has(event.id)) continue;
     const existing = byId.get(event.id);
+    if (existing?.status === "recording" && event.status === "scheduled" && event.forRobot) {
+      const robot = event.robot && existing.robot
+        ? { ...event.robot, ...existing.robot, status: existing.robot.status }
+        : existing.robot ?? event.robot;
+      byId.set(event.id, {
+        ...event,
+        status: "recording",
+        completedAtLabel: existing.completedAtLabel,
+        result: existing.result,
+        robot,
+        kept: existing.kept,
+      });
+      continue;
+    }
     // Preserve client-only fields the API doesn't know about (e.g. kept).
     byId.set(event.id, existing ? { ...event, kept: existing.kept } : event);
   }
@@ -264,9 +283,11 @@ function removeEventFromCalendarApi(id: string) {
 export function RobotEventProvider({ children }: { children: ReactNode }) {
   const [events, setEvents] = useState<RobotEvent[]>([]);
   const [ready, setReady] = useState(false);
+  const [schedulerTick, setSchedulerTick] = useState(0);
   const completedCount = useRef(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const syncingTasks = useRef<Set<string>>(new Set());
+  const autoStartedEvents = useRef<Set<string>>(new Set());
 
   const refreshCreatedEvents = useCallback(() => {
     return fetch("/api/calendar?source=created")
@@ -495,7 +516,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
       completedCount.current += 1;
       setEvents((current) =>
         current.map((event) =>
-          event.id === id && event.status === "recording"
+          event.id === id && event.status === "recording" && !isExternalCaptureEvent(event)
             ? { ...event, status: "done", completedAtLabel: nowLabel(), result }
             : event
         )
@@ -555,6 +576,29 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     timers.current.push(first);
     return id;
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const now = Date.now();
+    const dueEvents = events.filter((event) =>
+      event.forRobot &&
+      event.status === "scheduled" &&
+      event.scheduledAt <= now &&
+      !autoStartedEvents.current.has(event.id)
+    );
+    for (const event of dueEvents) {
+      autoStartedEvents.current.add(event.id);
+      runEvent(event.id);
+    }
+
+    const nextDueAt = events
+      .filter((event) => event.forRobot && event.status === "scheduled" && !autoStartedEvents.current.has(event.id))
+      .reduce<number | null>((next, event) => (next === null ? event.scheduledAt : Math.min(next, event.scheduledAt)), null);
+    if (nextDueAt === null) return;
+    const delay = Math.max(250, Math.min(nextDueAt - Date.now(), 60_000));
+    const timer = setTimeout(() => setSchedulerTick((tick) => tick + 1), delay);
+    return () => clearTimeout(timer);
+  }, [events, ready, runEvent, schedulerTick]);
 
   const completions = useMemo(() => events.filter((event) => event.status === "done"), [events]);
 
