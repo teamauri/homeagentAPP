@@ -67,7 +67,7 @@ const avatarStyles = {
   dad: "from-[#d9e7ef] to-[#4d6777] text-white",
 };
 
-const chatBubbleBg = "bg-[#e7f3ee]";
+const chatBubbleBg = "bg-[#DDEEE4]";
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
   const { completions, events } = useRobotEvents();
