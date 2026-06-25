@@ -49,8 +49,14 @@ const SHORT_DAY: Record<string, string> = {
 };
 const shortDay = (d: string) => SHORT_DAY[d] ?? d;
 
-export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: () => void; onSubpageChange?: (open: boolean) => void } = {}) {
-  const { events, addEvent, removeEvent, startHighlight } = useRobotEvents();
+export function JobsView({
+  onSubpageChange,
+  onBeforeSubpageOpen,
+}: {
+  onSubpageChange?: (open: boolean) => void;
+  onBeforeSubpageOpen?: () => void;
+} = {}) {
+  const { events, addEvent, removeEvent } = useRobotEvents();
   const children = useChildren();
   const personLabel = (id: string) => children.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
   const [standing, setStanding] = useState<StandingJob[]>(() => sortStandingJobs(seedStanding));
@@ -112,6 +118,11 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
     return [...builtIns, ...customAgents];
   }, [agentPatches, customAgents]);
 
+  const agentProfileById = useMemo<Record<string, AgentProfile>>(
+    () => Object.fromEntries(agentProfiles.map((agent) => [agent.id, agent])),
+    [agentProfiles]
+  );
+
   const now = Date.now();
 
   // The next time a standing job runs: today if its start is still ahead,
@@ -120,11 +131,6 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
     const todayStart = standingScheduledAtToday(job, now);
     return todayStart > now ? todayStart : todayStart + DAY_MS;
   };
-  const agentProfileById = useMemo<Record<string, AgentProfile>>(
-    () => Object.fromEntries(agentProfiles.map((agent) => [agent.id, agent])),
-    [agentProfiles]
-  );
-
 
   // Upcoming = future one-time jobs (status not done) + the next instance of
   // each enabled standing job, all sorted soonest-first.
@@ -163,21 +169,34 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   const toggle = (id: string) =>
     setStanding((cur) => cur.map((job) => (job.id === id ? { ...job, enabled: !job.enabled } : job)));
 
+  const openCreating = () => {
+    onBeforeSubpageOpen?.();
+    setCreating(true);
+  };
+
+  const openEditJob = (job: StandingJob) => {
+    onBeforeSubpageOpen?.();
+    setEditJob(job);
+  };
+
+  const openEditingAgent = (id: string) => {
+    onBeforeSubpageOpen?.();
+    setEditingAgentId(id);
+  };
+
+  const openCreatingAgent = () => {
+    onBeforeSubpageOpen?.();
+    setCreatingAgent(true);
+  };
+
   // A one-time job opens the detail sheet; a standing instance opens its editor.
   const selectItem = (item: UpcomingItem) => {
     if (item.standingId) {
       const job = standing.find((j) => j.id === item.standingId);
-      if (job) setEditJob(job);
+      if (job) openEditJob(job);
       return;
     }
     setSel(item);
-  };
-
-  // Run a highlight job now: it starts capturing for real and the live counter
-  // card shows up in the Home stream, so jump there to watch it.
-  const run = (job: StandingJob) => {
-    if (job.type === "highlight") startHighlight({ title: job.title, person: job.person });
-    onRunActivity?.();
   };
 
   const closeForm = () => {
@@ -274,7 +293,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
       <section className={STACKED_SECTION_CLASS}>
         <div className="mb-2.5 flex items-baseline justify-between px-1">
           <h2 className={SECTION_TITLE_CLASS}>Routines</h2>
-          <button onClick={() => setCreating(true)} className="flex items-center gap-1 text-[13px] font-semibold leading-4 text-auri">
+          <button onClick={openCreating} className="flex items-center gap-1 text-[13px] font-semibold leading-4 text-auri">
             <span className="text-[15px] leading-none">+</span> New Routine
           </button>
         </div>
@@ -286,8 +305,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
               agentProfiles={agentProfileById}
               first={i === 0}
               onToggle={() => toggle(job.id)}
-              onEdit={() => setEditJob(job)}
-              onRun={job.type === "highlight" ? () => run(job) : undefined}
+              onEdit={() => openEditJob(job)}
             />
           ))}
         </div>
@@ -296,7 +314,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
       <section className={STACKED_SECTION_CLASS}>
         <div className="mb-2.5 flex items-baseline justify-between px-1">
           <h2 className={SECTION_TITLE_CLASS}>Your agents</h2>
-          <button onClick={() => setCreatingAgent(true)} className="flex items-center gap-1 text-[13px] font-semibold leading-4 text-auri">
+          <button onClick={openCreatingAgent} className="flex items-center gap-1 text-[13px] font-semibold leading-4 text-auri">
             <span className="text-[15px] leading-none">+</span> New agent
           </button>
         </div>
@@ -305,7 +323,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
             <AgentCard
               key={agent.id}
               agent={agent}
-              onOpen={() => setEditingAgentId(agent.id)}
+              onOpen={() => openEditingAgent(agent.id)}
             />
           ))}
         </div>
@@ -518,9 +536,9 @@ function UpcomingRow({
   const agent = agentProfiles[item.agent] ?? teamAgentById[item.agent];
   return (
     <button onClick={onSelect} className={`flex w-full items-center gap-3 px-3.5 py-3 text-left ${first ? "" : "border-t border-line/70"}`}>
-      <div className="w-[52px] shrink-0 text-center">
+      <div className="w-[64px] shrink-0 text-center">
         <div className="text-[11px] leading-4 text-muted">{shortDay(deriveDateLabel(item.scheduledAt))}</div>
-        <div className="text-[13px] font-semibold leading-4 text-ink">{deriveTimeLabel(item.scheduledAt)}</div>
+        <div className="whitespace-nowrap text-[13px] font-semibold leading-4 text-ink tabular-nums">{deriveTimeLabel(item.scheduledAt)}</div>
       </div>
       <span className="h-8 w-px shrink-0 bg-line" aria-hidden="true" />
       <div className="min-w-0 flex-1">
@@ -543,14 +561,12 @@ function StandingRow({
   first,
   onToggle,
   onEdit,
-  onRun,
 }: {
   job: StandingJob;
   agentProfiles: Record<string, AgentProfile>;
   first: boolean;
   onToggle: () => void;
   onEdit: () => void;
-  onRun?: () => void;
 }) {
   const agent = agentProfiles[job.agent] ?? teamAgentById[job.agent];
   return (
@@ -562,17 +578,6 @@ function StandingRow({
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{job.title}</h3>
         <div className="mt-0.5 flex items-center gap-2 text-[12.5px] leading-[18px] tracking-[0] text-muted">
           <span><span className="font-semibold text-ink/75">{agent?.name}</span> · {job.trigger}</span>
-          {onRun && job.enabled ? (
-            <button
-              onClick={onRun}
-              aria-label={`Run ${job.title} now`}
-              className="inline-grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full border border-line text-ink"
-            >
-              <svg viewBox="0 0 24 24" className="h-[10px] w-[10px] translate-x-[0.5px]" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </button>
-          ) : null}
         </div>
       </div>
       <Toggle on={job.enabled} onClick={onToggle} label={`Turn ${job.enabled ? "off" : "on"} ${job.title}`} />

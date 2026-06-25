@@ -8,6 +8,7 @@ import {
   CalendarRobotCaptureStatus,
   deriveCalendarEventIcon,
 } from "@/lib/calendar-api";
+import { scheduledAtFromLabels } from "@/lib/job-time";
 import { moments } from "@/lib/mock-data";
 import { helperTeamAgentIds, normalizeTeamAgentId } from "@/lib/team";
 import { PersonId, SourceType, Status } from "@/lib/types";
@@ -68,6 +69,14 @@ export interface DemoMemoryItem {
   targetRoute: string;
   metadata: Record<string, unknown>;
 }
+
+type DemoMemoryOptions = {
+  title?: string;
+  body?: string;
+  status?: Status;
+  statusLabel?: string;
+  metadata?: Record<string, unknown>;
+};
 
 const globalStore = globalThis as typeof globalThis & {
   __auriDemoObjects?: StoredObject[];
@@ -156,6 +165,29 @@ function statusFor(type: ObjectToCreate["type"]): CreatedLocalObject["status"] {
   return "draft";
 }
 
+function timestampFromCalendarId(id?: string): number | undefined {
+  const match = id?.match(/^revent_(\d+)/);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function scheduledAtFromPayload(payload: Record<string, unknown>, dateLabel: string, timeLabel: string, anchor = Date.now()) {
+  if (typeof payload.scheduledAt === "number" && Number.isFinite(payload.scheduledAt)) return payload.scheduledAt;
+  const datetime = typeof payload.datetime === "string" ? payload.datetime : typeof payload.dateTime === "string" ? payload.dateTime : undefined;
+  if (datetime) {
+    const parsed = new Date(datetime).getTime();
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return scheduledAtFromLabels(dateLabel, timeLabel, anchor) ?? anchor;
+}
+
+function legacyCalendarScheduledAt(event: CalendarApiEvent) {
+  if (typeof event.scheduledAt === "number" && Number.isFinite(event.scheduledAt)) return event.scheduledAt;
+  const createdAnchor = event.createdAt ? new Date(event.createdAt).getTime() : timestampFromCalendarId(event.id);
+  return scheduledAtFromLabels(event.dateLabel, event.timeLabel, createdAnchor) ?? createdAnchor;
+}
+
 export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLocalObject[] {
   const currentStore = store();
 
@@ -179,6 +211,10 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
           existingEvent.timeLabel = new Intl.DateTimeFormat("en-US", {
             hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai",
           }).format(new Date(Date.now() + 60_000));
+          existingEvent.updatedAt = new Date().toISOString();
+        }
+        if (!Number.isFinite(existingEvent.scheduledAt)) {
+          existingEvent.scheduledAt = legacyCalendarScheduledAt(existingEvent);
           existingEvent.updatedAt = new Date().toISOString();
         }
         const agent = toCalendarJobAgent(p.agent);
@@ -241,10 +277,12 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
       const timeLabel = rawTimeLabel.trim().toLowerCase() === "now"
         ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai" }).format(new Date(Date.now() + 60_000))
         : normalizeTimeLabel(rawTimeLabel);
+      const scheduledAt = scheduledAtFromPayload(p, dateLabel, timeLabel);
       const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
       upsertDemoCalendarEvent({
         title,
         person,
+        scheduledAt,
         dateLabel,
         timeLabel,
         note,
@@ -291,6 +329,15 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
   const now = new Date().toISOString();
   const existing = input.id ? currentStore.__auriDemoCalendarEvents?.find((event) => event.id === input.id) : undefined;
   const forRobot = Boolean(input.forRobot);
+  const scheduledAt =
+    input.scheduledAt ??
+    existing?.scheduledAt ??
+    scheduledAtFromLabels(
+      input.dateLabel,
+      input.timeLabel,
+      existing?.createdAt ? new Date(existing.createdAt).getTime() : Date.now()
+    ) ??
+    Date.now();
   const event: CalendarApiEvent = {
     ...existing,
     id: nextCalendarId(input.id),
@@ -298,7 +345,7 @@ export function upsertDemoCalendarEvent(input: CalendarEventInput): CalendarApiE
     note: input.note,
     body: input.body ?? input.note,
     person: input.person,
-    scheduledAt: input.scheduledAt ?? existing?.scheduledAt,
+    scheduledAt,
     dateLabel: input.dateLabel,
     timeLabel: input.timeLabel,
     icon: input.icon ?? existing?.icon ?? deriveCalendarEventIcon(input.title, input.person),
@@ -478,10 +525,49 @@ function sourceLabel(source: DemoMediaSource) {
   return source === "auri" ? "Auri Robot" : "Phone";
 }
 
+const DISPLAY_TIME_ZONE = "Asia/Shanghai";
+
+function zonedDayNumber(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: DISPLAY_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return undefined;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+function dateLabelFor(date: Date, now = new Date()) {
+  const day = zonedDayNumber(date);
+  const today = zonedDayNumber(now);
+  if (day !== undefined && today !== undefined) {
+    if (day === today) return "Today";
+    if (day === today - 1) return "Yesterday";
+  }
+  const sameYear = new Intl.DateTimeFormat("en-US", { timeZone: DISPLAY_TIME_ZONE, year: "numeric" }).format(date) ===
+    new Intl.DateTimeFormat("en-US", { timeZone: DISPLAY_TIME_ZONE, year: "numeric" }).format(now);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: DISPLAY_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
+}
+
 function timeLabel(dateString: string) {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return "Just now";
-  return `Today · ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  const time = new Intl.DateTimeFormat("en-US", {
+    timeZone: DISPLAY_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+  return `${dateLabelFor(date)} · ${time}`;
 }
 
 export function addDemoMedia(inputs: DemoMediaInput[], defaultSource: DemoMediaSource): DemoMediaItem[] {
@@ -515,7 +601,7 @@ export function addDemoMedia(inputs: DemoMediaInput[], defaultSource: DemoMediaS
 
 export function createDemoMemoryFromMedia(
   mediaItems: DemoMediaItem[],
-  options?: { title?: string; body?: string; status?: Status; statusLabel?: string }
+  options?: DemoMemoryOptions
 ) {
   if (!mediaItems.length) return undefined;
 
@@ -524,6 +610,7 @@ export function createDemoMemoryFromMedia(
   const hasPhone = mediaItems.some((item) => item.source === "phone");
   const sourceType: SourceType = hasAuri && hasPhone ? "photos" : first.sourceType;
   const memoryId = nextId("memory", "__auriDemoMemoryCounter");
+  const firstMediaMetadata = first.metadata ?? {};
   const memory: DemoMemoryItem = {
     id: memoryId,
     title: options?.title || first.title,
@@ -539,8 +626,10 @@ export function createDemoMemoryFromMedia(
     // [id] in /memory/[id] is the memory id; the detail page joins mediaIds.
     targetRoute: `/memory/${memoryId}`,
     metadata: {
+      ...firstMediaMetadata,
       mediaCount: mediaItems.length,
       sources: [...new Set(mediaItems.map((item) => item.source))],
+      ...options?.metadata,
     },
   };
 

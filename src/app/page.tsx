@@ -1,6 +1,6 @@
 "use client";
 
-import { MouseEvent, useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppShell, TabKey } from "@/components/AppShell";
 import { JobsView } from "@/components/JobsView";
 import { ChatView, LiveChatTurn } from "@/components/ChatView";
@@ -13,6 +13,7 @@ import { enrichCards } from "@/lib/chat-draft";
 const HOME_TAB_KEY = "auri.homeTab.v1";
 const HOME_RETURN_KEY = "auri.returnHome.v1";
 const HOME_SCROLL_PREFIX = "auri.homeScroll.";
+const HOME_TABS: TabKey[] = ["chat", "today", "memory"];
 
 declare global {
   interface Window {
@@ -59,6 +60,9 @@ function HomeInner() {
   const tabRef = useRef<TabKey>("chat");
   const returningHomeRef = useRef(false);
   const liveTurnCountRef = useRef<number | null>(null);
+  const visitedTabsRef = useRef<Set<TabKey>>(new Set(["chat"]));
+  const pendingRestoreRef = useRef<{ tab: TabKey; allowRestore: boolean } | null>(null);
+  const jobsSubpageRef = useRef(false);
 
   const scrollKey = (targetTab: TabKey) => `${HOME_SCROLL_PREFIX}${targetTab}.v1`;
 
@@ -71,20 +75,36 @@ function HomeInner() {
     } catch { /* ignore */ }
   };
 
+  const saveVisibleTabScroll = () => {
+    if (tabRef.current === "today" && jobsSubpageRef.current) return;
+    saveScrollForTab(tabRef.current);
+  };
+
+  const defaultScrollForTab = (targetTab: TabKey, el: HTMLDivElement) => (
+    targetTab === "chat" ? el.scrollHeight - el.clientHeight : 0
+  );
+
   const restoreScrollForTab = (targetTab: TabKey, allowRestore: boolean) => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    requestAnimationFrame(() => {
+    const apply = () => {
       try {
         const saved = allowRestore ? sessionStorage.getItem(scrollKey(targetTab)) : null;
         if (saved !== null) {
           el.scrollTop = Number(saved);
         } else {
-          el.scrollTop = targetTab === "chat" ? el.scrollHeight : 0;
+          el.scrollTop = defaultScrollForTab(targetTab, el);
         }
       } catch {
-        el.scrollTop = targetTab === "chat" ? el.scrollHeight : 0;
+        el.scrollTop = defaultScrollForTab(targetTab, el);
       }
+    };
+    // Restore after the tab content is committed, then again after async layout
+    // work (images/data hydration) has had a chance to affect scrollHeight.
+    requestAnimationFrame(() => {
+      apply();
+      requestAnimationFrame(apply);
+      window.setTimeout(apply, 250);
     });
   };
 
@@ -109,6 +129,7 @@ function HomeInner() {
         }
       } else {
         sessionStorage.removeItem(HOME_TAB_KEY);
+        HOME_TABS.forEach((homeTab) => sessionStorage.removeItem(scrollKey(homeTab)));
       }
     } catch { /* ignore */ }
     try {
@@ -131,14 +152,43 @@ function HomeInner() {
   // When returning from another route, restore that tab's saved scroll offset.
   useEffect(() => {
     if (!liveLoaded) return;
-    restoreScrollForTab(tabRef.current, returningHomeRef.current);
+    const initialTab = tabRef.current;
+    visitedTabsRef.current.add(initialTab);
+    restoreScrollForTab(initialTab, returningHomeRef.current);
 
     const saveScroll = () => {
-      saveScrollForTab(tabRef.current);
+      saveVisibleTabScroll();
     };
     window.addEventListener("pagehide", saveScroll);
     return () => window.removeEventListener("pagehide", saveScroll);
   }, [liveLoaded]);
+
+  useLayoutEffect(() => {
+    if (!liveLoaded) return;
+    const pending = pendingRestoreRef.current;
+    if (!pending || pending.tab !== tab) return;
+    pendingRestoreRef.current = null;
+    restoreScrollForTab(pending.tab, pending.allowRestore);
+  }, [tab, liveLoaded]);
+
+  useLayoutEffect(() => {
+    if (!liveLoaded || tab !== "today") {
+      jobsSubpageRef.current = jobsSubpage;
+      return;
+    }
+    const wasSubpage = jobsSubpageRef.current;
+    jobsSubpageRef.current = jobsSubpage;
+    if (!wasSubpage && jobsSubpage) {
+      requestAnimationFrame(() => {
+        const el = scrollContainerRef.current;
+        if (el && tabRef.current === "today") el.scrollTop = 0;
+      });
+      return;
+    }
+    if (wasSubpage && !jobsSubpage) {
+      restoreScrollForTab("today", true);
+    }
+  }, [jobsSubpage, liveLoaded, tab]);
 
   const markReturnFromChildRoute = () => {
     saveScrollForTab(tabRef.current);
@@ -173,7 +223,7 @@ function HomeInner() {
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    const save = () => saveScrollForTab(tabRef.current);
+    const save = () => saveVisibleTabScroll();
     el.addEventListener("scroll", save, { passive: true });
     return () => el.removeEventListener("scroll", save);
   }, [liveLoaded]);
@@ -186,7 +236,7 @@ function HomeInner() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "hidden") saveScrollForTab(tabRef.current);
+      if (document.visibilityState === "hidden") saveVisibleTabScroll();
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
@@ -214,11 +264,14 @@ function HomeInner() {
   }, [liveTurns, liveLoaded]);
 
   const switchTab = (next: TabKey) => {
+    if (next === tabRef.current) return;
     saveScrollForTab(tabRef.current);
+    const allowRestore = visitedTabsRef.current.has(next);
+    visitedTabsRef.current.add(next);
     tabRef.current = next;
+    pendingRestoreRef.current = { tab: next, allowRestore };
     setTab(next);
     try { sessionStorage.setItem(HOME_TAB_KEY, next); } catch { /* ignore */ }
-    restoreScrollForTab(next, true);
   };
 
   const sendComposerMessage = async (message: string, imageUrl?: string) => {
@@ -331,7 +384,13 @@ function HomeInner() {
           Hiding with `hidden` preserves each view's state between tab switches.
         */}
         <div className={tab === "today" ? "" : "hidden"}>
-          <JobsView onRunActivity={() => switchTab("chat")} onSubpageChange={setJobsSubpage} />
+          <JobsView
+            onSubpageChange={setJobsSubpage}
+            onBeforeSubpageOpen={() => {
+              saveScrollForTab("today");
+              jobsSubpageRef.current = true;
+            }}
+          />
         </div>
         <div className={tab === "chat" ? "" : "hidden"}>
           <ChatView liveTurns={liveTurns} />

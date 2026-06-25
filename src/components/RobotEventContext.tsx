@@ -49,8 +49,8 @@ export interface RobotEvent {
   result?: RobotEventResult;
   robot?: CalendarApiEvent["robot"];
   // Highlight jobs capture real moments across a window. While "recording" the
-  // counters climb from actual run state (see startHighlight); on "done" the
-  // edited set lands as the keepsake.
+  // counters climb from robot run state; on "done" the edited set lands as the
+  // keepsake.
   kind?: "highlight";
   highlight?: { clipTarget: number; photoTarget: number };
   highlightProgress?: { clips: number; photos: number };
@@ -82,7 +82,6 @@ type RobotEventContextValue = {
   keepEvent: (id: string) => void;
   removeEvent: (id: string) => void;
   runEvent: (id: string) => void;
-  startHighlight: (opts?: { title?: string; person?: PersonId; clipTarget?: number; photoTarget?: number }) => string;
 };
 
 const RobotEventContext = createContext<RobotEventContextValue | null>(null);
@@ -160,16 +159,29 @@ function normalizeRobotAgent(value: unknown, icon: string): TeamAgentId {
   return agent && agent !== "auri" ? agent : agentFromIcon(icon);
 }
 
+function timestampFromEventId(id: string): number | undefined {
+  const match = id.match(/^revent_(\d+)/);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function legacyScheduledAt(dateLabel: string, timeLabel: string, anchor?: number) {
+  return scheduledAtFromLabels(dateLabel, timeLabel, anchor ?? Date.now());
+}
+
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
   const rawVideoUrl = event.robot?.rawOutputVideoUrl;
   const highlightVideoUrl = event.robot?.highlightVideoUrl;
   const icon = (event.icon && event.icon !== "spark") ? event.icon : deriveCalendarEventIcon(event.title, event.person);
   // Prefer the durable absolute time. Legacy events (no scheduledAt) fall back
-  // to parsing the labels; refreshCreatedEvents purges those separately.
+  // to parsing labels relative to the event's creation time. Otherwise an old
+  // frozen "Today" label gets reinterpreted as the current day on every read.
+  const createdAnchor = event.createdAt ? new Date(event.createdAt).getTime() : timestampFromEventId(event.id);
   const scheduledAt =
     typeof event.scheduledAt === "number"
       ? event.scheduledAt
-      : scheduledAtFromLabels(event.dateLabel, event.timeLabel) ??
+      : legacyScheduledAt(event.dateLabel, event.timeLabel, createdAnchor) ??
         (event.createdAt ? new Date(event.createdAt).getTime() : Date.now());
   return {
     id: event.id,
@@ -299,7 +311,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
           // Backfill scheduledAt for events stored before timestamps existed.
           const scheduledAt = Number.isFinite(e.scheduledAt)
             ? e.scheduledAt
-            : scheduledAtFromLabels(e.dateLabel, e.timeLabel) ?? Date.now();
+            : legacyScheduledAt(e.dateLabel, e.timeLabel, timestampFromEventId(e.id)) ?? Date.now();
           // Re-derive labels so a frozen "Today" from a prior day shows correctly.
           const icon = e.icon || deriveEventIcon(e.title, e.person);
           return {
@@ -504,61 +516,9 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
     timers.current.push(t);
   }, []);
 
-  // Start a highlight job: it goes straight to "recording" and the capture
-  // counters tick up from real run state until both targets are met, then it
-  // settles to "done" with the edited set. The progress lives on the event, so
-  // the Home stream renders a live counter card bound to it.
-  const startHighlight = useCallback((opts?: { title?: string; person?: PersonId; clipTarget?: number; photoTarget?: number }) => {
-    const id = `revent_${Date.now()}`;
-    const clipTarget = opts?.clipTarget ?? 3;
-    const photoTarget = opts?.photoTarget ?? 5;
-    setEvents((current) => [
-      ...current,
-      {
-        id,
-        title: opts?.title ?? "Evening highlights",
-        person: opts?.person ?? "family",
-        scheduledAt: Date.now(),
-        dateLabel: "Today",
-        timeLabel: nowLabel(),
-        icon: "camera-note",
-        agent: "cameraman" as TeamAgentId,
-        recordingMode: "cameraman_highlight",
-        forRobot: true,
-        kind: "highlight",
-        highlight: { clipTarget, photoTarget },
-        highlightProgress: { clips: 0, photos: 0 },
-        status: "recording",
-      },
-    ]);
-
-    // Closure-tracked progress keeps each setEvents updater pure (no scheduling
-    // side effects inside the updater).
-    let clips = 0;
-    let photos = 0;
-    const step = () => {
-      // Catch whichever target is proportionally furthest behind.
-      if (photos < photoTarget && (clips >= clipTarget || photos / photoTarget <= clips / clipTarget)) photos += 1;
-      else if (clips < clipTarget) clips += 1;
-
-      if (clips >= clipTarget && photos >= photoTarget) {
-        const result = DEMO_RESULTS[completedCount.current % DEMO_RESULTS.length];
-        completedCount.current += 1;
-        setEvents((current) => current.map((event) => (event.id === id ? { ...event, highlightProgress: { clips, photos }, status: "done", completedAtLabel: nowLabel(), result } : event)));
-        return;
-      }
-      setEvents((current) => current.map((event) => (event.id === id ? { ...event, highlightProgress: { clips, photos } } : event)));
-      const next = setTimeout(step, 850);
-      timers.current.push(next);
-    };
-    const first = setTimeout(step, 850);
-    timers.current.push(first);
-    return id;
-  }, []);
-
   const completions = useMemo(() => events.filter((event) => event.status === "done"), [events]);
 
-  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent, startHighlight }), [events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent, startHighlight]);
+  const value = useMemo<RobotEventContextValue>(() => ({ events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent }), [events, completions, addEvent, updateEvent, keepEvent, removeEvent, runEvent]);
 
   return <RobotEventContext.Provider value={value}>{children}</RobotEventContext.Provider>;
 }
