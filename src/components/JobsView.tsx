@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { jobIcon, loadStandingJobs, seedStanding, sortStandingJobs, standingScheduledAtToday, STANDING_KEY, type StandingJob } from "@/lib/jobs";
+import { loadStandingJobs, seedStanding, sortStandingJobs, standingScheduledAtToday, STANDING_KEY, type StandingJob } from "@/lib/jobs";
 import { deriveDateLabel, deriveTimeLabel } from "@/lib/job-time";
-import { helperTeamAgentIds, teamAgentById, teamAgents, type TeamAgent } from "@/lib/team";
+import { helperTeamAgentIds, teamAgentById, type TeamAgent } from "@/lib/team";
 import { useChildren } from "./FamilyContext";
 import { DoodleIcon } from "./Icons";
 import { NewJobView } from "./NewJobView";
@@ -31,7 +31,6 @@ type UpcomingItem = {
   standingId?: string; // backed by a standing job (opens its editor)
   title: string;
   scheduledAt: number; // canonical time — drives ordering + the derived labels
-  iconName: string;
   agent: TeamAgentId;
   meta: string;
   forRobot: boolean;
@@ -43,7 +42,7 @@ type AgentProfile = Omit<TeamAgent, "id"> & {
   custom?: boolean;
 };
 
-type AgentProfilePatch = Partial<Pick<AgentProfile, "name" | "role" | "shortRole" | "summary" | "responsibilities" | "enabled">>;
+type AgentProfilePatch = Partial<Omit<AgentProfile, "id" | "custom">>;
 
 const SHORT_DAY: Record<string, string> = {
   Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun", Tomorrow: "Tmrw",
@@ -121,6 +120,11 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
     const todayStart = standingScheduledAtToday(job, now);
     return todayStart > now ? todayStart : todayStart + DAY_MS;
   };
+  const agentProfileById = useMemo<Record<string, AgentProfile>>(
+    () => Object.fromEntries(agentProfiles.map((agent) => [agent.id, agent])),
+    [agentProfiles]
+  );
+
 
   // Upcoming = future one-time jobs (status not done) + the next instance of
   // each enabled standing job, all sorted soonest-first.
@@ -132,7 +136,6 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         eventId: e.id,
         title: e.title,
         scheduledAt: e.scheduledAt,
-        iconName: e.icon,
         agent: e.agent ?? "homekeeper",
         meta: personLabel(e.person),
         forRobot: true,
@@ -144,7 +147,6 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         standingId: job.id,
         title: job.title,
         scheduledAt: standingNextOccurrence(job),
-        iconName: jobIcon[job.type],
         agent: job.agent,
         meta: personLabel(job.person),
         forRobot: true,
@@ -262,7 +264,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         </div>
         <div className="overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
           {upcomingItems.length ? (
-            upcomingItems.map((item, i) => <UpcomingRow key={item.id} item={item} first={i === 0} onSelect={() => selectItem(item)} />)
+            upcomingItems.map((item, i) => <UpcomingRow key={item.id} item={item} agentProfiles={agentProfileById} first={i === 0} onSelect={() => selectItem(item)} />)
           ) : (
             <p className="px-4 py-5 text-[13px] leading-5 text-muted">Nothing scheduled yet. Tap “New” to set Auri a job.</p>
           )}
@@ -281,6 +283,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
             <StandingRow
               key={job.id}
               job={job}
+              agentProfiles={agentProfileById}
               first={i === 0}
               onToggle={() => toggle(job.id)}
               onEdit={() => setEditJob(job)}
@@ -317,7 +320,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
           <EventDetailSheet
             detail={{
               title: sel.title,
-              icon: sel.iconName,
+              icon: agentProfileById[sel.agent]?.icon ?? teamAgentById[sel.agent]?.icon ?? "calendar",
               agent: created?.agent ?? sel.agent,
               whenLine,
               note: created?.note,
@@ -501,8 +504,18 @@ function LabeledTextarea({ label, value, onChange }: { label: string; value: str
   );
 }
 
-function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boolean; onSelect: () => void }) {
-  const agent = teamAgentById[item.agent];
+function UpcomingRow({
+  item,
+  agentProfiles,
+  first,
+  onSelect,
+}: {
+  item: UpcomingItem;
+  agentProfiles: Record<string, AgentProfile>;
+  first: boolean;
+  onSelect: () => void;
+}) {
+  const agent = agentProfiles[item.agent] ?? teamAgentById[item.agent];
   return (
     <button onClick={onSelect} className={`flex w-full items-center gap-3 px-3.5 py-3 text-left ${first ? "" : "border-t border-line/70"}`}>
       <div className="w-[52px] shrink-0 text-center">
@@ -514,7 +527,7 @@ function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boo
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{item.title}</h3>
         <div className="mt-0.5 flex items-center gap-1.5 text-[12.5px] leading-[18px] tracking-[0] text-muted">
           <span className="grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border border-line/70 bg-white text-[11px]" aria-hidden="true">
-            <DoodleIcon name={agent?.icon ?? item.iconName} className="h-[14px] w-[14px]" />
+            <DoodleIcon name={agent?.icon ?? "calendar"} className="h-[14px] w-[14px]" />
           </span>
           <span><span className="font-semibold text-ink/75">{agent?.name}</span> {item.meta}</span>
         </div>
@@ -524,12 +537,26 @@ function UpcomingRow({ item, first, onSelect }: { item: UpcomingItem; first: boo
   );
 }
 
-function StandingRow({ job, first, onToggle, onEdit, onRun }: { job: StandingJob; first: boolean; onToggle: () => void; onEdit: () => void; onRun?: () => void }) {
-  const agent = teamAgentById[job.agent];
+function StandingRow({
+  job,
+  agentProfiles,
+  first,
+  onToggle,
+  onEdit,
+  onRun,
+}: {
+  job: StandingJob;
+  agentProfiles: Record<string, AgentProfile>;
+  first: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onRun?: () => void;
+}) {
+  const agent = agentProfiles[job.agent] ?? teamAgentById[job.agent];
   return (
     <div className={`flex items-center gap-2 px-3.5 py-3 ${first ? "" : "border-t border-line/70"} ${job.enabled ? "" : "opacity-60"}`}>
       <div className="grid h-[40px] w-[40px] shrink-0 place-items-center">
-        <DoodleIcon name={jobIcon[job.type]} className="h-8 w-8" />
+        <DoodleIcon name={agent?.icon ?? "calendar"} className="h-8 w-8" />
       </div>
       <div className="min-w-0 flex-1">
         <h3 className="text-[15px] font-semibold leading-[19px] tracking-[-0.02em] text-ink">{job.title}</h3>

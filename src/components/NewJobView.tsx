@@ -10,15 +10,15 @@ import { TeamBadge } from "./TeamBadge";
 
 // One agent owns one fixed routine capability. This page picks that capability,
 // then exposes only the user-adjustable configuration.
-type Template = { type: JobType; agent: TeamAgentId; label: string; blurb: string; sched: "window" | "alarm" };
+type Template = { type: JobType; agent: TeamAgentId; sched: "window" | "alarm" };
 
 const TEMPLATES: Template[] = [
-  { type: "highlight", agent: "cameraman", label: "Cameraman", blurb: "Capture family highlights and keepsake moments.", sched: "window" },
-  { type: "watch", agent: "watcher", label: "Watcher", blurb: "Observe the room at intervals and summarize what is happening.", sched: "window" },
-  { type: "reading", agent: "companion", label: "Companion", blurb: "Read, learn, and play alongside the kids.", sched: "window" },
-  { type: "workout", agent: "coach", label: "Coach", blurb: "Run a home workout for the parent.", sched: "window" },
-  { type: "routine", agent: "homekeeper", label: "Homekeeper", blurb: "Keep reminders, calendar, and home checklists moving.", sched: "alarm" },
-  { type: "baby_log", agent: "baby_logger", label: "Baby Logger", blurb: "Record feeding, sleep, diapers, meds, and other care events.", sched: "alarm" },
+  { type: "highlight", agent: "cameraman", sched: "window" },
+  { type: "watch", agent: "watcher", sched: "window" },
+  { type: "reading", agent: "companion", sched: "window" },
+  { type: "workout", agent: "coach", sched: "window" },
+  { type: "routine", agent: "homekeeper", sched: "alarm" },
+  { type: "baby_log", agent: "baby_logger", sched: "alarm" },
 ];
 
 function fmtTime(hhmm: string) {
@@ -96,7 +96,7 @@ export function NewJobView({
         id: editJob?.id ?? `job_${Date.now()}`,
         type: tpl.type,
         agent: tpl.agent,
-            title: title || defaultTitle(tpl),
+        title: title || defaultTitle(tpl),
         trigger,
         person,
         schedule,
@@ -127,7 +127,7 @@ export function NewJobView({
             <TeamBadge agentId={tpl.agent} size="sm" />
             <div>
               <div className="text-[15px] font-semibold text-ink">{teamAgentById[tpl.agent].name}</div>
-              <div className="mt-0.5 text-[13px] text-muted">{tpl.blurb}</div>
+              <div className="mt-0.5 text-[13px] text-muted">{teamAgentById[tpl.agent].role}</div>
             </div>
           </div>
         </div>
@@ -145,7 +145,7 @@ export function NewJobView({
                 <TeamBadge agentId={t.agent} size="sm" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[15px] font-semibold leading-5 text-ink">{a.name}</div>
-                  <div className="mt-0.5 text-[13px] leading-[18px] text-muted">{t.blurb}</div>
+                  <div className="mt-0.5 text-[13px] leading-[18px] text-muted">{a.role}</div>
                 </div>
                 <span className="pt-1 text-[22px] font-light leading-none text-ink/35">›</span>
               </button>
