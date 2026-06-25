@@ -132,10 +132,6 @@ async function syncRawOutputForTaskUnlocked(taskId: string, client: AuriClient):
     return { outcome: "missing_video_id", httpStatus: 409, event, error: "Capture task has no Auri video id" };
   }
 
-  if (robot?.rawOutputVideoUrl && robot.rawOutputSummary && robot.rawOutputPosterUrl) {
-    return alreadySyncedResult(event);
-  }
-
   try {
     let rawOutput: RawOutputStatusResponse;
     try {
