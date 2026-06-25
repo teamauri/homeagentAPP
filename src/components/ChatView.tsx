@@ -260,10 +260,14 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
       {/* Keep button */}
       <div className="flex items-center justify-end gap-2 border-t border-line px-3.5 py-2.5">
         {event.kept ? (
-          <span className="shrink-0 text-[12px] font-medium text-gold">💗 Kept</span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold">
+            <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
+            Kept
+          </span>
         ) : (
-          <button onClick={() => keepEvent(event.id)} className="shrink-0 text-[12px] font-medium text-gold active:opacity-60">
-            Keep 💗
+          <button onClick={() => keepEvent(event.id)} className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold active:opacity-60">
+            Keep
+            <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
           </button>
         )}
       </div>

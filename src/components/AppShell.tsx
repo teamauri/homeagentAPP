@@ -27,7 +27,7 @@ declare global {
 const tabs: { key: TabKey; label: string; icon: string; activeBg: string; activeText: string }[] = [
   { key: "chat", label: "Chat", icon: "home", activeBg: "bg-[#FF6B6B]/15", activeText: "text-[#E03C3C]" },
   { key: "today", label: "Jobs", icon: "bell", activeBg: "bg-[#FF9F43]/15", activeText: "text-[#D47A00]" },
-  { key: "memory", label: "Memories", icon: "photos", activeBg: "bg-[#A855F7]/15", activeText: "text-[#7C3AED]" },
+  { key: "memory", label: "Memories", icon: "heart", activeBg: "bg-[#A855F7]/15", activeText: "text-[#7C3AED]" },
 ];
 
 const titles: Record<TabKey, string> = {
