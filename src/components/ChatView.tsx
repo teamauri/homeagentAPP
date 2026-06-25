@@ -401,10 +401,12 @@ function ApiResponseCard({ card }: { card: ChatTurnCard }) {
   const handleClick = () => {
     // Reminder cards belong in the calendar, not the object detail page.
     if (card.type === "reminder") {
+      window.__auriMarkHomeReturn?.();
       window.location.href = "/calendar";
       return;
     }
     if (card.targetRoute) {
+      window.__auriMarkHomeReturn?.();
       window.location.href = card.targetRoute;
       return;
     }
@@ -603,7 +605,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
         </button>
         <div className="border-t border-line px-3 py-2">
           <button
-            onClick={() => { window.location.href = "/calendar"; }}
+            onClick={() => { window.__auriMarkHomeReturn?.(); window.location.href = "/calendar"; }}
             className="w-full rounded-full border border-line py-1.5 text-[12.5px] font-medium text-ink shadow-[0_4px_10px_rgba(8,8,8,0.03)]"
           >
             View in Calendar

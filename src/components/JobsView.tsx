@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { jobIcon, loadStandingJobs, seedStanding, standingScheduledAtToday, STANDING_KEY, type StandingJob } from "@/lib/jobs";
+import { jobIcon, loadStandingJobs, seedStanding, sortStandingJobs, standingScheduledAtToday, STANDING_KEY, type StandingJob } from "@/lib/jobs";
 import { deriveDateLabel, deriveTimeLabel } from "@/lib/job-time";
 import { helperTeamAgentIds, teamAgentById, teamAgents, type TeamAgent } from "@/lib/team";
 import { useChildren } from "./FamilyContext";
@@ -54,7 +54,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
   const { events, addEvent, removeEvent, startHighlight } = useRobotEvents();
   const children = useChildren();
   const personLabel = (id: string) => children.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
-  const [standing, setStanding] = useState<StandingJob[]>(seedStanding);
+  const [standing, setStanding] = useState<StandingJob[]>(() => sortStandingJobs(seedStanding));
   const [standingReady, setStandingReady] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editJob, setEditJob] = useState<StandingJob | null>(null);
@@ -218,7 +218,7 @@ export function JobsView({ onRunActivity, onSubpageChange }: { onRunActivity?: (
         editJob={editJob ?? undefined}
         onClose={closeForm}
         onSubmitStanding={(job, isEdit) => {
-          setStanding((cur) => (isEdit ? cur.map((j) => (j.id === job.id ? job : j)) : [...cur, job]));
+          setStanding((cur) => sortStandingJobs(isEdit ? cur.map((j) => (j.id === job.id ? job : j)) : [...cur, job]));
           closeForm();
         }}
         onSubmitOnce={(input) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 import { AppShell, TabKey } from "@/components/AppShell";
 import { JobsView } from "@/components/JobsView";
 import { ChatView, LiveChatTurn } from "@/components/ChatView";
@@ -9,6 +9,16 @@ import { ChatApiResponse } from "@/lib/chat-server/types";
 import { normalizeTeamAgentId, teamAgentById, type TeamAgentId } from "@/lib/team";
 import { FamilyProvider, useFamilyMember } from "@/components/FamilyContext";
 import { enrichCards } from "@/lib/chat-draft";
+
+const HOME_TAB_KEY = "auri.homeTab.v1";
+const HOME_RETURN_KEY = "auri.returnHome.v1";
+const HOME_SCROLL_PREFIX = "auri.homeScroll.";
+
+declare global {
+  interface Window {
+    __auriMarkHomeReturn?: () => void;
+  }
+}
 
 function nowLabel() {
   return new Intl.DateTimeFormat("en-US", {
@@ -46,19 +56,60 @@ function HomeInner() {
   const [jobsSubpage, setJobsSubpage] = useState(false);
   const [showCover, setShowCover] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const tabRef = useRef<TabKey>("chat");
+  const returningHomeRef = useRef(false);
+  const liveTurnCountRef = useRef<number | null>(null);
+
+  const scrollKey = (targetTab: TabKey) => `${HOME_SCROLL_PREFIX}${targetTab}.v1`;
+
+  const saveScrollForTab = (targetTab: TabKey = tabRef.current) => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    try {
+      sessionStorage.setItem(scrollKey(targetTab), String(el.scrollTop));
+      sessionStorage.setItem(HOME_TAB_KEY, targetTab);
+    } catch { /* ignore */ }
+  };
+
+  const restoreScrollForTab = (targetTab: TabKey, allowRestore: boolean) => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      try {
+        const saved = allowRestore ? sessionStorage.getItem(scrollKey(targetTab)) : null;
+        if (saved !== null) {
+          el.scrollTop = Number(saved);
+        } else {
+          el.scrollTop = targetTab === "chat" ? el.scrollHeight : 0;
+        }
+      } catch {
+        el.scrollTop = targetTab === "chat" ? el.scrollHeight : 0;
+      }
+    });
+  };
 
   useEffect(() => {
     const id = window.setTimeout(() => setShowCover(false), 3000);
     return () => window.clearTimeout(id);
   }, []);
 
-  // Persist both the active tab and the chat thread so full-page navigations
-  // (e.g. tapping "View calendar" or opening a memory detail) return the user
-  // to exactly where they left off.
+  // Cold launch always enters Chat. A return from a child route restores the
+  // tab that initiated navigation, so Back lands where the action started.
   useEffect(() => {
+    let returningHome = false;
     try {
-      // Always default to chat on load — don't restore the last tab.
-      sessionStorage.removeItem("auri.tab.v1");
+      returningHome = sessionStorage.getItem(HOME_RETURN_KEY) === "1";
+      returningHomeRef.current = returningHome;
+      sessionStorage.removeItem(HOME_RETURN_KEY);
+      if (returningHome) {
+        const savedTab = sessionStorage.getItem(HOME_TAB_KEY) as TabKey | null;
+        if (savedTab === "chat" || savedTab === "today" || savedTab === "memory") {
+          tabRef.current = savedTab;
+          setTab(savedTab);
+        }
+      } else {
+        sessionStorage.removeItem(HOME_TAB_KEY);
+      }
     } catch { /* ignore */ }
     try {
       const raw = sessionStorage.getItem("auri.liveTurns.v1");
@@ -76,42 +127,77 @@ function HomeInner() {
     setLiveLoaded(true);
   }, []);
 
-  // On load: restore the scroll position saved before a full-page navigation
-  // (back from /calendar, /family, etc.) or, if none saved, jump to the bottom
-  // of chat so the latest message is always visible. Also save position on leave.
+  // On cold load, Chat starts at the newest message. Other tabs start at top.
+  // When returning from another route, restore that tab's saved scroll offset.
   useEffect(() => {
     if (!liveLoaded) return;
-    const el = scrollContainerRef.current;
-    if (!el) return;
-
-    // rAF lets the browser finish painting all content before we scroll, so
-    // scrollHeight is accurate for both restore and scroll-to-bottom.
-    requestAnimationFrame(() => {
-      try {
-        const savedScroll = sessionStorage.getItem("auri.scrollTop.v1");
-        sessionStorage.removeItem("auri.scrollTop.v1");
-        // Only restore positive offsets; zero means either the user hadn't
-        // scrolled or the page was refreshed at top — both should go to bottom.
-        if (savedScroll !== null && Number(savedScroll) > 0) {
-          el.scrollTop = Number(savedScroll);
-        } else {
-          el.scrollTop = el.scrollHeight;
-        }
-      } catch { /* ignore */ }
-    });
+    restoreScrollForTab(tabRef.current, returningHomeRef.current);
 
     const saveScroll = () => {
-      try {
-        sessionStorage.setItem("auri.scrollTop.v1", String(el.scrollTop));
-      } catch { /* ignore */ }
+      saveScrollForTab(tabRef.current);
     };
-    window.addEventListener("beforeunload", saveScroll);
-    return () => window.removeEventListener("beforeunload", saveScroll);
+    window.addEventListener("pagehide", saveScroll);
+    return () => window.removeEventListener("pagehide", saveScroll);
   }, [liveLoaded]);
+
+  const markReturnFromChildRoute = () => {
+    saveScrollForTab(tabRef.current);
+    try {
+      sessionStorage.setItem(HOME_RETURN_KEY, "1");
+    } catch { /* ignore */ }
+  };
+
+  const handleHomeClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as Element | null;
+    const anchor = target?.closest("a[href]");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    if (!href || href === "/" || href.startsWith("#")) return;
+    try {
+      const url = new URL(href, window.location.href);
+      if (url.origin === window.location.origin && url.pathname !== "/") {
+        markReturnFromChildRoute();
+      }
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    window.__auriMarkHomeReturn = markReturnFromChildRoute;
+    return () => {
+      if (window.__auriMarkHomeReturn === markReturnFromChildRoute) {
+        delete window.__auriMarkHomeReturn;
+      }
+    };
+  });
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const save = () => saveScrollForTab(tabRef.current);
+    el.addEventListener("scroll", save, { passive: true });
+    return () => el.removeEventListener("scroll", save);
+  }, [liveLoaded]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(HOME_TAB_KEY, tab);
+    } catch { /* ignore */ }
+  }, [tab]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") saveScrollForTab(tabRef.current);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
 
   // Scroll to bottom whenever a new live turn arrives (user sent or Auri replied).
   useEffect(() => {
     if (!liveLoaded) return;
+    const previousCount = liveTurnCountRef.current;
+    liveTurnCountRef.current = liveTurns.length;
+    if (previousCount === null || liveTurns.length <= previousCount) return;
     const el = scrollContainerRef.current;
     if (!el) return;
     requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
@@ -128,8 +214,11 @@ function HomeInner() {
   }, [liveTurns, liveLoaded]);
 
   const switchTab = (next: TabKey) => {
+    saveScrollForTab(tabRef.current);
+    tabRef.current = next;
     setTab(next);
-    try { sessionStorage.setItem("auri.tab.v1", next); } catch { /* ignore */ }
+    try { sessionStorage.setItem(HOME_TAB_KEY, next); } catch { /* ignore */ }
+    restoreScrollForTab(next, true);
   };
 
   const sendComposerMessage = async (message: string, imageUrl?: string) => {
@@ -233,7 +322,8 @@ function HomeInner() {
   };
 
   return (
-    <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage} scrollContainerRef={scrollContainerRef}>
+    <div onClickCapture={handleHomeClickCapture}>
+      <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage} scrollContainerRef={scrollContainerRef}>
         {/*
           Keep every tab mounted and just toggle visibility. Conditional rendering
           (`tab === x && <View/>`) unmounts the inactive views, which made Memory
@@ -251,6 +341,7 @@ function HomeInner() {
         </div>
         {showCover && tab === "chat" ? <AuriCover /> : null}
       </AppShell>
+    </div>
   );
 }
 

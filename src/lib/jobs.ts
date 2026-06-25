@@ -59,13 +59,14 @@ export function loadStandingJobs(): StandingJob[] {
         ...job,
         agent: normalizeTeamAgentId(job.agent) ?? agentForJobType(job.type),
       })) as StandingJob[];
-      localStorage.setItem(STANDING_KEY, JSON.stringify(migrated));
-      return migrated;
+      const sorted = sortStandingJobs(migrated);
+      localStorage.setItem(STANDING_KEY, JSON.stringify(sorted));
+      return sorted;
     }
   } catch {
     // ignore malformed storage
   }
-  return seedStanding;
+  return sortStandingJobs(seedStanding);
 }
 
 export function agentForJobType(type: JobType): TeamAgentId {
@@ -80,6 +81,20 @@ export function agentForJobType(type: JobType): TeamAgentId {
 // The time a standing job's daily instance starts (window start, or the alarm).
 export function standingStartHHMM(job: StandingJob): string {
   return job.schedule.kind === "window" ? job.schedule.start : job.schedule.alarm;
+}
+
+function standingStartMinutes(job: StandingJob): number {
+  const [hours, minutes] = standingStartHHMM(job).split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.MAX_SAFE_INTEGER;
+  return hours * 60 + minutes;
+}
+
+export function sortStandingJobs(jobs: StandingJob[]): StandingJob[] {
+  return [...jobs].sort((a, b) => {
+    const timeDiff = standingStartMinutes(a) - standingStartMinutes(b);
+    if (timeDiff !== 0) return timeDiff;
+    return a.title.localeCompare(b.title);
+  });
 }
 
 // Today's real datetime for a standing job's instance (epoch ms).
