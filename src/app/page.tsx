@@ -328,13 +328,14 @@ function HomeInner() {
         if (payload.helper) {
           const helper = payload.helper;
           const helperAgent = normalizeLiveAvatar(helper.teamMemberId);
+          const helperDefaultAgent = helperAgent === "mom" || helperAgent === "dad" ? undefined : helperAgent;
           const helperTurn: LiveChatTurn = {
             id: `helper-${sentAt}`,
             sender: helperAgent === "mom" || helperAgent === "dad" ? displayHelperName(helper.name) : teamAgentById[helperAgent].name,
             time: nowLabel(),
             avatar: helperAgent,
             text: helper.reply,
-            cards: enrichCards(helper.cards, helper.objectsToCreate, payload.createdLocalObjects, payload.objectsToCreate?.length ?? 0),
+            cards: enrichCards(helper.cards, helper.objectsToCreate, payload.createdLocalObjects, payload.objectsToCreate?.length ?? 0, helperDefaultAgent),
             createdAt: sentAt,
           };
           return current.map((turn) => turn.id === pendingId ? helperTurn : turn);

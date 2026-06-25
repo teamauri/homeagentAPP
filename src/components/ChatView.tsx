@@ -4,7 +4,6 @@ import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
 import { teamAgentById } from "@/lib/team";
-import { TeamBadge } from "./TeamBadge";
 import { useChildren, useFamilyMember } from "./FamilyContext";
 import { chatFixtureMessages } from "@/lib/chat-fixtures";
 import { ChatMessage } from "@/lib/chat-contracts";
@@ -68,6 +67,8 @@ const avatarStyles = {
   dad: "from-[#d9e7ef] to-[#4d6777] text-white",
 };
 
+const chatBubbleBg = "bg-[#e7f3ee]";
+
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
   const { completions, events } = useRobotEvents();
   // Highlight jobs that are mid-capture: Cameraman shows a live counter card that
@@ -113,13 +114,13 @@ function HighlightProgressRow({ event }: { event: RobotEvent }) {
   const target = event.highlight ?? { clipTarget: 0, photoTarget: 0 };
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <TeamBadge agentId="cameraman" size="sm" />
+      <ChatAgentBadge agentId="cameraman" size="sm" />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
           <span className="text-[15px] font-semibold leading-5 text-ink">{teamAgentById["cameraman"].name}</span>
           <span className="text-[13px] text-muted">{event.timeLabel}</span>
         </div>
-        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">Catching the highlights — eyes up.</p>
+        <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>Catching the highlights — eyes up.</p>
         <div className="mt-2 w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
           <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
             <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
@@ -168,7 +169,7 @@ function RobotCompletionRow({ event }: { event: RobotEvent }) {
   const agentName = teamAgentById[agentId]?.name ?? "Reminder";
   return (
     <div className="grid grid-cols-[44px_minmax(0,1fr)] gap-2.5">
-      <TeamBadge agentId={agentId} size="sm" />
+      <ChatAgentBadge agentId={agentId} size="sm" />
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
           <span className="text-[15px] font-semibold leading-5 text-ink">{agentName}</span>
@@ -206,9 +207,6 @@ function JobDoneCard({ event }: { event: RobotEvent }) {
     <div className="w-full overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
       {/* Job card header */}
       <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
-        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
-          <DoodleIcon name={teamAgentById[event.agent ?? "homekeeper"]?.icon ?? event.icon} className="h-8 w-8" />
-        </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{event.dateLabel} · {event.timeLabel}</div>
           <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{event.title}</div>
@@ -293,7 +291,7 @@ function ChatTurnRow({ turn }: { turn: ChatTurn }) {
           <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
         </div>
-        <p className="inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink">{turn.text}</p>
+        <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>{turn.text}</p>
         {turn.cards ? (
           <div className="mt-2">
             <ChatCardList cards={turn.cards} />
@@ -324,7 +322,7 @@ function ParentAvatar({ id, fallbackInitial }: { id: "mom" | "dad"; fallbackInit
 
 function Avatar({ avatar }: { avatar: ChatTurn["avatar"] }) {
   const isParent = avatar === "mom" || avatar === "dad";
-  if (!isParent) return <TeamBadge agentId={avatar} size="sm" />;
+  if (!isParent) return <ChatAgentBadge agentId={avatar} size="sm" />;
   return <ParentAvatar id={avatar} fallbackInitial={avatar === "mom" ? "J" : "D"} />;
 }
 
@@ -333,7 +331,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
   if (turn.pending) {
     return (
       <div className="pl-[54px]">
-        <p className="inline-block max-w-[98%] rounded-[16px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-muted">{turn.text}</p>
+        <p className={clsx("inline-block max-w-[98%] rounded-[16px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-muted", chatBubbleBg)}>{turn.text}</p>
       </div>
     );
   }
@@ -353,7 +351,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
           </div>
         ) : null}
         {turn.text ? (
-          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] bg-[#f3f0eb] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0]", turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
+          <p className={clsx("inline-block max-w-[98%] rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0]", chatBubbleBg, turn.pending ? "text-muted" : "text-ink")}>{turn.text}</p>
         ) : null}
         {turn.cards?.length ? (
           <div className="mt-2 space-y-2">
@@ -369,8 +367,26 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
 
 function LiveAvatar({ avatar, sender }: { avatar: LiveChatTurn["avatar"]; sender: string }) {
   const isParent = avatar === "mom" || avatar === "dad";
-  if (!isParent) return <TeamBadge agentId={avatar} size="sm" />;
+  if (!isParent) return <ChatAgentBadge agentId={avatar} size="sm" />;
   return <ParentAvatar id={avatar} fallbackInitial={sender.slice(0, 1)} />;
+}
+
+function ChatAgentBadge({ agentId, size = "sm" }: { agentId: TeamAgentId; size?: "xs" | "sm" }) {
+  const agent = teamAgentById[agentId];
+  const sizes = {
+    xs: "h-5 w-5",
+    sm: "h-10 w-10",
+  };
+  const iconSizes = {
+    xs: "h-4 w-4",
+    sm: "h-8 w-8",
+  };
+
+  return (
+    <span className={clsx("mx-auto grid shrink-0 place-items-center rounded-full border border-line/70 bg-white", sizes[size])}>
+      <DoodleIcon name={agent.icon} className={iconSizes[size]} />
+    </span>
+  );
 }
 
 function iconForApiCard(type: ApiChatCard["type"]) {
@@ -596,7 +612,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
           onClick={() => setEditing(true)}
           className="flex w-full items-start gap-2.5 px-3 py-3 text-left"
         >
-          <TeamBadge agentId={agentId} size="xs" />
+          <ChatAgentBadge agentId={agentId} size="xs" />
           <div className="min-w-0 flex-1">
             <div className="text-[12px] leading-4 text-muted">
               {agent.name}
@@ -660,7 +676,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
         <>
           <div className="flex items-start gap-3 px-3.5 pt-3">
             <div className="grid h-9 w-9 shrink-0 place-items-center">
-              <TeamBadge agentId={agentId} size="sm" />
+              <ChatAgentBadge agentId={agentId} size="sm" />
             </div>
             <div className="min-w-0 flex-1 pb-1">
               <div className="text-[12px] leading-4 tracking-[0] text-muted">{agent.name}</div>
