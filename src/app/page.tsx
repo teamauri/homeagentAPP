@@ -65,6 +65,7 @@ function HomeInner() {
   const pendingRestoreRef = useRef<{ tab: TabKey; allowRestore: boolean } | null>(null);
   const jobsSubpageRef = useRef(false);
   const coverStartedAtRef = useRef(Date.now());
+  const coverDismissTimerRef = useRef<number | null>(null);
 
   const scrollKey = (targetTab: TabKey) => `${HOME_SCROLL_PREFIX}${targetTab}.v1`;
 
@@ -110,11 +111,32 @@ function HomeInner() {
     });
   };
 
+  const clearCoverDismissTimer = () => {
+    if (coverDismissTimerRef.current === null) return;
+    window.clearTimeout(coverDismissTimerRef.current);
+    coverDismissTimerRef.current = null;
+  };
+
+  const scheduleCoverDismiss = () => {
+    clearCoverDismissTimer();
+    const remaining = Math.max(0, COVER_MIN_MS - (Date.now() - coverStartedAtRef.current));
+    coverDismissTimerRef.current = window.setTimeout(() => {
+      setShowCover(false);
+      coverDismissTimerRef.current = null;
+    }, remaining);
+  };
+
+  const replayCover = () => {
+    if (tabRef.current !== "chat") return;
+    coverStartedAtRef.current = Date.now();
+    setShowCover(true);
+    if (liveLoaded) scheduleCoverDismiss();
+  };
+
   useEffect(() => {
     if (!liveLoaded) return;
-    const remaining = Math.max(0, COVER_MIN_MS - (Date.now() - coverStartedAtRef.current));
-    const id = window.setTimeout(() => setShowCover(false), remaining);
-    return () => window.clearTimeout(id);
+    scheduleCoverDismiss();
+    return clearCoverDismissTimer;
   }, [liveLoaded]);
 
   // Cold launch always enters Chat. A return from a child route restores the
@@ -240,11 +262,23 @@ function HomeInner() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "hidden") saveVisibleTabScroll();
+      if (document.visibilityState === "hidden") {
+        saveVisibleTabScroll();
+        return;
+      }
+      replayCover();
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, []);
+  }, [liveLoaded]);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) replayCover();
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, [liveLoaded]);
 
   // Scroll to bottom whenever a new live turn arrives (user sent or Auri replied).
   useEffect(() => {
