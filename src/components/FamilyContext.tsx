@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { resetClientUserDataOnce } from "@/lib/client-user-data-reset";
 import type { FamilyMemberProfile } from "@/lib/family/profile";
 
 // Client-side family data so the functional pages (chat, memory) can show the
@@ -12,6 +13,7 @@ const FamilyContext = createContext<Record<string, FamilyMemberProfile>>({});
 const LS_KEY = "auri.family.v1";
 
 export function loadFamilyFromStorage(): FamilyMemberProfile[] | null {
+  resetClientUserDataOnce();
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;

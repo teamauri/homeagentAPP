@@ -2,6 +2,7 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deriveCalendarEventIcon, type CalendarApiEvent } from "@/lib/calendar-api";
+import { resetClientUserDataOnce } from "@/lib/client-user-data-reset";
 import type { PersonId } from "@/lib/types";
 import { normalizeTeamAgentId, type TeamAgentId } from "@/lib/team";
 import { deriveDateLabel, deriveTimeLabel, scheduledAtFromLabels } from "@/lib/job-time";
@@ -286,6 +287,7 @@ function removeEventFromCalendarApi(id: string) {
 }
 
 export function RobotEventProvider({ children }: { children: ReactNode }) {
+  resetClientUserDataOnce();
   const [events, setEvents] = useState<RobotEvent[]>([]);
   const [ready, setReady] = useState(false);
   const syncingTasks = useRef<Set<string>>(new Set());
