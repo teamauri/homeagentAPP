@@ -321,6 +321,27 @@ function ensureHomekeeperReminderJob(response: ChatAIResponse, request: ChatRequ
 
 async function fallbackResponse(chatRequest: ChatRequestBody, reason: string) {
   const fallback = normalizeRouting(createFallbackChatResponse(chatRequest), chatRequest);
+  const isGenericFallback =
+    fallback.intent === "general_question" &&
+    !fallback.helper &&
+    fallback.cards.length === 0 &&
+    fallback.objectsToCreate.length === 0;
+
+  if (isGenericFallback) {
+    return NextResponse.json(
+      {
+        error: "Model response unavailable",
+        detail: reason,
+        metadata: {
+          provider: "fallback",
+          fallbackUsed: true,
+          fallbackReason: reason,
+        },
+      },
+      { status: 503 }
+    );
+  }
+
   return NextResponse.json(
     await withCreatedObjects(fallback, {
       provider: "fallback",

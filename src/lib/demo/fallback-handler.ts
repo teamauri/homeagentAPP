@@ -212,7 +212,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
 
   // 3) Default — warm, not a menu of tasks.
   return auri(
-    "I'm here. Ask me anything about the kids or the week — or I can set a reminder, sort your photos into an album, or keep a reading note when you need it.",
+    "",
     { intent: "general_question", suggestedFollowups: ["How's Mia doing this week?", "Organize my photos", "Set a reminder"] }
   );
 }
