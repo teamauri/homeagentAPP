@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PersonId } from "@/lib/types";
 import { useRobotEvents } from "@/components/RobotEventContext";
 import { EventDetailSheet } from "@/components/EventDetailSheet";
+import { JobDetailSheet } from "@/components/JobCard";
 import { deriveTimeLabel } from "@/lib/job-time";
 import { iconForJobAgent, loadStandingJobs, standingScheduledAtToday, type StandingJob } from "@/lib/jobs";
 import type { TeamAgentId } from "@/lib/team";
@@ -271,6 +272,19 @@ export default function CalendarPage() {
       {/* Tap a block → details. One-time jobs can be deleted; standing jobs are
           managed from the Jobs screen (no delete here). */}
       {sel ? (() => {
+        const event = sel.eventId ? events.find((item) => item.id === sel.eventId) : undefined;
+        if (event) {
+          return (
+            <JobDetailSheet
+              event={event}
+              onDelete={() => {
+                removeEvent(event.id);
+                setSel(null);
+              }}
+              onClose={() => setSel(null)}
+            />
+          );
+        }
         const whenLine = [deriveTimeLabel(sel.scheduledAt), PERSON_LABEL[sel.person]].filter(Boolean).join(" · ");
         return (
           <EventDetailSheet

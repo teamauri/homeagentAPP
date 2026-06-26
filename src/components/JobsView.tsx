@@ -8,6 +8,7 @@ import { useChildren } from "./FamilyContext";
 import { DoodleIcon } from "./Icons";
 import { NewJobView } from "./NewJobView";
 import { EventDetailSheet } from "./EventDetailSheet";
+import { JobDetailSheet } from "./JobCard";
 import { useRobotEvents } from "./RobotEventContext";
 import type { TeamAgentId } from "@/lib/team";
 
@@ -342,21 +343,28 @@ export function JobsView({
           jobs route to their editor instead (handled in selectItem). */}
       {sel ? (() => {
         const created = sel.eventId ? events.find((e) => e.id === sel.eventId) : undefined;
-        const whenLine = [deriveDateLabel(sel.scheduledAt), deriveTimeLabel(sel.scheduledAt), created ? personLabel(created.person) : ""].filter(Boolean).join(" · ");
+        if (created) {
+          return (
+            <JobDetailSheet
+              event={created}
+              onDelete={() => {
+                removeEvent(created.id);
+                setSel(null);
+              }}
+              onClose={() => setSel(null)}
+            />
+          );
+        }
+        const whenLine = [deriveDateLabel(sel.scheduledAt), deriveTimeLabel(sel.scheduledAt), sel.meta].filter(Boolean).join(" · ");
         return (
           <EventDetailSheet
             detail={{
               title: sel.title,
               icon: agentProfileById[sel.agent]?.icon ?? teamAgentById[sel.agent]?.icon ?? "calendar",
-              agent: created?.agent ?? sel.agent,
+              agent: sel.agent,
               whenLine,
-              note: created?.note,
-              quoteNote: !!created,
-              statusLabel: created ? STATUS_LABEL[created.status] : undefined,
-              hasPhoto: !!created?.photoUrl,
-              hasVoice: !!created?.voiceUrl,
+              statusLabel: STATUS_LABEL.scheduled,
             }}
-            onDelete={created ? () => { removeEvent(sel.eventId!); setSel(null); } : undefined}
             onClose={() => setSel(null)}
           />
         );

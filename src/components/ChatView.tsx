@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
@@ -10,6 +10,7 @@ import { ChatMessage } from "@/lib/chat-contracts";
 import { TeamAgentId } from "@/lib/team";
 import { RobotEvent, useRobotEvents } from "./RobotEventContext";
 import { ChatTurnCard, DraftInfo } from "@/lib/chat-draft";
+import { JobCard, JobDetailSheet } from "./JobCard";
 
 type ChatTurn = {
   id: string;
@@ -50,15 +51,6 @@ function displayTimeFromIso(value?: string): string | undefined {
   const time = epochFromIso(value);
   if (!time) return undefined;
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(time));
-}
-
-function displayDateTimeFromIso(value?: string): string | undefined {
-  const time = epochFromIso(value);
-  if (!time) return undefined;
-  const date = new Date(time);
-  const dateLabel = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
-  const timeLabel = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(date);
-  return `${dateLabel} · ${timeLabel}`;
 }
 
 function robotStartedAt(event: RobotEvent): number {
@@ -107,7 +99,8 @@ const chatRowShell = "relative min-w-0";
 const chatRowAvatar = "absolute left-0 top-0";
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
-  const { completions, events } = useRobotEvents();
+  const { completions, events, removeEvent } = useRobotEvents();
+  const [selectedJob, setSelectedJob] = useState<RobotEvent | null>(null);
   // Jobs that are mid-run land as fresh agent messages. The card shows the same
   // job receipt shape as the final response, just without the returned media yet.
   const runningEvents = events.filter((event) => event.forRobot && event.status === "recording");
@@ -123,12 +116,12 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
     ...completions.map((event) => ({
       key: `done-${event.id}`,
       at: robotCompletedAt(event),
-      node: <RobotCompletionRow key={`done-${event.id}`} event={event} />,
+      node: <RobotCompletionRow key={`done-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} />,
     })),
     ...runningEvents.map((event) => ({
       key: `live-${event.id}`,
       at: robotStartedAt(event),
-      node: <RobotRunningRow key={`live-${event.id}`} event={event} />,
+      node: <RobotRunningRow key={`live-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} />,
     })),
   ].sort((a, b) => a.at - b.at);
 
@@ -140,11 +133,21 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
         ))}
         {stream.map((item) => item.node)}
       </div>
+      {selectedJob ? (
+        <JobDetailSheet
+          event={selectedJob}
+          onDelete={() => {
+            removeEvent(selectedJob.id);
+            setSelectedJob(null);
+          }}
+          onClose={() => setSelectedJob(null)}
+        />
+      ) : null}
     </div>
   );
 }
 
-function RobotRunningRow({ event }: { event: RobotEvent }) {
+function RobotRunningRow({ event, onOpen }: { event: RobotEvent; onOpen: () => void }) {
   const agentId = event.agent ?? "homekeeper";
   const agentName = teamAgentById[agentId]?.name ?? "Auri";
   const startedLabel = displayTimeFromIso(event.robot?.startedAt) ?? displayTimeFromIso(event.robot?.uploadedAt) ?? event.timeLabel;
@@ -164,25 +167,8 @@ function RobotRunningRow({ event }: { event: RobotEvent }) {
           </p>
         </div>
         <div className="mt-2">
-          <AgentJobReceiptCard event={event} phase="running" />
+          <JobCard event={event} phase="running" onOpen={onOpen} />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function CounterRow({ label, done, total }: { label: string; done: number; total: number }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  return (
-    <div className="py-1.5">
-      <div className="flex items-center justify-between text-[13px] leading-4">
-        <span className="text-ink/80">{label}</span>
-        <span className="font-semibold text-ink">
-          {done} <span className="font-normal text-muted">/ {total}</span>
-        </span>
-      </div>
-      <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-[#efece6]">
-        <div className="h-full rounded-full bg-[#C0492C] transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -190,7 +176,7 @@ function CounterRow({ label, done, total }: { label: string; done: number; total
 
 // A finished job lands in chat as a new message: a job card showing the Done
 // status, with the captured video embedded and a Keep button at the bottom.
-function RobotCompletionRow({ event }: { event: RobotEvent }) {
+function RobotCompletionRow({ event, onOpen }: { event: RobotEvent; onOpen: () => void }) {
   const agentId = event.agent ?? "homekeeper";
   const agentName = teamAgentById[agentId]?.name ?? "Reminder";
   return (
@@ -208,204 +194,8 @@ function RobotCompletionRow({ event }: { event: RobotEvent }) {
             Done — here’s the video and summary.
           </p>
         </div>
-        <AgentJobReceiptCard event={event} phase="completed" />
+        <JobCard event={event} phase="completed" onOpen={onOpen} />
       </div>
-    </div>
-  );
-}
-
-type AgentJobReceiptPhase = "created" | "running" | "completed";
-
-type AgentJobReceiptInput = {
-  title: string;
-  agentId: TeamAgentId;
-  dateLabel: string;
-  timeLabel: string;
-  personLabel?: string;
-  note?: string;
-  status: RobotEvent["status"];
-  result?: RobotEvent["result"];
-  highlight?: RobotEvent["highlight"];
-  highlightProgress?: RobotEvent["highlightProgress"];
-  kept?: boolean;
-  eventId?: string;
-  startedAtLabel?: string;
-  repliedAtLabel?: string;
-};
-
-function AgentJobReceiptCard({ event, draft, phase }: { event?: RobotEvent; draft?: DraftInfo; phase: AgentJobReceiptPhase }) {
-  const { keepEvent } = useRobotEvents();
-  const agentId = event?.agent ?? draft?.agent ?? "homekeeper";
-  const personLabel = draft?.personLabel;
-  const job: AgentJobReceiptInput = event
-    ? {
-        title: event.title,
-        agentId,
-        dateLabel: event.dateLabel,
-        timeLabel: event.timeLabel,
-        note: event.note,
-        status: event.status,
-        result: event.result,
-        highlight: event.highlight,
-        highlightProgress: event.highlightProgress,
-        kept: event.kept,
-        eventId: event.id,
-        startedAtLabel: displayDateTimeFromIso(event.robot?.startedAt) ?? displayDateTimeFromIso(event.robot?.uploadedAt),
-        repliedAtLabel:
-          displayDateTimeFromIso(event.robot?.highlightSyncedAt) ??
-          displayDateTimeFromIso(event.robot?.rawOutputReadyAt) ??
-          displayDateTimeFromIso(event.robot?.uploadedAt),
-      }
-    : {
-        title: draft?.title ?? "Job",
-        agentId,
-        dateLabel: draft?.dateLabel ?? "Today",
-        timeLabel: draft?.timeLabel ?? "",
-        personLabel,
-        note: draft?.note,
-        status: "scheduled",
-      };
-  const agent = teamAgentById[job.agentId];
-  const result = job.result;
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const metadata = [agent.name, job.dateLabel, job.timeLabel, job.personLabel, statusLabelForJobPhase(phase)].filter(Boolean).join(" · ");
-
-  const play = () => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play();
-    }
-    setPlaying(true);
-  };
-
-  // Seek to 1s on metadata load so the first meaningful frame shows as thumbnail
-  // instead of a black screen (only when no explicit poster image is provided).
-  const handleMetadata = () => {
-    if (result && !result.poster && videoRef.current && !playing) {
-      videoRef.current.currentTime = 1;
-    }
-  };
-
-  return (
-    <div className="w-full overflow-hidden rounded-[15px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
-      <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
-        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center">
-          <DoodleIcon name={agent.icon} className="h-8 w-8" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">
-            {metadata}
-          </div>
-          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{job.title}</div>
-        </div>
-      </div>
-
-      <div className="border-t border-line/70 px-3.5 py-2">
-        <JobStepRow label="Created" done active={phase === "created"} detail={createdDetail(job)} />
-        <JobStepRow label="Started" done={phase === "completed"} active={phase === "running"} detail={startedDetail(job, phase)} />
-        <JobStepRow label="Replied" done={phase === "completed"} active={phase === "completed"} detail={repliedDetail(job, phase)} />
-      </div>
-
-      {phase === "running" && job.highlight ? (
-        <div className="border-t border-line/70 px-3.5 pb-3 pt-2">
-          <CounterRow label="Clips" done={job.highlightProgress?.clips ?? 0} total={job.highlight.clipTarget} />
-          <CounterRow label="Photos" done={job.highlightProgress?.photos ?? 0} total={job.highlight.photoTarget} />
-        </div>
-      ) : null}
-
-      {job.note && phase !== "completed" ? (
-        <p className="border-t border-line/70 px-3.5 py-2.5 text-[13px] leading-[18px] tracking-[0] text-ink/70">
-          “{job.note}”
-        </p>
-      ) : null}
-
-      {result ? (
-        <div className="border-t border-line/70">
-          {result.summary ? (
-            <p className="border-b border-line/70 px-3.5 py-3 text-[13px] leading-[19px] tracking-[0] text-ink">
-              {result.summary}
-            </p>
-          ) : null}
-          <div className="relative bg-[#17181b]">
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              ref={videoRef}
-              src={result.videoUrl}
-              poster={result.poster}
-              playsInline
-              preload="metadata"
-              controls={playing}
-              onLoadedMetadata={handleMetadata}
-              onEnded={() => setPlaying(false)}
-              onPause={() => setPlaying(false)}
-              className="block max-h-64 w-full object-cover"
-            />
-            {!playing ? (
-              <button onClick={play} className="absolute inset-0 grid place-items-center" aria-label="Play clip">
-                <span className="grid h-12 w-12 place-items-center rounded-full bg-white/95 text-ink shadow">
-                  <svg viewBox="0 0 24 24" className="h-6 w-6 translate-x-[1px]" fill="currentColor" aria-hidden="true">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </span>
-                <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">{result.duration}</span>
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {phase === "completed" ? (
-        <div className="flex items-center justify-end gap-2 border-t border-line px-3.5 py-2.5">
-          {job.kept ? (
-            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold">
-              <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
-              Kept
-            </span>
-          ) : (
-            <button onClick={() => job.eventId && keepEvent(job.eventId)} className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-gold active:opacity-60">
-              Keep
-              <DoodleIcon name="heart" className="h-[14px] w-[14px]" />
-            </button>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function statusLabelForJobPhase(phase: AgentJobReceiptPhase) {
-  if (phase === "completed") return "Done";
-  if (phase === "running") return "Running";
-  return "Created";
-}
-
-function createdDetail(job: AgentJobReceiptInput) {
-  return [job.dateLabel, job.timeLabel].filter(Boolean).join(" · ");
-}
-
-function startedDetail(job: AgentJobReceiptInput, phase: AgentJobReceiptPhase) {
-  if (phase === "completed") return job.startedAtLabel ?? "Started";
-  if (phase === "running") return job.startedAtLabel ?? "Starting now";
-  return "Waiting for start";
-}
-
-function repliedDetail(job: AgentJobReceiptInput, phase: AgentJobReceiptPhase) {
-  if (phase === "completed") return job.repliedAtLabel ?? "Replied";
-  return "Waiting for reply";
-}
-
-function JobStepRow({ label, detail, done, active }: { label: string; detail: string; done: boolean; active?: boolean }) {
-  return (
-    <div className={clsx("flex items-center gap-2.5 py-1.5", active && !done && "-mx-1 rounded-[10px] bg-[#C0492C]/10 px-1")}>
-      <span className={clsx(
-        "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border text-[11px] font-semibold",
-        done ? "border-[#2f9d5b] bg-[#2f9d5b] text-white" : active ? "border-[#C0492C] text-[#C0492C]" : "border-line text-transparent"
-      )}>
-        {done ? "✓" : active ? <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-current" /> : ""}
-      </span>
-      <span className={clsx("min-w-0 flex-1 truncate text-[13px] leading-4", done ? "font-medium text-ink" : active ? "font-medium text-[#C0492C]" : "text-ink/65")}>{label}</span>
-      <span className="max-w-[45%] shrink-0 truncate text-right text-[12px] leading-4 text-muted">{detail}</span>
     </div>
   );
 }
@@ -758,7 +548,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
     return (
       <div className="w-full">
         <button onClick={() => setEditing(true)} className="block w-full text-left">
-          <AgentJobReceiptCard
+          <JobCard
             phase="created"
             draft={{
               ...draft,
