@@ -5,6 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { ChatCard, Subtask } from "@/lib/chat-contracts";
 import { DoodleIcon } from "./Icons";
 
+function previewVideoSrc(videoUrl: string | undefined, poster: string | undefined) {
+  if (!videoUrl || poster || videoUrl.includes("#")) return videoUrl;
+  return `${videoUrl}#t=1`;
+}
+
 export function ChatCardRenderer({ card, compact = false }: { card: ChatCard; compact?: boolean }) {
   // A session in progress: render the checklist that updates in place. Done
   // steps collapse to a ticked line, the current step is highlighted.
@@ -144,8 +149,17 @@ function VideoReceiptCard({ card }: { card: ChatCard }) {
   const [acked, setAcked] = useState(false);
 
   const play = () => {
-    videoRef.current?.play();
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play();
+    }
     setPlaying(true);
+  };
+
+  const handleMetadata = () => {
+    if (!card.poster && videoRef.current && !playing) {
+      videoRef.current.currentTime = 1;
+    }
   };
 
   return (
@@ -154,10 +168,12 @@ function VideoReceiptCard({ card }: { card: ChatCard }) {
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
-          src={card.videoUrl}
+          src={previewVideoSrc(card.videoUrl, card.poster)}
           poster={card.poster}
           playsInline
+          preload="metadata"
           controls={playing}
+          onLoadedMetadata={handleMetadata}
           onEnded={() => setPlaying(false)}
           onPause={() => setPlaying(false)}
           className="block max-h-72 w-full object-cover"
