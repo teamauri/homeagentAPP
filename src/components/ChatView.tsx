@@ -269,7 +269,7 @@ function AgentJobReceiptCard({ event, draft, phase }: { event?: RobotEvent; draf
   const result = job.result;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const statusMeta = statusForJobPhase(phase);
+  const metadata = [agent.name, job.dateLabel, job.timeLabel, job.personLabel, statusLabelForJobPhase(phase)].filter(Boolean).join(" · ");
 
   const play = () => {
     if (videoRef.current) {
@@ -295,14 +295,10 @@ function AgentJobReceiptCard({ event, draft, phase }: { event?: RobotEvent; draf
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">
-            {agent.name} · {[job.dateLabel, job.timeLabel, job.personLabel].filter(Boolean).join(" · ")}
+            {metadata}
           </div>
           <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{job.title}</div>
         </div>
-        <span className={clsx("flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-4", statusMeta.className)}>
-          {phase === "running" ? <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-current" aria-hidden="true" /> : null}
-          {statusMeta.label}
-        </span>
       </div>
 
       <div className="border-t border-line/70 px-3.5 py-2">
@@ -378,10 +374,10 @@ function AgentJobReceiptCard({ event, draft, phase }: { event?: RobotEvent; draf
   );
 }
 
-function statusForJobPhase(phase: AgentJobReceiptPhase) {
-  if (phase === "completed") return { label: "Done", className: "bg-[#2f9d5b]/10 text-[#2f9d5b]" };
-  if (phase === "running") return { label: "Running", className: "bg-[#C0492C]/10 text-[#C0492C]" };
-  return { label: "Created", className: "bg-[#c08a2b]/[0.14] text-[#9a7a1e]" };
+function statusLabelForJobPhase(phase: AgentJobReceiptPhase) {
+  if (phase === "completed") return "Done";
+  if (phase === "running") return "Running";
+  return "Created";
 }
 
 function createdDetail(job: AgentJobReceiptInput) {
