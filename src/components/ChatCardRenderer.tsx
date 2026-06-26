@@ -5,11 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import { ChatCard, Subtask } from "@/lib/chat-contracts";
 import { DoodleIcon } from "./Icons";
 
-function previewVideoSrc(videoUrl: string | undefined, poster: string | undefined) {
-  if (!videoUrl || poster || videoUrl.includes("#")) return videoUrl;
-  return `${videoUrl}#t=1`;
-}
-
 export function ChatCardRenderer({ card, compact = false }: { card: ChatCard; compact?: boolean }) {
   // A session in progress: render the checklist that updates in place. Done
   // steps collapse to a ticked line, the current step is highlighted.
@@ -150,7 +145,7 @@ function VideoReceiptCard({ card }: { card: ChatCard }) {
 
   const play = () => {
     if (videoRef.current) {
-      videoRef.current.currentTime = 0;
+      if (card.poster) videoRef.current.currentTime = 0;
       videoRef.current.play();
     }
     setPlaying(true);
@@ -168,7 +163,7 @@ function VideoReceiptCard({ card }: { card: ChatCard }) {
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
-          src={previewVideoSrc(card.videoUrl, card.poster)}
+          src={card.videoUrl}
           poster={card.poster}
           playsInline
           preload="metadata"
