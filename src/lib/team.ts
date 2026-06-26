@@ -18,7 +18,7 @@ export type TeamAgent = {
   scope: TeamAgentScope;
 };
 
-export const helperTeamAgentIds = ["cameraman", "watcher", "companion", "coach", "homekeeper", "baby_logger"] as const satisfies readonly TeamAgentId[];
+export const helperTeamAgentIds = ["cameraman", "homekeeper", "companion", "coach", "watcher", "baby_logger"] as const satisfies readonly TeamAgentId[];
 export type HelperTeamAgentId = (typeof helperTeamAgentIds)[number];
 
 export const teamAgents: TeamAgent[] = [
