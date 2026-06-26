@@ -1,5 +1,6 @@
 import type { PersonId } from "@/lib/types";
 import type { ChatResponseCard, CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
+import { deriveDateLabel, deriveTimeLabel, immediateScheduledAt, timeLabelInZone } from "@/lib/job-time";
 import { helperTeamAgentIds, normalizeTeamAgentId, type TeamAgentId } from "@/lib/team";
 
 // A reminder / calendar card Auri proposes in chat that the user can confirm
@@ -12,6 +13,7 @@ export type DraftInfo = {
   personLabel: string;
   dateLabel: string;
   timeLabel: string;
+  scheduledAt?: number;
   agent?: TeamAgentId;
   recordingMode?: string;
   note?: string;
@@ -28,29 +30,6 @@ function normalizePerson(value: unknown): { id: PersonId; label: string } {
   if (match) return { id: match, label: raw ? raw[0].toUpperCase() + raw.slice(1).toLowerCase() : match };
   if (raw) return { id: "family", label: raw };
   return { id: "family", label: "Family" };
-}
-
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-// The demo's calendar week is Fri Jun 19 → Thu Jun 25, 2026, with "today" = the
-// 19th. Map an absolute date onto a label the calendar understands; anything
-// outside the visible week falls back to "Today" so it still surfaces.
-function demoDayLabel(d: Date): string {
-  if (d.getUTCFullYear() === 2026 && d.getUTCMonth() === 5) {
-    const day = d.getUTCDate();
-    if (day === 19) return "Today";
-    if (day === 20) return "Tomorrow";
-    if (day >= 21 && day <= 25) return WEEKDAYS[d.getUTCDay()];
-  }
-  return "Today";
-}
-
-function formatTimeUTC(d: Date): string {
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
 const TIME_RE = /(\d{1,2}):(\d{2})\s*(AM|PM)/i;
@@ -77,8 +56,7 @@ function formatTimeField(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const v = value.trim();
   if (v.toLowerCase() === "now") {
-    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
-      .format(new Date(Date.now() + 60_000));
+    return timeLabelInZone(immediateScheduledAt());
   }
   const friendly = v.match(TIME_RE);
   if (friendly) {
@@ -97,13 +75,13 @@ function formatTimeField(value: unknown): string | undefined {
   return v || undefined;
 }
 
-// "2026-06-19" → a demo-week label ("Today"); leaves "Friday"/"Today" alone.
+// "2026-06-19" → a real relative label ("Today", "Tomorrow", "Jun 30").
 function formatDateField(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const v = value.trim();
   if (ISO_DATE_RE.test(v)) {
-    const d = new Date(`${v}T00:00:00Z`);
-    if (!Number.isNaN(d.getTime())) return demoDayLabel(d);
+    const d = new Date(`${v}T00:00:00`);
+    if (!Number.isNaN(d.getTime())) return deriveDateLabel(d.getTime());
   }
   return v || undefined;
 }
@@ -111,11 +89,14 @@ function formatDateField(value: unknown): string | undefined {
 function humanizeWhen(payload: Record<string, unknown>): { dateLabel: string; timeLabel: string } {
   // The model is inconsistent: sometimes a full ISO datetime, sometimes split
   // date + 24h time fields, sometimes a friendly compound string.
+  if (typeof payload.scheduledAt === "number" && Number.isFinite(payload.scheduledAt)) {
+    return { dateLabel: deriveDateLabel(payload.scheduledAt), timeLabel: deriveTimeLabel(payload.scheduledAt) };
+  }
   const candidates = [payload.datetime, payload.dateTime, payload.when, payload.time, payload.due, payload.date, payload.timeLabel, payload.dateLabel, payload.dueLabel];
   for (const c of candidates) {
     if (typeof c === "string" && ISO_DATETIME_RE.test(c)) {
       const d = new Date(c);
-      if (!Number.isNaN(d.getTime())) return { dateLabel: demoDayLabel(d), timeLabel: formatTimeUTC(d) };
+      if (!Number.isNaN(d.getTime())) return { dateLabel: deriveDateLabel(d.getTime()), timeLabel: deriveTimeLabel(d.getTime()) };
     }
   }
   const compound = pickFromCompound(String(payload.dueLabel ?? payload.subtitle ?? ""));
@@ -146,12 +127,14 @@ function cardForDraft(card: ChatResponseCard, object: ObjectToCreate | undefined
   const title = String(payload.title ?? card.title);
   const { id, label } = normalizePerson(merged.recipient ?? merged.person ?? merged.assignee);
   const { dateLabel, timeLabel } = humanizeWhen(merged);
+  const scheduledAt = typeof merged.scheduledAt === "number" && Number.isFinite(merged.scheduledAt) ? merged.scheduledAt : undefined;
   const metadata = {
     ...card.metadata,
     ...payload,
     person: id,
     dateLabel,
     timeLabel,
+    ...(scheduledAt ? { scheduledAt } : {}),
     ...(agent ? { agent } : {}),
   };
 
@@ -185,6 +168,7 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
     }
   }
   const { dateLabel, timeLabel } = humanizeWhen(merged);
+  const scheduledAt = typeof merged.scheduledAt === "number" && Number.isFinite(merged.scheduledAt) ? merged.scheduledAt : undefined;
   const noteRaw = (payload.note ?? (card.body && !BOILERPLATE.test(card.body) ? card.body : undefined)) as string | undefined;
   const agent = normalizeAgent(merged.agent) ?? defaultAgent;
   const recordingMode = normalizeRecordingMode(merged.recordingMode);
@@ -197,6 +181,7 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
     personLabel: label,
     dateLabel,
     timeLabel,
+    scheduledAt,
     agent,
     recordingMode,
     note: noteRaw ? String(noteRaw) : undefined,

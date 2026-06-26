@@ -4,6 +4,7 @@
 // frozen strings — a job created yesterday stayed "Today" forever.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_TIME_ZONE = "Asia/Shanghai";
 
 function startOfDay(d: Date): number {
   const c = new Date(d);
@@ -29,6 +30,19 @@ export function deriveDateLabel(scheduledAt: number, now: number = Date.now()): 
 
 export function deriveTimeLabel(scheduledAt: number): string {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(scheduledAt));
+}
+
+export function immediateScheduledAt(now: number = Date.now()): number {
+  return now + 60_000;
+}
+
+export function timeLabelInZone(epoch: number, timeZone: string = DEFAULT_TIME_ZONE): string {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone,
+  }).format(new Date(epoch));
 }
 
 // From an <input type="date"> (YYYY-MM-DD) + <input type="time"> (HH:MM) in

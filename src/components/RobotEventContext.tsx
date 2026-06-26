@@ -79,7 +79,7 @@ type RobotEventContextValue = {
   completions: RobotEvent[];
   ready: boolean;
   addEvent: (input: NewRobotEventInput) => string;
-  updateEvent: (id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "dateLabel" | "timeLabel">>) => void;
+  updateEvent: (id: string, updates: Partial<Pick<RobotEvent, "title" | "note" | "person" | "scheduledAt" | "dateLabel" | "timeLabel">>) => void;
   keepEvent: (id: string) => void;
   removeEvent: (id: string) => void;
   runEvent: (id: string) => void;

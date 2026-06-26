@@ -470,14 +470,16 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
       updateEvent(activeEventId, {
         title: liveTitle,
         person: livePerson,
-        dateLabel: draft.dateLabel,
-        timeLabel: liveTime,
+        ...(liveTime === draft.timeLabel && draft.scheduledAt
+          ? { scheduledAt: draft.scheduledAt }
+          : { dateLabel: draft.dateLabel, timeLabel: liveTime }),
       });
     } else if (!hasCreatedObject) {
       const id = addEvent({
         title: liveTitle,
         note: draft.note,
         person: livePerson,
+        scheduledAt: liveTime === draft.timeLabel ? draft.scheduledAt : undefined,
         dateLabel: draft.dateLabel,
         timeLabel: liveTime,
         forRobot: true,

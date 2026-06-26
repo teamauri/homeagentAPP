@@ -8,7 +8,7 @@ import {
   CalendarRobotCaptureStatus,
   deriveCalendarEventIcon,
 } from "@/lib/calendar-api";
-import { scheduledAtFromLabels } from "@/lib/job-time";
+import { immediateScheduledAt, scheduledAtFromLabels, timeLabelInZone } from "@/lib/job-time";
 import { moments } from "@/lib/mock-data";
 import { helperTeamAgentIds, normalizeTeamAgentId } from "@/lib/team";
 import { PersonId, SourceType, Status } from "@/lib/types";
@@ -208,9 +208,9 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
       if (existingEvent) {
         // Fix stale "now" timeLabel in-place so DockKit sees the actual time.
         if (existingEvent.timeLabel.trim().toLowerCase() === "now") {
-          existingEvent.timeLabel = new Intl.DateTimeFormat("en-US", {
-            hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai",
-          }).format(new Date(Date.now() + 60_000));
+          const scheduledAt = immediateScheduledAt();
+          existingEvent.scheduledAt = scheduledAt;
+          existingEvent.timeLabel = timeLabelInZone(scheduledAt);
           existingEvent.updatedAt = new Date().toISOString();
         }
         if (!Number.isFinite(existingEvent.scheduledAt)) {
@@ -274,10 +274,12 @@ export function createDemoObjects(objectsToCreate: ObjectToCreate[]): CreatedLoc
       // Accept time as alias for timeLabel; if AI returns "now" substitute actual time.
       const rawTimeLabel = (typeof p.timeLabel === "string" && p.timeLabel) ? p.timeLabel :
                            (typeof p.time === "string" && p.time) ? p.time : "now";
-      const timeLabel = rawTimeLabel.trim().toLowerCase() === "now"
-        ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Shanghai" }).format(new Date(Date.now() + 60_000))
+      const rawIsNow = rawTimeLabel.trim().toLowerCase() === "now";
+      const immediateAt = rawIsNow ? immediateScheduledAt() : undefined;
+      const timeLabel = immediateAt
+        ? timeLabelInZone(immediateAt)
         : normalizeTimeLabel(rawTimeLabel);
-      const scheduledAt = scheduledAtFromPayload(p, dateLabel, timeLabel);
+      const scheduledAt = immediateAt ?? scheduledAtFromPayload(p, dateLabel, timeLabel);
       const note = typeof p.note === "string" ? p.note : typeof p.body === "string" ? p.body : undefined;
       upsertDemoCalendarEvent({
         title,

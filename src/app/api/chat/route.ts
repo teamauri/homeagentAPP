@@ -5,6 +5,7 @@ import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
 import { ChatAIResponse, ChatApiResponse, ChatRequestBody, ChatResponseCard, ObjectToCreate, type TeamMemberId } from "@/lib/chat-server/types";
+import { immediateScheduledAt, timeLabelInZone } from "@/lib/job-time";
 import { helperTeamAgentIds, normalizeTeamAgentId, teamAgentById, type HelperTeamAgentId } from "@/lib/team";
 
 export const runtime = "nodejs";
@@ -77,13 +78,13 @@ function normalizeTimeLabel(value: unknown) {
   return trimmed;
 }
 
-function nowTimeLabel() {
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "Asia/Shanghai",
-  }).format(new Date(Date.now() + 60_000));
+function nowScheduleFields() {
+  const scheduledAt = immediateScheduledAt();
+  return {
+    scheduledAt,
+    timeLabel: timeLabelInZone(scheduledAt),
+    dateLabel: "Today",
+  };
 }
 
 function cameraCaptureTitle(request: ChatRequestBody) {
@@ -103,13 +104,15 @@ function reminderTitle(request: ChatRequestBody) {
 }
 
 function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
-  const timeLabel = /现在|立刻|马上|\bnow\b/i.test(request.message ?? "") ? nowTimeLabel() : "8:00 PM";
+  const now = nowScheduleFields();
+  const immediate = /现在|立刻|马上|\bnow\b/i.test(request.message ?? "");
   return {
     type: "reminder_draft",
     payload: {
       title: cameraCaptureTitle(request),
-      timeLabel,
-      dateLabel: "Today",
+      timeLabel: immediate ? now.timeLabel : "8:00 PM",
+      dateLabel: now.dateLabel,
+      ...(immediate ? { scheduledAt: now.scheduledAt } : {}),
       person: "mia",
       agent: "cameraman",
       recordingMode: "cameraman_highlight",
@@ -119,12 +122,14 @@ function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
 }
 
 function homekeeperReminderObject(request: ChatRequestBody): ObjectToCreate {
+  const now = nowScheduleFields();
   return {
     type: "reminder_draft",
     payload: {
       title: reminderTitle(request),
-      timeLabel: nowTimeLabel(),
-      dateLabel: "Today",
+      scheduledAt: now.scheduledAt,
+      timeLabel: now.timeLabel,
+      dateLabel: now.dateLabel,
       person: inferPersonFromRequest(request),
       agent: "homekeeper",
       note: request.message,
@@ -133,12 +138,14 @@ function homekeeperReminderObject(request: ChatRequestBody): ObjectToCreate {
 }
 
 function watcherObject(request: ChatRequestBody): ObjectToCreate {
+  const now = nowScheduleFields();
   return {
     type: "reminder_draft",
     payload: {
       title: cameraCaptureTitle(request) || "Home watch",
-      timeLabel: nowTimeLabel(),
-      dateLabel: "Today",
+      scheduledAt: now.scheduledAt,
+      timeLabel: now.timeLabel,
+      dateLabel: now.dateLabel,
       person: inferPersonFromRequest(request),
       agent: "watcher",
       recordingMode: "watcher_interval",

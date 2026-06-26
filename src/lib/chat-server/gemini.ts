@@ -1,16 +1,12 @@
 import { buildFamilyContext } from "@/lib/demo/family-context";
+import { immediateScheduledAt, timeLabelInZone } from "@/lib/job-time";
 import { AURI_SYSTEM_PROMPT } from "./persona";
 import { chatResponseJsonSchema } from "./response-schema";
 import { ChatAIResponse, ChatRequestBody } from "./types";
 import { parseJsonObject, validateChatAIResponse } from "./validate";
 
 function currentTimeLabel(): string {
-  const now = new Date();
-  const h = now.getHours();
-  const m = now.getMinutes();
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+  return timeLabelInZone(immediateScheduledAt());
 }
 
 function buildPrompt(request: ChatRequestBody) {

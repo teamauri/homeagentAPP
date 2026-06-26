@@ -1,4 +1,5 @@
 import { buildFamilyContext } from "@/lib/demo/family-context";
+import { immediateScheduledAt, timeLabelInZone } from "@/lib/job-time";
 import { AURI_SYSTEM_PROMPT } from "./persona";
 import { ChatAIResponse, ChatRequestBody } from "./types";
 import { parseJsonObject, validateChatAIResponse } from "./validate";
@@ -30,12 +31,7 @@ const responseContract = {
 
 function currentTimeLabel(): string {
   // Add 1 minute so "now" reminders fire shortly after creation rather than immediately.
-  return new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "Asia/Shanghai",
-  }).format(new Date(Date.now() + 60_000));
+  return timeLabelInZone(immediateScheduledAt());
 }
 
 function buildMessages(request: ChatRequestBody) {
