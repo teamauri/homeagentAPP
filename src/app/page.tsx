@@ -14,7 +14,7 @@ const HOME_TAB_KEY = "auri.homeTab.v1";
 const HOME_RETURN_KEY = "auri.returnHome.v1";
 const HOME_SCROLL_PREFIX = "auri.homeScroll.";
 const HOME_TABS: TabKey[] = ["chat", "today", "memory"];
-const COVER_MIN_MS = 1800;
+const COVER_MIN_MS = 3500;
 
 declare global {
   interface Window {
@@ -57,6 +57,7 @@ function HomeInner() {
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
   const [showCover, setShowCover] = useState(true);
+  const [coverMediaReady, setCoverMediaReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<TabKey>("chat");
   const returningHomeRef = useRef(false);
@@ -66,6 +67,7 @@ function HomeInner() {
   const jobsSubpageRef = useRef(false);
   const coverStartedAtRef = useRef(Date.now());
   const coverDismissTimerRef = useRef<number | null>(null);
+  const coverMediaReadyRef = useRef(false);
 
   const scrollKey = (targetTab: TabKey) => `${HOME_SCROLL_PREFIX}${targetTab}.v1`;
 
@@ -119,6 +121,7 @@ function HomeInner() {
 
   const scheduleCoverDismiss = () => {
     clearCoverDismissTimer();
+    if (!coverMediaReadyRef.current) return;
     const remaining = Math.max(0, COVER_MIN_MS - (Date.now() - coverStartedAtRef.current));
     coverDismissTimerRef.current = window.setTimeout(() => {
       setShowCover(false);
@@ -126,18 +129,31 @@ function HomeInner() {
     }, remaining);
   };
 
+  const markCoverMediaReady = () => {
+    if (coverMediaReadyRef.current) return;
+    coverMediaReadyRef.current = true;
+    setCoverMediaReady(true);
+    if (liveLoaded) scheduleCoverDismiss();
+  };
+
+  const resetCoverMediaReady = () => {
+    coverMediaReadyRef.current = false;
+    setCoverMediaReady(false);
+  };
+
   const replayCover = () => {
     if (tabRef.current !== "chat") return;
     coverStartedAtRef.current = Date.now();
+    resetCoverMediaReady();
     setShowCover(true);
     if (liveLoaded) scheduleCoverDismiss();
   };
 
   useEffect(() => {
-    if (!liveLoaded) return;
+    if (!liveLoaded || !coverMediaReady) return;
     scheduleCoverDismiss();
     return clearCoverDismissTimer;
-  }, [liveLoaded]);
+  }, [liveLoaded, coverMediaReady]);
 
   // Cold launch always enters Chat. A return from a child route restores the
   // tab that initiated navigation, so Back lands where the action started.
@@ -437,17 +453,32 @@ function HomeInner() {
         <div className={tab === "memory" ? "" : "hidden"}>
           <MomentsView />
         </div>
-        {showCover && tab === "chat" ? <AuriCover onDismiss={() => setShowCover(false)} /> : null}
+        {showCover && tab === "chat" ? <AuriCover onReady={markCoverMediaReady} onDismiss={() => setShowCover(false)} /> : null}
       </AppShell>
     </div>
   );
 }
 
-function AuriCover({ onDismiss }: { onDismiss: () => void }) {
+function AuriCover({ onReady, onDismiss }: { onReady: () => void; onDismiss: () => void }) {
+  const imageRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    if (imageRef.current?.complete) onReady();
+  }, [onReady]);
+
   return (
     <button type="button" onClick={onDismiss} className="absolute inset-0 z-20 bg-paper text-left" aria-label="Enter Auri">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/agents/auri-app-cover.png" alt="" className="h-full w-full object-cover" style={{ objectPosition: "50% 50%" }} />
+      <img
+        ref={imageRef}
+        src="/agents/auri-app-cover.png"
+        alt=""
+        loading="eager"
+        onLoad={onReady}
+        onError={onReady}
+        className="h-full w-full object-cover"
+        style={{ objectPosition: "50% 50%" }}
+      />
     </button>
   );
 }
