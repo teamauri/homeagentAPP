@@ -97,6 +97,11 @@ const chatBubbleBg = "bg-[#DDEEE4]";
 const chatAvatarOffset = "pl-[54px]";
 const chatRowShell = "relative min-w-0";
 const chatRowAvatar = "absolute left-0 top-0";
+const CHAT_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+
+function isRecentChatEvent(at: number, now = Date.now()) {
+  return at >= now - CHAT_RETENTION_MS;
+}
 
 export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
   const { completions, events, removeEvent } = useRobotEvents();
@@ -113,16 +118,18 @@ export function ChatView({ liveTurns = [] }: { liveTurns?: LiveChatTurn[] }) {
       at: turn.createdAt ?? epochFromId(turn.id),
       node: <LiveChatTurnRow key={turn.id} turn={turn} />,
     })),
-    ...completions.map((event) => ({
-      key: `done-${event.id}`,
-      at: robotCompletedAt(event),
-      node: <RobotCompletionRow key={`done-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} />,
-    })),
-    ...runningEvents.map((event) => ({
-      key: `live-${event.id}`,
-      at: robotStartedAt(event),
-      node: <RobotRunningRow key={`live-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} />,
-    })),
+    ...completions.flatMap((event) => {
+      const at = robotCompletedAt(event);
+      return isRecentChatEvent(at)
+        ? [{ key: `done-${event.id}`, at, node: <RobotCompletionRow key={`done-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} /> }]
+        : [];
+    }),
+    ...runningEvents.flatMap((event) => {
+      const at = robotStartedAt(event);
+      return isRecentChatEvent(at)
+        ? [{ key: `live-${event.id}`, at, node: <RobotRunningRow key={`live-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} /> }]
+        : [];
+    }),
   ].sort((a, b) => a.at - b.at);
 
   return (

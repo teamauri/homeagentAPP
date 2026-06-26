@@ -95,6 +95,8 @@ const STORAGE_KEY = "auri.events.v1";
 // Tombstones: ids the user deleted locally. The 5s server poll must never
 // resurrect these, even if a stale copy still lives in the server snapshot.
 const TOMBSTONE_KEY = "auri.deletedIds.v1";
+const EVENT_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+const MAX_STORED_EVENTS = 150;
 
 function nowLabel() {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date());
@@ -163,6 +165,27 @@ function timestampFromEventId(id: string): number | undefined {
 
 function legacyScheduledAt(dateLabel: string, timeLabel: string, anchor?: number) {
   return scheduledAtFromLabels(dateLabel, timeLabel, anchor ?? Date.now());
+}
+
+function robotEventActivityTime(event: RobotEvent): number {
+  const completedAt =
+    event.robot?.highlightSyncedAt ??
+    event.robot?.rawOutputReadyAt ??
+    event.robot?.uploadedAt ??
+    event.robot?.startedAt;
+  if (completedAt) {
+    const time = new Date(completedAt).getTime();
+    if (Number.isFinite(time)) return time;
+  }
+  return Number.isFinite(event.scheduledAt) ? event.scheduledAt : timestampFromEventId(event.id) ?? Date.now();
+}
+
+function pruneStoredEvents(events: RobotEvent[], now = Date.now()): RobotEvent[] {
+  const cutoff = now - EVENT_RETENTION_MS;
+  return events
+    .filter((event) => event.status === "recording" || robotEventActivityTime(event) >= cutoff)
+    .sort((a, b) => robotEventActivityTime(a) - robotEventActivityTime(b))
+    .slice(-MAX_STORED_EVENTS);
 }
 
 function eventFromApi(event: CalendarApiEvent): RobotEvent {
@@ -342,7 +365,8 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
         // jobs at the view level (JobsView filters scheduledAt > now); the
         // calendar still shows them on their day. Deletion only happens on an
         // explicit user action (removeEvent) — never on a staleness heuristic.
-        localEvents = migrated;
+        localEvents = pruneStoredEvents(migrated);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(localEvents));
         setEvents(localEvents);
       }
     } catch {
@@ -367,7 +391,7 @@ export function RobotEventProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pruneStoredEvents(events)));
     } catch {
       // ignore quota / serialization failures
     }

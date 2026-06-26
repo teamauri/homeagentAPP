@@ -15,6 +15,8 @@ const HOME_RETURN_KEY = "auri.returnHome.v1";
 const HOME_SCROLL_PREFIX = "auri.homeScroll.";
 const HOME_TABS: TabKey[] = ["chat", "today", "memory"];
 const COVER_MIN_MS = 3500;
+const CHAT_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+const MAX_LIVE_TURNS = 120;
 
 declare global {
   interface Window {
@@ -47,6 +49,20 @@ function normalizeLiveTurn(turn: LiveChatTurn): LiveChatTurn {
     avatar,
     sender: agent ? agent.name : turn.sender,
   };
+}
+
+function liveTurnTime(turn: LiveChatTurn): number {
+  if (typeof turn.createdAt === "number" && Number.isFinite(turn.createdAt)) return turn.createdAt;
+  const match = turn.id.match(/(\d{10,})/);
+  return match ? Number(match[1]) : Date.now();
+}
+
+function pruneLiveTurns(turns: LiveChatTurn[], now = Date.now()): LiveChatTurn[] {
+  const cutoff = now - CHAT_RETENTION_MS;
+  return turns
+    .filter((turn) => !turn.pending)
+    .filter((turn) => liveTurnTime(turn) >= cutoff)
+    .slice(-MAX_LIVE_TURNS);
 }
 
 function HomeInner() {
@@ -179,7 +195,7 @@ function HomeInner() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          const migrated = parsed.map((turn) => normalizeLiveTurn(turn as LiveChatTurn));
+          const migrated = pruneLiveTurns(parsed.map((turn) => normalizeLiveTurn(turn as LiveChatTurn)));
           sessionStorage.setItem("auri.liveTurns.v1", JSON.stringify(migrated));
           setLiveTurns(migrated);
         }
@@ -310,8 +326,8 @@ function HomeInner() {
   useEffect(() => {
     if (!liveLoaded) return;
     try {
-      // Drop transient "thinking…" bubbles so they don't restore as stuck spinners.
-      sessionStorage.setItem("auri.liveTurns.v1", JSON.stringify(liveTurns.filter((turn) => !turn.pending)));
+      // Keep only recent settled turns so test chats do not make startup heavy.
+      sessionStorage.setItem("auri.liveTurns.v1", JSON.stringify(pruneLiveTurns(liveTurns)));
     } catch {
       // ignore quota / serialization failures
     }
