@@ -52,6 +52,15 @@ function displayTimeFromIso(value?: string): string | undefined {
   return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(time));
 }
 
+function displayDateTimeFromIso(value?: string): string | undefined {
+  const time = epochFromIso(value);
+  if (!time) return undefined;
+  const date = new Date(time);
+  const dateLabel = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+  const timeLabel = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(date);
+  return `${dateLabel} · ${timeLabel}`;
+}
+
 function robotStartedAt(event: RobotEvent): number {
   return epochFromIso(event.robot?.startedAt) || epochFromIso(event.robot?.uploadedAt) || epochFromId(event.id);
 }
@@ -220,6 +229,8 @@ type AgentJobReceiptInput = {
   highlightProgress?: RobotEvent["highlightProgress"];
   kept?: boolean;
   eventId?: string;
+  startedAtLabel?: string;
+  repliedAtLabel?: string;
 };
 
 function AgentJobReceiptCard({ event, draft, phase }: { event?: RobotEvent; draft?: DraftInfo; phase: AgentJobReceiptPhase }) {
@@ -239,6 +250,11 @@ function AgentJobReceiptCard({ event, draft, phase }: { event?: RobotEvent; draf
         highlightProgress: event.highlightProgress,
         kept: event.kept,
         eventId: event.id,
+        startedAtLabel: displayDateTimeFromIso(event.robot?.startedAt) ?? displayDateTimeFromIso(event.robot?.uploadedAt),
+        repliedAtLabel:
+          displayDateTimeFromIso(event.robot?.highlightSyncedAt) ??
+          displayDateTimeFromIso(event.robot?.rawOutputReadyAt) ??
+          displayDateTimeFromIso(event.robot?.uploadedAt),
       }
     : {
         title: draft?.title ?? "Job",
@@ -373,13 +389,13 @@ function createdDetail(job: AgentJobReceiptInput) {
 }
 
 function startedDetail(job: AgentJobReceiptInput, phase: AgentJobReceiptPhase) {
-  if (phase === "completed") return "Recorded by Auri";
-  if (phase === "running") return job.agentId === "cameraman" ? "Capturing now" : "Recording now";
+  if (phase === "completed") return job.startedAtLabel ?? "Started";
+  if (phase === "running") return job.startedAtLabel ?? "Starting now";
   return "Waiting for start";
 }
 
 function repliedDetail(job: AgentJobReceiptInput, phase: AgentJobReceiptPhase) {
-  if (phase === "completed") return job.result?.summary ? "Video and summary ready" : "Video ready";
+  if (phase === "completed") return job.repliedAtLabel ?? "Replied";
   return "Waiting for reply";
 }
 
