@@ -14,6 +14,7 @@ const HOME_TAB_KEY = "auri.homeTab.v1";
 const HOME_RETURN_KEY = "auri.returnHome.v1";
 const HOME_SCROLL_PREFIX = "auri.homeScroll.";
 const HOME_TABS: TabKey[] = ["chat", "today", "memory"];
+const COVER_MIN_MS = 1800;
 
 declare global {
   interface Window {
@@ -55,7 +56,7 @@ function HomeInner() {
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
-  const [showCover, setShowCover] = useState(false);
+  const [showCover, setShowCover] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<TabKey>("chat");
   const returningHomeRef = useRef(false);
@@ -63,6 +64,7 @@ function HomeInner() {
   const visitedTabsRef = useRef<Set<TabKey>>(new Set(["chat"]));
   const pendingRestoreRef = useRef<{ tab: TabKey; allowRestore: boolean } | null>(null);
   const jobsSubpageRef = useRef(false);
+  const coverStartedAtRef = useRef(Date.now());
 
   const scrollKey = (targetTab: TabKey) => `${HOME_SCROLL_PREFIX}${targetTab}.v1`;
 
@@ -109,17 +111,11 @@ function HomeInner() {
   };
 
   useEffect(() => {
-    try {
-      const seenCover = sessionStorage.getItem("auri.coverSeen.v1") === "1";
-      if (seenCover) return;
-      sessionStorage.setItem("auri.coverSeen.v1", "1");
-      setShowCover(true);
-    } catch {
-      setShowCover(true);
-    }
-    const id = window.setTimeout(() => setShowCover(false), 900);
+    if (!liveLoaded) return;
+    const remaining = Math.max(0, COVER_MIN_MS - (Date.now() - coverStartedAtRef.current));
+    const id = window.setTimeout(() => setShowCover(false), remaining);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [liveLoaded]);
 
   // Cold launch always enters Chat. A return from a child route restores the
   // tab that initiated navigation, so Back lands where the action started.
