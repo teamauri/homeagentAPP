@@ -93,7 +93,7 @@ export const teamAgents: TeamAgent[] = [
     portrait: "/agents/coach-ethan.png",
     portraitPosition: "50% 50%",
     cardPortrait: "/agents/coach-card.png",
-    icon: "spark",
+    icon: "muscle",
     tone: "bg-[#F5D87A]",
     accent: "text-[#8A6800]",
     scope: "private",

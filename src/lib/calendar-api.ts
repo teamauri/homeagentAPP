@@ -91,7 +91,8 @@ export function deriveCalendarEventIcon(title: string, _person: PersonId) {
   if (/photo|album|picture|smile/.test(t)) return "camera-note";
   if (/record|recording|film|video|clip|e2e|highlight/.test(t)) return "camera-note";
   if (/call|grandma|grandpa|phone/.test(t)) return "video-heart";
-  if (/soccer|play|sport|run|stretch|jump|exercise|dance|swim/.test(t)) return "soccer";
+  if (/workout|exercise|fitness|rep|reps|squat|stretch|run|jump|dance|swim/.test(t)) return "muscle";
+  if (/soccer|play|sport/.test(t)) return "soccer";
   if (/draw|paint|art|write|color/.test(t)) return "pencil";
   if (/medicine|med|药|pill|vitamin|吃药|dose/.test(t)) return "bell";
   if (/school|class|lesson|homework|study|preschool|dropoff/.test(t)) return "backpack";

@@ -17,6 +17,7 @@ const emojiFor = (name: string): string => {
     bottle: "🍼",
     backpack: "🎒",
     soccer: "⚽",
+    muscle: "💪",
     "video-heart": "📹",
     photos: "🖼️",
     "camera-note": "📷",
