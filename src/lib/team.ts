@@ -12,6 +12,7 @@ export type TeamAgent = {
   responsibilities: string[];
   portrait: string;
   portraitPosition: string;
+  cardPortrait?: string;
   icon: string;
   tone: string;
   accent: string;
@@ -31,6 +32,7 @@ export const teamAgents: TeamAgent[] = [
     responsibilities: ["Capture moments", "Highlight stories"],
     portrait: "/agents/cameraman-leo.png",
     portraitPosition: "50% 50%",
+    cardPortrait: "/agents/cameraman-card.png",
     icon: "camera-note",
     tone: "bg-[#FFCFC4]",
     accent: "text-[#C0492C]",
@@ -45,6 +47,7 @@ export const teamAgents: TeamAgent[] = [
     responsibilities: ["Every X minutes", "10-second clips", "Activity recognition", "Observation timeline"],
     portrait: "/agents/observer-owen.png",
     portraitPosition: "50% 50%",
+    cardPortrait: "/agents/observer-card.png",
     icon: "home",
     tone: "bg-[#CFE8F7]",
     accent: "text-[#236A8A]",
@@ -59,6 +62,7 @@ export const teamAgents: TeamAgent[] = [
     responsibilities: ["Read books", "Learn together", "Play with toys"],
     portrait: "/agents/companion-theo.png",
     portraitPosition: "50% 50%",
+    cardPortrait: "/agents/companion-card.png",
     icon: "book",
     tone: "bg-[#DDD0FC]",
     accent: "text-[#6B43B5]",
@@ -73,6 +77,7 @@ export const teamAgents: TeamAgent[] = [
     responsibilities: ["Reminders", "Check-ins", "Family updates"],
     portrait: "/agents/homekeeper-emma.png",
     portraitPosition: "50% 50%",
+    cardPortrait: "/agents/homekeeper-card.png",
     icon: "calendar",
     tone: "bg-[#C8EDD8]",
     accent: "text-[#1F5C42]",
@@ -87,6 +92,7 @@ export const teamAgents: TeamAgent[] = [
     responsibilities: ["Form cues", "Rep counts", "Workout flow"],
     portrait: "/agents/coach-ethan.png",
     portraitPosition: "50% 50%",
+    cardPortrait: "/agents/coach-card.png",
     icon: "spark",
     tone: "bg-[#F5D87A]",
     accent: "text-[#8A6800]",
@@ -101,6 +107,7 @@ export const teamAgents: TeamAgent[] = [
     responsibilities: ["Feeds", "Sleep", "Diapers", "Likely next"],
     portrait: "/agents/baby-rhythm-nina.png",
     portraitPosition: "50% 50%",
+    cardPortrait: "/agents/baby-rhythm-card.png",
     icon: "baby",
     tone: "bg-[#F8D7E8]",
     accent: "text-[#9D3C6A]",

@@ -374,11 +374,12 @@ export function JobsView({
 }
 
 function AgentCard({ agent, onOpen }: { agent: AgentProfile; onOpen: () => void }) {
+  const imageSrc = agent.cardPortrait ?? agent.portrait;
   return (
     <article className="overflow-hidden rounded-[8px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
       <div className="aspect-[4/3] bg-[#eee7dc]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={agent.portrait} alt="" className="h-full w-full object-contain" style={{ objectPosition: agent.portraitPosition }} />
+        <img src={imageSrc} alt="" className="h-full w-full object-cover" style={{ objectPosition: agent.portraitPosition }} />
       </div>
       <div className="border-t border-line px-3.5 py-3">
         <button
