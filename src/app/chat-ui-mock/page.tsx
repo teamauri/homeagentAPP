@@ -141,7 +141,7 @@ function ChatRow({ message, theme }: { message: (typeof messages)[number]; theme
   const mine = message.side === "mine";
   return (
     <div>
-      {message.time ? (
+      {message.time && !mine ? (
         <div className="mb-3 text-center text-[17px]" style={{ color: theme.time }}>
           {message.time}
         </div>
@@ -149,9 +149,11 @@ function ChatRow({ message, theme }: { message: (typeof messages)[number]; theme
       <div className={mine ? "flex items-start justify-end gap-2.5" : "flex items-start gap-2.5"}>
         {!mine ? <Avatar src="/family/liang.jpg" name="Liang" /> : null}
         <div className={mine ? "flex max-w-[74%] flex-col items-end" : "flex max-w-[74%] flex-col items-start"}>
-          <div className="mb-1 text-[12px]" style={{ color: theme.time }}>
-            {message.who}
-          </div>
+          {!mine ? (
+            <div className="mb-1 text-[12px]" style={{ color: theme.time }}>
+              {message.who}
+            </div>
+          ) : null}
           <div className="relative">
             <p
               className={[

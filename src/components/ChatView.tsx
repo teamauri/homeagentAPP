@@ -164,35 +164,35 @@ export function ChatView({ liveTurns = [], sophieDemoPhase = 0 }: { liveTurns?: 
 
 function CameramanMomentJobCard({ phase }: { phase: number }) {
   const complete = phase >= 8;
-  const steps: Array<{ label: string; detail?: string; state: "done" | "active" | "todo" }> =
+  const logs: Array<{ time?: string; text: string; note?: string; state: "done" | "active" | "todo"; tone?: "skip" | "keeper" }> =
     phase >= 8
       ? [
-          { label: "9:15 check - Sophie not in view", state: "done" },
-          { label: "9:30 check - Sophie found in the living room", state: "done" },
-          { label: "Filmed while she stayed in frame", state: "done" },
-          { label: "Cut the best moments", detail: "0:10", state: "done" },
+          { time: "9:02", text: "Looking... living room empty", state: "done", tone: "skip" },
+          { time: "9:17", text: "Sophie's here, but just napping", note: "Skipped", state: "done", tone: "skip" },
+          { time: "9:34", text: "She's up and playing -> filming", state: "done" },
+          { text: "Her tower fell, but she laughed", note: "This is the one worth keeping", state: "done", tone: "keeper" },
+          { text: "Editing -> \"Sophie's big laugh\" · 0:08", note: "Sent to Family Chat", state: "done", tone: "keeper" },
         ]
       : phase >= 7
         ? [
-            { label: "9:15 check - Sophie not in view", state: "done" },
-            { label: "9:30 check - Sophie found in the living room", state: "done" },
-            { label: "Filming while she stays in frame", detail: "now", state: "active" },
-            { label: "Cut the best moments", state: "todo" },
+            { time: "9:02", text: "Looking... living room empty", state: "done", tone: "skip" },
+            { time: "9:17", text: "Sophie's here, but just napping", note: "Not a keeper", state: "done", tone: "skip" },
+            { time: "9:34", text: "She's up and playing -> filming", state: "active" },
+            { text: "Wait for a moment worth keeping", state: "todo" },
           ]
         : phase >= 6
           ? [
-              { label: "9:15 check - Sophie not in view", state: "done" },
-              { label: "9:30 check - looking again", detail: "now", state: "active" },
-              { label: "Film when Sophie is in view", state: "todo" },
-              { label: "Cut the best moments", state: "todo" },
+              { time: "9:02", text: "Looking... living room empty", state: "done", tone: "skip" },
+              { time: "9:17", text: "Sophie's here, but just napping", note: "Not a keeper", state: "active", tone: "skip" },
+              { time: "9:34", text: "Check again for movement", state: "todo" },
+              { text: "Save only the best moment", state: "todo" },
             ]
           : [
-              { label: "Created today's watch-and-film plan", detail: "9:02", state: "done" },
-              { label: "Next check for Sophie", detail: "9:15", state: "active" },
-              { label: "Film when Sophie is in view", state: "todo" },
-              { label: "Cut the best moments", state: "todo" },
+              { time: "9:02", text: "Looking... living room empty", state: "active", tone: "skip" },
+              { time: "9:17", text: "Check if Sophie is doing something", state: "todo" },
+              { time: "9:34", text: "Film only if it looks worth saving", state: "todo" },
+              { text: "Send a keeper to Family Chat", state: "todo" },
             ];
-  const doneCount = steps.filter((step) => step.state === "done").length;
   const [kept, setKept] = useState(false);
 
   return (
@@ -202,17 +202,22 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
           <DoodleIcon name="camera-note" className="h-8 w-8" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{complete ? "Completed" : "Running"}</div>
-          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">Sophie's best moments</div>
+          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">Cameraman</div>
+          <div className="text-[15px] font-semibold leading-[18px] tracking-[-0.02em] text-ink">
+            {complete ? "Sophie's best moments" : "Watching for Sophie's best moments"}
+          </div>
+          <div className="text-[12px] leading-4 text-muted">
+            {complete ? "Found one worth keeping · 0:08" : "Started just now · checking the room"}
+          </div>
         </div>
         <span className="shrink-0 whitespace-nowrap rounded-full bg-[#7a55c7]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#7a55c7]">
-          {doneCount} of {steps.length}
+          {complete ? "Ready" : "Watching"}
         </span>
       </div>
 
       <div className="border-t border-line/70 px-3.5 pb-2.5 pt-1.5">
-        {steps.map((step) => (
-          <MomentJobStep key={step.label} step={step} />
+        {logs.map((log, index) => (
+          <MomentJobLog key={`${log.time ?? "log"}-${index}`} log={log} />
         ))}
       </div>
 
@@ -221,8 +226,8 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
           <div className="relative overflow-hidden rounded-[16px] bg-[#17181b]">
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
-              src="/demo-media/e82d1f82-ca73-4222-8db0-4fe4799b9f04.mp4"
-              poster="/demo-media/7fada8f9-fc26-417f-86c7-80fd6b3048b8.jpg"
+              src="/demo-media/sophie-big-laugh.mp4"
+              poster="/demo-media/sophie-big-laugh.jpg"
               playsInline
               preload="metadata"
               className="block aspect-[4/3] w-full object-cover"
@@ -234,13 +239,13 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </span>
-              <span className="absolute left-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">0:10</span>
+              <span className="absolute left-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">0:08</span>
             </button>
             <div className="pointer-events-none absolute bottom-[50px] left-3.5 right-3.5 text-white">
-              <p className="text-[13px] font-normal leading-[16px] tracking-[0] text-white drop-shadow">Her tower fell and she cracked up 😄</p>
+              <p className="text-[13px] font-normal leading-[16px] tracking-[0] text-white drop-shadow">Her tower fell, but she laughed 😄</p>
             </div>
             <div className="absolute bottom-3.5 left-3.5 right-3.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold leading-[16px] text-white">
-              <div className="min-w-0 truncate drop-shadow">Highlight Story · 0:10</div>
+              <div className="min-w-0 truncate drop-shadow">Highlight Story · 0:08</div>
               <button
                 type="button"
                 onClick={() => setKept((value) => !value)}
@@ -257,35 +262,52 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
   );
 }
 
-function MomentJobStep({ step }: { step: { label: string; detail?: string; state: "done" | "active" | "todo" } }) {
-  if (step.state === "active") {
+function MomentJobLog({ log }: { log: { time?: string; text: string; note?: string; state: "done" | "active" | "todo"; tone?: "skip" | "keeper" } }) {
+  const textTone = "text-muted";
+  if (log.state === "active") {
     return (
-      <div className="-mx-1.5 my-0.5 flex items-center gap-2.5 rounded-[10px] bg-[#7a55c7]/10 px-1.5 py-1.5">
-        <span className="h-[17px] w-[17px] shrink-0 animate-spin rounded-full border-2 border-[#7a55c7] border-t-transparent" aria-hidden="true" />
-        <span className="min-w-0 flex-1 text-[14px] font-medium leading-[18px] text-[#5a3a9e]">{step.label}</span>
-        {step.detail ? <span className="shrink-0 text-[12px] text-[#7a55c7]">{step.detail}</span> : null}
+      <div className="-mx-1.5 my-0.5 flex items-start gap-2.5 rounded-[10px] bg-[#7a55c7]/10 px-1.5 py-1.5">
+        <span className="mt-[1px] h-[17px] w-[17px] shrink-0 animate-spin rounded-full border-2 border-[#7a55c7] border-t-transparent" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[14px] font-medium leading-[18px] text-[#5a3a9e]">
+            {log.time ? <span className="mr-1.5 font-semibold tabular-nums">{log.time}</span> : null}
+            {log.text}
+          </div>
+          {log.note ? <div className="mt-0.5 text-[12px] font-medium leading-4 text-[#7a55c7]">{"->"} {log.note}</div> : null}
+        </div>
       </div>
     );
   }
-  if (step.state === "done") {
+  if (log.state === "done") {
     return (
-      <div className="flex items-center gap-2.5 py-1.5">
-        <span className="shrink-0 text-mint" aria-hidden="true">
+      <div className="flex items-start gap-2.5 py-1.5">
+        <span className="mt-[1px] shrink-0 text-mint" aria-hidden="true">
           <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="9" />
             <path d="m8.5 12 2.5 2.5 4.5-5" />
           </svg>
         </span>
-        <span className="min-w-0 flex-1 text-[14px] leading-[18px] text-muted">{step.label}</span>
-        {step.detail ? <span className="shrink-0 text-[12px] text-muted/70">{step.detail}</span> : null}
+        <div className="min-w-0 flex-1">
+          <div className={clsx("text-[14px] leading-[18px]", textTone)}>
+            {log.time ? <span className="mr-1.5 font-medium tabular-nums">{log.time}</span> : null}
+            {log.text}
+          </div>
+          {log.note ? (
+            <div className="mt-0.5 text-[12px] font-medium leading-4 text-muted">
+              {"->"} {log.note}
+            </div>
+          ) : null}
+        </div>
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-2.5 py-1.5">
-      <span className="h-[17px] w-[17px] shrink-0 rounded-full border-[1.5px] border-line" aria-hidden="true" />
-      <span className="min-w-0 flex-1 text-[14px] leading-[18px] text-ink/75">{step.label}</span>
-      {step.detail ? <span className="shrink-0 text-[12px] text-muted">{step.detail}</span> : null}
+    <div className="flex items-start gap-2.5 py-1.5">
+      <span className="mt-[1px] h-[17px] w-[17px] shrink-0 rounded-full border-[1.5px] border-line" aria-hidden="true" />
+      <div className="min-w-0 flex-1 text-[14px] leading-[18px] text-ink/70">
+        {log.time ? <span className="mr-1.5 tabular-nums text-muted">{log.time}</span> : null}
+        {log.text}
+      </div>
     </div>
   );
 }
@@ -367,11 +389,13 @@ function ChatTurnRow({ turn, after }: { turn: ChatTurn; after?: ReactNode }) {
     >
       {!isMe ? <Avatar avatar={turn.avatar} /> : null}
       <div className={clsx(isMe ? clsx(chatMessageColumn, "flex flex-col items-end") : after ? "min-w-0 w-full max-w-full" : chatMessageColumn)}>
-        <div className={clsx("mb-1 flex items-baseline gap-3", isMe && "justify-end")}>
-          <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
-          <span className="text-[13px] text-muted">{turn.time}</span>
-        </div>
-        <div className={clsx("flex", isMe ? "justify-end" : "justify-start")}>
+        {!isMe ? (
+          <div className={clsx("mb-1 flex items-baseline gap-3", after && "pl-3")}>
+            <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
+            <span className="text-[13px] text-muted">{turn.time}</span>
+          </div>
+        ) : null}
+        <div className={clsx("flex", isMe ? "justify-end" : "justify-start", after && !isMe && "pl-3")}>
           <p
             className={clsx(
               "inline-block rounded-[16px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink",
@@ -434,10 +458,12 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
     <div className={clsx("flex min-w-0 items-start gap-2.5", isMe && "justify-end")}>
       {!isMe ? <LiveAvatar avatar={turn.avatar} sender={turn.sender} /> : null}
       <div className={clsx(chatMessageColumn, isMe && "flex flex-col items-end")}>
-        <div className={clsx("mb-1 flex items-baseline gap-3", isMe && "justify-end")}>
-          <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
-          <span className="text-[13px] text-muted">{turn.time}</span>
-        </div>
+        {!isMe ? (
+          <div className="mb-1 flex items-baseline gap-3">
+            <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
+            <span className="text-[13px] text-muted">{turn.time}</span>
+          </div>
+        ) : null}
         {turn.imageUrl ? (
           <div className={clsx("mb-2 mt-1", isMe && "w-full")}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
