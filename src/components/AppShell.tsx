@@ -1,6 +1,7 @@
 import clsx from "clsx";
-import { ChangeEvent, ReactNode, RefObject, useEffect, useRef, useState } from "react";
+import { ChangeEvent, ReactNode, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { TabKey } from "@/lib/types";
+import { useFamilyMembers } from "./FamilyContext";
 import { DoodleIcon } from "./Icons";
 
 export type { TabKey };
@@ -35,6 +36,42 @@ const titles: Record<TabKey, string> = {
   chat: "Jane’s Family",
   memory: "Memories",
 };
+
+type FamilyNameCorrection = {
+  canonical: string;
+  aliases: string[];
+};
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function familyNameAliases(id: string, name: string) {
+  const lowerId = id.toLowerCase();
+  const lowerName = name.toLowerCase();
+  const aliases = new Set([name]);
+
+  if (lowerId === "mia" || lowerName === "mia") {
+    ["mia", "me a", "mee a", "mya", "maya", "nia"].forEach((alias) => aliases.add(alias));
+  }
+  if (lowerId === "leo" || lowerName === "leo") {
+    ["leo", "lio", "lee oh", "le oh", "rio"].forEach((alias) => aliases.add(alias));
+  }
+
+  return [...aliases].filter((alias) => alias.trim().length >= 2);
+}
+
+function correctFamilyNameMentions(text: string, corrections: FamilyNameCorrection[]) {
+  let corrected = text;
+  for (const correction of corrections) {
+    const aliases = [...correction.aliases].sort((a, b) => b.length - a.length);
+    for (const alias of aliases) {
+      const pattern = new RegExp(`(^|[^A-Za-z])(${escapeRegExp(alias)})(?=$|[^A-Za-z])`, "gi");
+      corrected = corrected.replace(pattern, (_match, prefix: string) => `${prefix}${correction.canonical}`);
+    }
+  }
+  return corrected;
+}
 
 export function AppShell({
   children,
@@ -132,6 +169,17 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
   const [image, setImage] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const familyMembers = useFamilyMembers();
+  const familyNameCorrections = useMemo(
+    () =>
+      familyMembers
+        .map((member) => ({
+          canonical: member.name.trim(),
+          aliases: familyNameAliases(member.id, member.name.trim()),
+        }))
+        .filter((correction) => correction.canonical && correction.aliases.length),
+    [familyMembers]
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -239,8 +287,9 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
       for (let i = 0; i < event.results.length; i += 1) {
         transcript += event.results[i][0].transcript;
       }
-      sessionTextRef.current = transcript;
-      setValue((finalizedRef.current + transcript).replace(/\s+/g, " ").trimStart());
+      const correctedTranscript = correctFamilyNameMentions(transcript, familyNameCorrections);
+      sessionTextRef.current = correctedTranscript;
+      setValue((finalizedRef.current + correctedTranscript).replace(/\s+/g, " ").trimStart());
     };
     // A pause ends the session; while the user hasn't tapped Done/Cancel, fold
     // what we heard into the running transcript and restart so it feels continuous.

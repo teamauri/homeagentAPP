@@ -54,6 +54,11 @@ export function useFamilyMember(id?: string): FamilyMemberProfile | undefined {
   return id ? byId[id] : undefined;
 }
 
+export function useFamilyMembers(): FamilyMemberProfile[] {
+  const byId = useContext(FamilyContext);
+  return Object.values(byId);
+}
+
 /** Children, oldest first (by birthday). Drives the per-child tabs in Memory. */
 export function useChildren(): FamilyMemberProfile[] {
   const byId = useContext(FamilyContext);
