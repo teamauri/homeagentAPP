@@ -492,7 +492,7 @@ function nextId(prefix: string, key: "__auriDemoMediaCounter" | "__auriDemoMemor
 
 function toPersonId(value: unknown): PersonId {
   const person = String(value || "family");
-  if (["mia", "leo", "baby", "mom", "dad", "grandma", "family"].includes(person)) return person as PersonId;
+  if (["child1", "child2", "baby", "mom", "dad", "grandma", "family"].includes(person)) return person as PersonId;
   return "family";
 }
 

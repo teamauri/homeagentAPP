@@ -8,7 +8,7 @@ import type { PersonId } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const personIds = new Set<PersonId>(["mia", "leo", "baby", "mom", "dad", "grandma", "family"]);
+const personIds = new Set<PersonId>(["child1", "child2", "baby", "mom", "dad", "grandma", "family"]);
 const calendarAgentIds = new Set<CalendarJobAgentId>(helperTeamAgentIds);
 
 function normalizeAgent(value: unknown): CalendarJobAgentId | undefined {

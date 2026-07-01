@@ -1,4 +1,4 @@
-import { seedObservations } from "@/lib/family/profile";
+import { seedFamilyMembers, seedObservations } from "@/lib/family/profile";
 import { getChildren } from "@/lib/family/store";
 import { listDemoCalendarEvents } from "@/lib/demo/demo-store";
 
@@ -38,12 +38,7 @@ export function buildFamilyContext() {
 export const demoFamilyContext = {
   family: {
     name: "Jane’s Family",
-    members: [
-      { id: "mom", name: "Jane", role: "parent" },
-      { id: "dad", name: "Liang", role: "parent" },
-      { id: "mia", name: "Mia", role: "child" },
-      { id: "leo", name: "Leo", role: "child" },
-    ],
+    members: seedFamilyMembers.map(({ id, name, role }) => ({ id, name, role })),
   },
   teamMembers: [
     {

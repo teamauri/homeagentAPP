@@ -88,8 +88,8 @@ export const seedFamilyMembers: FamilyMemberProfile[] = [
     health: [],
   },
   {
-    id: "mia",
-    name: "Mia",
+    id: "child1",
+    name: "Sophie",
     role: "child",
     ageLabel: "3",
     birthday: "2023-02-10",
@@ -99,8 +99,8 @@ export const seedFamilyMembers: FamilyMemberProfile[] = [
     health: ["Finishing a 10-day course of medicine"],
   },
   {
-    id: "leo",
-    name: "Leo",
+    id: "child2",
+    name: "Mike",
     role: "child",
     ageLabel: "7",
     birthday: "2019-03-15",
@@ -111,10 +111,36 @@ export const seedFamilyMembers: FamilyMemberProfile[] = [
   },
 ];
 
+export const canonicalFamilyOverrides: Record<string, Pick<FamilyMemberProfile, "name"> & Partial<Pick<FamilyMemberProfile, "avatarUrl">>> = {
+  mom: { name: "Jane", avatarUrl: "/family/jane.jpg" },
+  dad: { name: "Liang", avatarUrl: "/family/liang.jpg" },
+  child1: { name: "Sophie" },
+  child2: { name: "Mike" },
+};
+
+const legacyFamilyId: Record<string, string> = {
+  mia: "child1",
+  leo: "child2",
+};
+
+export function canonicalPersonId(id: string): string {
+  return legacyFamilyId[id] ?? id;
+}
+
+export function withCanonicalFamilyData(members: FamilyMemberProfile[]): FamilyMemberProfile[] {
+  const byId = new Map<string, FamilyMemberProfile>();
+  for (const member of members) {
+    const id = canonicalPersonId(member.id);
+    const canonical = canonicalFamilyOverrides[id];
+    byId.set(id, canonical ? { ...member, id, ...canonical } : { ...member, id });
+  }
+  return Array.from(byId.values());
+}
+
 export const seedObservations: Observation[] = [
   {
     id: "obs_seed_1",
-    memberId: "mia",
+    memberId: "child1",
     source: "reading_session",
     note: "Read Goodnight Moon with Companion — asked where the mouse went.",
     tags: ["books", "bedtime"],
@@ -122,9 +148,9 @@ export const seedObservations: Observation[] = [
   },
   {
     id: "obs_seed_2",
-    memberId: "leo",
+    memberId: "child2",
     source: "robot_clip",
-    note: "Cameraman filmed first three steps to the couch — big milestone.",
+    note: "Cameraman filmed Mike's soccer goal — big proud grin after.",
     tags: ["milestone"],
     observedAt: "2026-06-15T17:12:00.000Z",
   },
@@ -133,3 +159,11 @@ export const seedObservations: Observation[] = [
 export const familyMemberById = Object.fromEntries(
   seedFamilyMembers.map((member) => [member.id, member])
 ) as Record<string, FamilyMemberProfile>;
+
+export function displayNameForPersonId(id: string): string {
+  const canonical = canonicalPersonId(id);
+  if (canonical === "family") return "Family";
+  if (canonical === "baby") return "Baby";
+  if (canonical === "grandma") return "Grandma";
+  return familyMemberById[canonical]?.name ?? canonical;
+}

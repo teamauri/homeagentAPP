@@ -8,6 +8,7 @@ import { JobDetailSheet } from "@/components/JobCard";
 import { deriveTimeLabel } from "@/lib/job-time";
 import { iconForJobAgent, loadStandingJobs, standingScheduledAtToday, type StandingJob } from "@/lib/jobs";
 import type { TeamAgentId } from "@/lib/team";
+import { canonicalPersonId, displayNameForPersonId } from "@/lib/family/profile";
 
 // A calendar block — a one-time job the family created, or one instance of a
 // standing (Every-day) job projected onto a day. Both carry a real datetime.
@@ -40,8 +41,8 @@ function startOfDay(epoch: number): number {
 
 // Google event colors, keyed by whose calendar the event belongs to.
 const PERSON_COLOR: Record<PersonId, string> = {
-  mia: "#d50000", // Tomato
-  leo: "#039be5", // Peacock
+  child1: "#d50000", // Tomato
+  child2: "#039be5", // Peacock
   family: "#0b8043", // Basil
   baby: "#8e24aa", // Grape
   mom: "#3f51b5", // Blueberry
@@ -49,9 +50,13 @@ const PERSON_COLOR: Record<PersonId, string> = {
   grandma: "#e67c73", // Flamingo
 };
 
-const PERSON_LABEL: Record<PersonId, string> = {
-  mia: "Mia", leo: "Leo", family: "Family", baby: "Baby", mom: "Mom", dad: "Dad", grandma: "Grandma",
-};
+function personColor(id: PersonId): string {
+  return PERSON_COLOR[canonicalPersonId(id)] ?? PERSON_COLOR.family;
+}
+
+function personLabel(id: PersonId): string {
+  return displayNameForPersonId(id);
+}
 
 // Visible grid window: 7 AM → 9 PM.
 const START_HOUR = 7;
@@ -239,7 +244,7 @@ export default function CalendarPage() {
               {/* Event blocks */}
               {laidOut.map(({ e, start, col, cols }) => {
                 const top = (start - START_HOUR) * ROW_H + 12;
-                const color = PERSON_COLOR[e.person];
+                const color = personColor(e.person);
                 const left = `calc(58px + (100% - 70px) * ${col} / ${cols})`;
                 const width = `calc((100% - 70px) / ${cols} - 3px)`;
                 return (
@@ -259,7 +264,7 @@ export default function CalendarPage() {
                       <span className="truncate text-[13px] font-medium leading-4">{e.title}</span>
                     </div>
                     <div className="truncate text-[11px] leading-4 text-white/85">
-                      {deriveTimeLabel(e.scheduledAt)} · {PERSON_LABEL[e.person]}
+                      {deriveTimeLabel(e.scheduledAt)} · {personLabel(e.person)}
                     </div>
                   </button>
                 );
@@ -285,7 +290,7 @@ export default function CalendarPage() {
             />
           );
         }
-        const whenLine = [deriveTimeLabel(sel.scheduledAt), PERSON_LABEL[sel.person]].filter(Boolean).join(" · ");
+        const whenLine = [deriveTimeLabel(sel.scheduledAt), personLabel(sel.person)].filter(Boolean).join(" · ");
         return (
           <EventDetailSheet
             detail={{

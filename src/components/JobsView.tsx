@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { loadStandingJobs, seedStanding, sortStandingJobs, standingScheduledAtToday, STANDING_KEY, type StandingJob } from "@/lib/jobs";
+import { loadStandingJobs, seedStanding, sortStandingJobs, STANDING_KEY, type StandingJob } from "@/lib/jobs";
 import { deriveDateLabel, deriveTimeLabel } from "@/lib/job-time";
 import { helperTeamAgentIds, teamAgentById, type TeamAgent } from "@/lib/team";
 import { useChildren } from "./FamilyContext";
@@ -11,9 +11,9 @@ import { EventDetailSheet } from "./EventDetailSheet";
 import { JobDetailSheet } from "./JobCard";
 import { useRobotEvents } from "./RobotEventContext";
 import type { TeamAgentId } from "@/lib/team";
+import { displayNameForPersonId } from "@/lib/family/profile";
 
 const STATUS_LABEL: Record<string, string> = { scheduled: "Scheduled", recording: "Recording", done: "Done" };
-const DAY_MS = 24 * 60 * 60 * 1000;
 const AGENT_PROFILE_KEY = "auri.agentProfiles.v2";
 const LEGACY_AGENT_PROFILE_KEY = "auri.agentProfiles.v1";
 const SECTION_TITLE_CLASS = "font-display text-[22px] font-normal leading-none tracking-[-0.01em] text-ink";
@@ -22,15 +22,14 @@ const STACKED_SECTION_CLASS = "mt-8 pb-2";
 // "Jobs" — everything the family has set Auri to do, in two zones:
 //   Upcoming   · the next occurrence of each job, soonest first (clears once run)
 //   Every day  · standing recurring jobs with on/off toggles
-// One job is one card. Upcoming shows future one-time jobs PLUS the next instance
-// of every enabled standing job — flip a toggle off and it leaves both Upcoming
-// and the calendar.
+// One job is one card. Upcoming shows future one-time jobs; recurring routines
+// stay in Every day and the calendar so the top list does not become a daily
+// dump of every enabled routine.
 
 // One unified row for the Upcoming zone.
 type UpcomingItem = {
   id: string;
   eventId?: string;    // backed by a real one-time event (opens the detail sheet)
-  standingId?: string; // backed by a standing job (opens its editor)
   title: string;
   scheduledAt: number; // canonical time — drives ordering + the derived labels
   agent: TeamAgentId;
@@ -73,7 +72,7 @@ export function JobsView({
 } = {}) {
   const { events, addEvent, removeEvent } = useRobotEvents();
   const children = useChildren();
-  const personLabel = (id: string) => children.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
+  const personLabel = (id: string) => children.find((c) => c.id === id)?.name ?? displayNameForPersonId(id);
   const [standing, setStanding] = useState<StandingJob[]>(() => sortStandingJobs(seedStanding));
   const [standingReady, setStandingReady] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -139,42 +138,21 @@ export function JobsView({
 
   const now = Date.now();
 
-  // The next time a standing job runs: today if its start is still ahead,
-  // otherwise tomorrow. Keeps Upcoming showing a live "next occurrence".
-  const standingNextOccurrence = (job: StandingJob) => {
-    const todayStart = standingScheduledAtToday(job, now);
-    return todayStart > now ? todayStart : todayStart + DAY_MS;
-  };
-
-  // Upcoming = future one-time jobs (status not done) + the next instance of
-  // each enabled standing job, all sorted soonest-first.
-  const upcomingItems: UpcomingItem[] = [
-    ...events
-      .filter((e) => !e.kind && e.status !== "done" && e.scheduledAt > now)
-      .map<UpcomingItem>((e) => ({
-        id: e.id,
-        eventId: e.id,
-        title: e.title,
-        scheduledAt: e.scheduledAt,
-        agent: e.agent ?? "homekeeper",
-        meta: personLabel(e.person),
-        forRobot: true,
-      })),
-    ...standing
-      .filter((job) => job.enabled)
-      .map<UpcomingItem>((job) => {
-        const scheduledAt = standingNextOccurrence(job);
-        return {
-          id: `standing-${job.id}`,
-          standingId: job.id,
-          title: job.title,
-          scheduledAt,
-          agent: job.agent,
-          meta: personLabel(job.person),
-          forRobot: true,
-        };
-      })
-  ].sort((a, b) => a.scheduledAt - b.scheduledAt);
+  // Upcoming = future one-time jobs only, sorted soonest-first. Standing jobs
+  // are recurring controls, not pending work; showing their next daily instance
+  // here made Upcoming refill forever.
+  const upcomingItems: UpcomingItem[] = events
+    .filter((e) => !e.kind && e.status !== "done" && e.scheduledAt > now)
+    .map<UpcomingItem>((e) => ({
+      id: e.id,
+      eventId: e.id,
+      title: e.title,
+      scheduledAt: e.scheduledAt,
+      agent: e.agent ?? "homekeeper",
+      meta: personLabel(e.person),
+      forRobot: true,
+    }))
+    .sort((a, b) => a.scheduledAt - b.scheduledAt);
 
   // Tell the shell to drop its "Jobs" header while the New/Edit page is open —
   // that page has its own "‹ Back · New job" header, so the global one is noise.
@@ -206,13 +184,8 @@ export function JobsView({
     setCreatingAgent(true);
   };
 
-  // A one-time job opens the detail sheet; a standing instance opens its editor.
+  // One-time jobs open the detail sheet; recurring jobs are edited from Every day.
   const selectItem = (item: UpcomingItem) => {
-    if (item.standingId) {
-      const job = standing.find((j) => j.id === item.standingId);
-      if (job) openEditJob(job);
-      return;
-    }
     setSel(item);
   };
 

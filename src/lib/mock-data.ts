@@ -68,9 +68,9 @@ export function getMockUpcoming(children: FamilyMemberProfile[]): CalendarEvent[
   const fc = firstChild?.name ?? "Child";
   const sc = sportsChild?.name ?? "Child";
   const bc = booksChild?.name ?? "Child";
-  const fcId = firstChild?.id ?? "child";
-  const scId = sportsChild?.id ?? "child";
-  const bcId = booksChild?.id ?? "child";
+  const fcId = firstChild?.id ?? "child1";
+  const scId = sportsChild?.id ?? "child2";
+  const bcId = booksChild?.id ?? "child1";
   return [
     {
       id: "piano-lesson",
@@ -148,8 +148,8 @@ export function getMockMoments(children: FamilyMemberProfile[]): Moment[] {
   const booksChild = childByProfile(children, (c) => c.interests.some((i) => /book|read|dinosaur/i.test(i))) ?? firstChild;
   const sc = sportsChild?.name ?? "Child";
   const bc = booksChild?.name ?? "Child";
-  const scId = sportsChild?.id ?? "child";
-  const bcId = booksChild?.id ?? "child";
+  const scId = sportsChild?.id ?? "child2";
+  const bcId = booksChild?.id ?? "child1";
   return [
     {
       id: "soccer",

@@ -10,6 +10,7 @@ import { TeamBadge } from "./TeamBadge";
 import { RobotEventComposer } from "./RobotEventComposer";
 import { RobotEvent, useRobotEvents } from "./RobotEventContext";
 import { useChildren } from "./FamilyContext";
+import { displayNameForPersonId } from "@/lib/family/profile";
 
 export function TodayView() {
   const { events, addEvent, runEvent } = useRobotEvents();
@@ -18,9 +19,9 @@ export function TodayView() {
   const needs = useMemo(() => getMockNeeds(children), [children]);
   const upcoming = useMemo(() => getMockUpcoming(children), [children]);
   const personLabel = useMemo(() => {
-    const m: Record<string, string> = { family: "Family" };
+    const m: Record<string, string> = {};
     children.forEach((c) => { m[c.id] = c.name; });
-    return (id: string) => m[id] ?? id;
+    return (id: string) => m[id] ?? displayNameForPersonId(id);
   }, [children]);
 
   const robotOnly = events.filter((event) => event.forRobot);
@@ -114,7 +115,7 @@ const robotStatusMeta: Record<RobotEvent["status"], { label: string; className: 
 
 function RobotEventRow({ event, onRun }: { event: RobotEvent; onRun: () => void }) {
   const rowChildren = useChildren();
-  const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
+  const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? displayNameForPersonId(id);
   const meta = robotStatusMeta[event.status];
   const agentId = event.agent ?? "homekeeper";
   const agent = teamAgentById[agentId];
@@ -191,7 +192,7 @@ function NeedRow({ item }: { item: NeedItem }) {
 
 function EventRow({ event }: { event: CalendarEvent }) {
   const rowChildren = useChildren();
-  const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? (id === "family" ? "Family" : id);
+  const personLabel = (id: string) => rowChildren.find((c) => c.id === id)?.name ?? displayNameForPersonId(id);
   return (
     <button className="flex w-full items-center gap-3 py-1 text-left">
       <div className="grid h-[40px] w-[40px] shrink-0 place-items-center">

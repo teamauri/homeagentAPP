@@ -47,13 +47,13 @@ const seedDays: SeedDay[] = [
   {
     date: "2026-06-06",
     caption: "Pancakes with Dad. Flour everywhere — worth it.",
-    childId: "leo",
+    childId: "child2",
     tones: [{ tone: "g4" }, { tone: "g2" }, { tone: "g5" }],
   },
 ];
 
 export function seedGrowthData(): GrowthData {
-  const mia = getMember("mia") ?? getMember("leo")!;
+  const primaryChild = getMember("child1") ?? getMember("child2")!;
   const days: DayGroup[] = [];
   const firsts: FirstItem[] = [];
 
@@ -63,14 +63,14 @@ export function seedGrowthData(): GrowthData {
       media(`seed_${di}_${i}`, t.tone, {
         kind: t.kind,
         source: t.source,
-        childId: day.childId ?? "mia",
+        childId: day.childId ?? "child1",
         durationLabel: t.durationLabel,
         capturedAtISO,
         isFirst: i === 0 && Boolean(day.firstLabel),
         firstLabel: i === 0 ? day.firstLabel : undefined,
       })
     );
-    const age = ageAt(mia.birthday, day.date);
+    const age = ageAt(primaryChild.birthday, day.date);
     days.push({
       dateISO: day.date,
       dateLabel: dateLabel(capturedAtISO),
@@ -96,10 +96,10 @@ export function seedGrowthData(): GrowthData {
     }
   });
 
-  const todayAge = ageAt(mia.birthday, new Date().toISOString());
-  const miaSession: MilestoneSession = {
-    childId: mia.id,
-    childName: mia.name,
+  const todayAge = ageAt(primaryChild.birthday, new Date().toISOString());
+  const primarySession: MilestoneSession = {
+    childId: primaryChild.id,
+    childName: primaryChild.name,
     ageShort: todayAge?.short,
     nowSummary: "Lately she’s naming animals, stringing two-word phrases, and going down the big slide on her own.",
     suggestions: [
@@ -107,17 +107,17 @@ export function seedGrowthData(): GrowthData {
       { icon: "🦕", text: "A dino museum trip" },
       { icon: "🔢", text: "Count steps together" },
     ],
-    reassurance: "Ideas from Mia’s last few weeks — never a score, never a comparison.",
+    reassurance: "Ideas from Sophie’s last few weeks — never a score, never a comparison.",
   };
 
-  // A milestone card for every child (shown on their tab). Mia gets the rich
+  // A milestone card for every child (shown on their tab). Sophie gets the rich
   // hand-written one; others are generated warmly from their profile.
   const sessions: Record<string, MilestoneSession> = {};
   for (const child of getChildren()) {
-    sessions[child.id] = child.id === mia.id ? miaSession : sessionForChild(child);
+    sessions[child.id] = child.id === primaryChild.id ? primarySession : sessionForChild(child);
   }
 
-  return { child: { id: mia.id, name: mia.name }, session: miaSession, sessions, days, firsts, skippedCount: 0 };
+  return { child: { id: primaryChild.id, name: primaryChild.name }, session: primarySession, sessions, days, firsts, skippedCount: 0 };
 }
 
 function sessionForChild(child: { id: string; name: string; birthday?: string; interests?: string[] }): MilestoneSession {

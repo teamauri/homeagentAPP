@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Provide at least one photo with dataBase64" }, { status: 400 });
   }
 
-  const childId = typeof body?.childId === "string" ? body.childId : "mia";
+  const childId = typeof body?.childId === "string" ? body.childId : "child1";
 
   try {
     // Pull the latest organized album (growth) AND ingested Stories/uploads

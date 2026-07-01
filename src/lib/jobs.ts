@@ -1,5 +1,5 @@
 import type { PersonId } from "./types";
-import { familyMemberById } from "./family/profile";
+import { canonicalPersonId, displayNameForPersonId, familyMemberById } from "./family/profile";
 import { normalizeTeamAgentId, teamAgentById, type TeamAgentId } from "./team";
 import { todayAt } from "./job-time";
 
@@ -36,6 +36,9 @@ export interface StandingJob {
 // localStorage key for the Every-day list (toggle states + user-added jobs).
 // Shared by the Jobs screen and the Calendar route so both reflect one source.
 export const STANDING_KEY = "auri.standing.v1";
+const STANDING_SEED_MIGRATION_KEY = "auri.standing.seedMigration.v1";
+const MEDICINE_CONFIRMATION_JOB_ID = "medicine-confirmation";
+const MEDICINE_CONFIRMATION_MIGRATION = "medicine-confirmation-v1";
 
 // Read the saved Every-day list, falling back to seed on first run. Client-only.
 export function loadStandingJobs(): StandingJob[] {
@@ -47,6 +50,14 @@ export function loadStandingJobs(): StandingJob[] {
         ...job,
         agent: normalizeTeamAgentId(job.agent) ?? agentForJobType(job.type),
       } as StandingJob));
+      const hasMedicineConfirmation = migrated.some((job) => job.id === MEDICINE_CONFIRMATION_JOB_ID);
+      if (!hasMedicineConfirmation) {
+        migrated.push(medicineConfirmationJob);
+      }
+      const migration = localStorage.getItem(STANDING_SEED_MIGRATION_KEY);
+      if (migration !== MEDICINE_CONFIRMATION_MIGRATION) {
+        localStorage.setItem(STANDING_SEED_MIGRATION_KEY, MEDICINE_CONFIRMATION_MIGRATION);
+      }
       const sorted = sortStandingJobs(migrated);
       localStorage.setItem(STANDING_KEY, JSON.stringify(sorted));
       return sorted;
@@ -90,12 +101,22 @@ export function sortStandingJobs(jobs: StandingJob[]): StandingJob[] {
 }
 
 function migrateSeedStandingJob(job: StandingJob): StandingJob {
+  const canonicalPerson = canonicalPersonId(job.person) as PersonId;
+  const normalized = {
+    ...job,
+    person: canonicalPerson,
+    trigger: job.trigger
+      .replace(/\bMia\b/g, displayNameForPersonId("child1"))
+      .replace(/\bLeo\b/g, displayNameForPersonId("child2"))
+      .replace(/\bchild1\b/g, displayNameForPersonId("child1"))
+      .replace(/\bchild2\b/g, displayNameForPersonId("child2")),
+  };
   if (job.id === "home-watch" && (job.title === "Home watch" || job.trigger === "8 AM–8 PM · Family")) {
     return {
-      ...job,
+      ...normalized,
       title: "Afterschool check-in",
-      trigger: `4:30 PM · ${familyMemberById.leo.name}`,
-      person: "leo",
+      trigger: `4:30 PM · ${familyMemberById.child2.name}`,
+      person: "child2",
       schedule: { kind: "alarm", alarm: "16:30" },
     };
   }
@@ -105,27 +126,38 @@ function migrateSeedStandingJob(job: StandingJob): StandingJob {
     (job.trigger === "Alarm 7:30 AM" || (job.schedule.kind === "alarm" && job.schedule.alarm === "07:30"))
   ) {
     return {
-      ...job,
-      trigger: `7:45 AM · ${familyMemberById.leo.name}`,
-      person: "leo",
+      ...normalized,
+      trigger: `7:45 AM · ${familyMemberById.child2.name}`,
+      person: "child2",
       schedule: { kind: "alarm", alarm: "07:45" },
     };
   }
 
-  if (job.id === "baby-routine-log" && job.trigger === `Alarm 9 PM · ${familyMemberById.mia.name}`) {
+  if (job.id === "baby-routine-log" && job.trigger === `Alarm 9 PM · ${familyMemberById.child1.name}`) {
     return {
-      ...job,
-      trigger: `9 PM · ${familyMemberById.mia.name}`,
+      ...normalized,
+      trigger: `9 PM · ${familyMemberById.child1.name}`,
     };
   }
 
-  return job;
+  return normalized;
 }
 
 // Today's real datetime for a standing job's instance (epoch ms).
 export function standingScheduledAtToday(job: StandingJob, now: number = Date.now()): number {
   return todayAt(standingStartHHMM(job), now);
 }
+
+const medicineConfirmationJob: StandingJob = {
+  id: MEDICINE_CONFIRMATION_JOB_ID,
+  type: "routine",
+  agent: "homekeeper",
+  title: "Medicine confirmation",
+  trigger: `8 AM · ${displayNameForPersonId("grandma")}`,
+  person: "grandma",
+  schedule: { kind: "alarm", alarm: "08:00" },
+  enabled: true,
+};
 
 // One default standing routine per helper agent.
 export const seedStanding: StandingJob[] = [
@@ -144,8 +176,8 @@ export const seedStanding: StandingJob[] = [
     type: "watch",
     agent: "watcher",
     title: "Afterschool check-in",
-    trigger: `4:30 PM · ${familyMemberById.leo.name}`,
-    person: "leo",
+    trigger: `4:30 PM · ${familyMemberById.child2.name}`,
+    person: "child2",
     schedule: { kind: "alarm", alarm: "16:30" },
     enabled: true,
   },
@@ -154,8 +186,8 @@ export const seedStanding: StandingJob[] = [
     type: "reading",
     agent: "companion",
     title: "Bedtime reading",
-    trigger: "6:30 PM · Leo",
-    person: "leo",
+    trigger: `6:30 PM · ${familyMemberById.child2.name}`,
+    person: "child2",
     schedule: { kind: "window", start: "18:30", end: "19:00" },
     enabled: true,
   },
@@ -164,18 +196,19 @@ export const seedStanding: StandingJob[] = [
     type: "routine",
     agent: "homekeeper",
     title: "Morning routine",
-    trigger: `7:45 AM · ${familyMemberById.leo.name}`,
-    person: "leo",
+    trigger: `7:45 AM · ${familyMemberById.child2.name}`,
+    person: "child2",
     schedule: { kind: "alarm", alarm: "07:45" },
     enabled: true,
   },
+  medicineConfirmationJob,
   {
     id: "baby-routine-log",
     type: "baby_log",
     agent: "baby_logger",
     title: "Baby routine log",
-    trigger: `9 PM · ${familyMemberById.mia.name}`,
-    person: "mia",
+    trigger: `9 PM · ${familyMemberById.child1.name}`,
+    person: "child1",
     schedule: { kind: "alarm", alarm: "21:00" },
     enabled: true,
   },

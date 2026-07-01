@@ -71,7 +71,7 @@ function durationLabel(seconds?: number) {
 // Convert real Stories sitting in the shared demo-store (robot ingest / phone
 // upload) into growth DayGroups so they render in the same timeline.
 function demoStoryDays(): DayGroup[] {
-  const child = getMember("mia");
+  const child = getMember("child1");
   const media = listDemoMedia();
   const byId = new Map(media.map((m) => [m.id, m]));
   const items = listDemoMemory().filter((it) => it.metadata?.fixture !== true && it.mediaIds.length > 0);
@@ -83,8 +83,8 @@ function demoStoryDays(): DayGroup[] {
       id: m.id,
       kind: m.mediaType === "photo" ? "photo" : "video",
       source: m.source === "auri" ? "auri" : "phone",
-      // Attribute to a child when the ingest tagged a known one (mia/leo).
-      childId: m.person === "mia" || m.person === "leo" ? m.person : undefined,
+      // Attribute to a child when the ingest tagged a known child id.
+      childId: m.person === "child1" || m.person === "child2" ? m.person : undefined,
       // Photos use their image; a video only shows a poster if one exists,
       // otherwise the tile falls back to a gradient + ▶ (poster frames are ③).
       thumbDataUrl: m.mediaType === "photo" ? m.thumbnailUrl || m.url : m.thumbnailUrl,

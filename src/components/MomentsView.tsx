@@ -285,7 +285,7 @@ export function MomentsView() {
       setError("Those files aren't photos or videos.");
       return;
     }
-    const childId = growth?.child.id ?? "mia";
+    const childId = growth?.child.id ?? "child1";
     setError(null);
     setStatus(null);
     setOrganizing({ count: images.length + videos.length });
@@ -369,7 +369,7 @@ export function MomentsView() {
   const days = growth.days;
 
   return (
-    <div className="-mx-[26px] -mt-2 pb-0">
+    <div className="-mx-[9px] -mt-2 pb-0">
       <input ref={inputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
       <input ref={auriInputRef} type="file" accept="video/*" hidden onChange={(e) => onAuriVideo(e.target.files)} />
 

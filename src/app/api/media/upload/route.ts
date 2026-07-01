@@ -16,7 +16,7 @@ async function inputsFromJson(request: Request): Promise<DemoMediaInput[]> {
 
 function toPersonId(value: FormDataEntryValue | null): PersonId {
   const person = String(value || "family");
-  if (["mia", "leo", "baby", "mom", "dad", "grandma", "family"].includes(person)) return person as PersonId;
+  if (["child1", "child2", "baby", "mom", "dad", "grandma", "family"].includes(person)) return person as PersonId;
   return "family";
 }
 

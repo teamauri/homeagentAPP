@@ -1,5 +1,6 @@
 import type { PersonId } from "@/lib/types";
 import type { ChatResponseCard, CreatedLocalObject, ObjectToCreate } from "@/lib/chat-server/types";
+import { canonicalPersonId, displayNameForPersonId } from "@/lib/family/profile";
 import { deriveDateLabel, deriveTimeLabel, immediateScheduledAt, timeLabelInZone } from "@/lib/job-time";
 import { helperTeamAgentIds, normalizeTeamAgentId, type TeamAgentId } from "@/lib/team";
 
@@ -22,12 +23,13 @@ export type DraftInfo = {
 // A chat card optionally carrying a confirmable draft.
 export type ChatTurnCard = ChatResponseCard & { draft?: DraftInfo };
 
-const PERSON_IDS: PersonId[] = ["mia", "leo", "baby", "mom", "dad", "grandma", "family"];
+const PERSON_IDS: PersonId[] = ["child1", "child2", "baby", "mom", "dad", "grandma", "family"];
 
 function normalizePerson(value: unknown): { id: PersonId; label: string } {
   const raw = typeof value === "string" ? value.trim() : "";
-  const match = PERSON_IDS.find((p) => p === raw.toLowerCase());
-  if (match) return { id: match, label: raw ? raw[0].toUpperCase() + raw.slice(1).toLowerCase() : match };
+  const canonical = canonicalPersonId(raw.toLowerCase());
+  const match = PERSON_IDS.find((p) => p === canonical);
+  if (match) return { id: match, label: displayNameForPersonId(match) };
   if (raw) return { id: "family", label: raw };
   return { id: "family", label: "Family" };
 }
@@ -158,13 +160,13 @@ export function buildDraft(card: ChatResponseCard, object: ObjectToCreate | unde
   const merged = { ...meta, ...payload } as Record<string, unknown>;
   const title = String(payload.title ?? card.title);
   let { id, label } = normalizePerson(merged.recipient ?? merged.person ?? merged.assignee);
-  // When the model didn't pin a person, infer it from the title ("Leo's game").
+  // When the model didn't pin a person, infer it from the title ("Mike's game").
   if (id === "family") {
     const lower = title.toLowerCase();
     const named = PERSON_IDS.find((p) => p !== "family" && lower.includes(p));
     if (named) {
       id = named;
-      label = named[0].toUpperCase() + named.slice(1);
+      label = displayNameForPersonId(named);
     }
   }
   const { dateLabel, timeLabel } = humanizeWhen(merged);

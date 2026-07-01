@@ -51,11 +51,11 @@ function familyNameAliases(id: string, name: string) {
   const lowerName = name.toLowerCase();
   const aliases = new Set([name]);
 
-  if (lowerId === "mia" || lowerName === "mia") {
-    ["mia", "me a", "mee a", "mya", "maya", "nia"].forEach((alias) => aliases.add(alias));
+  if (lowerId === "child1" || lowerName === "child1") {
+    ["sophie", "sofi", "sophy", "child1", "mia", "me a", "mee a", "mya", "maya", "nia"].forEach((alias) => aliases.add(alias));
   }
-  if (lowerId === "leo" || lowerName === "leo") {
-    ["leo", "lio", "lee oh", "le oh", "rio"].forEach((alias) => aliases.add(alias));
+  if (lowerId === "child2" || lowerName === "child2") {
+    ["mike", "michael", "child2", "leo", "lio", "lee oh", "le oh", "rio"].forEach((alias) => aliases.add(alias));
   }
 
   return [...aliases].filter((alias) => alias.trim().length >= 2);
@@ -90,12 +90,14 @@ export function AppShell({
   scrollContainerRef?: RefObject<HTMLDivElement>;
   voiceDemoPhase?: number;
 }) {
+  const contentPadding = activeTab === "memory" ? "px-[9px] pb-0 pt-0" : "px-[9px] pb-3 pt-2";
+
   return (
     <main className="min-h-[100dvh] bg-paper md:grid md:min-h-screen md:place-items-center md:bg-[#f5f1eb] md:px-10 md:py-8">
       <div className="mx-auto w-full overflow-hidden bg-paper md:max-w-[430px]">
         <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-paper md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
           {hideHeader ? <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]" /> : <ShellHeader activeTab={activeTab} />}
-          <div ref={scrollContainerRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[9px] pb-3 pt-2">{children}</div>
+          <div ref={scrollContainerRef} className={clsx("no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain", contentPadding)}>{children}</div>
           <ShellBottom activeTab={activeTab} onTabChange={onTabChange} onComposerSubmit={onComposerSubmit} voiceDemoPhase={voiceDemoPhase} />
         </div>
       </div>
@@ -104,9 +106,11 @@ export function AppShell({
 }
 
 function ShellHeader({ activeTab }: { activeTab: TabKey }) {
+  const titlePadding = activeTab === "chat" || activeTab === "today" ? "px-[18px]" : "px-[9px]";
+
   return (
     <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]">
-      <header className="flex items-start justify-between gap-3 px-[9px] pb-3 pt-3">
+      <header className={clsx("flex items-start justify-between gap-3 pb-3 pt-3", titlePadding)}>
         <div className="min-w-0">
           <h1 className="font-display text-[30px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
             {titles[activeTab].split("\n").map((line) => (
@@ -173,6 +177,7 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
   const [image, setImage] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [demoVoiceDismissed, setDemoVoiceDismissed] = useState(false);
   const familyMembers = useFamilyMembers();
   const familyNameCorrections = useMemo(
     () =>
@@ -187,6 +192,10 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const demoListening = (voiceDemoPhase === 1 || voiceDemoPhase === 2) && !demoVoiceDismissed;
+  const demoTranscript = voiceDemoPhase >= 2 ? "watch for sophie's best moments today" : "";
+  const composerValue = demoListening ? demoTranscript : value;
+  const listeningActive = listening || demoListening;
   // Snapshot of the text box from before recording started, so Cancel can
   // restore it (dropping only what this dictation session added).
   const baseTextRef = useRef("");
@@ -198,6 +207,7 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
   const keepListeningRef = useRef(false);
   const finalizedRef = useRef("");
   const sessionTextRef = useRef("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Stop recognition AND detach its handlers, so a final onresult fired by
   // stop() can't write the transcript back into the box after we've cleared it.
@@ -231,6 +241,17 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
     return () => clearInterval(id);
   }, [listening]);
 
+  useEffect(() => {
+    if (voiceDemoPhase > 2) setDemoVoiceDismissed(false);
+  }, [voiceDemoPhase]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [composerValue]);
+
   const submit = async () => {
     const message = value.trim();
     if ((!message && !image) || submitting) return;
@@ -246,11 +267,17 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
     }
   };
 
-  // Finish dictation: send straight away if anything was captured (submit() stops
-  // recognition itself); otherwise just close the panel.
+  // Finish dictation: stop listening and leave the transcript in the composer.
   const finishVoice = () => {
-    if (value.trim() || image) submit();
-    else stopRecognition();
+    stopRecognition();
+  };
+
+  const endVoiceInput = () => {
+    if (demoListening) {
+      setDemoVoiceDismissed(true);
+      return;
+    }
+    finishVoice();
   };
 
   const pickImage = (event: ChangeEvent<HTMLInputElement>) => {
@@ -325,19 +352,6 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
     recognition.start();
   };
 
-  if (voiceDemoPhase === 1 || voiceDemoPhase === 2) {
-    return (
-      <div className="px-[9px] pb-2 pt-1.5">
-        <RecordingPanel
-          transcript={voiceDemoPhase >= 2 ? "watch for sophie's best moments today" : ""}
-          elapsed={voiceDemoPhase >= 2 ? 3 : 1}
-          onCancel={() => {}}
-          onStop={() => {}}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="px-[9px] pb-2 pt-1.5">
       {image ? (
@@ -357,10 +371,8 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
           <span className="text-[13px] text-muted">Photo attached</span>
         </div>
       ) : null}
-      {listening ? (
-        <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={finishVoice} />
-      ) : (
-        <div className="auri-composer-shell flex h-[54px] items-center gap-2.5 px-2.5">
+      <div className="space-y-2">
+        <div className="auri-composer-shell flex min-h-[54px] items-end gap-2.5 px-2.5 py-2">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} className="hidden" />
           <button
             type="button"
@@ -372,20 +384,31 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
               <path d="M12 6.7v10.6M6.7 12h10.6" />
             </svg>
           </button>
-          <input
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submit();
+          <textarea
+            ref={textareaRef}
+            value={composerValue}
+            onChange={(event) => {
+              if (!demoListening) setValue(event.target.value);
             }}
-            className="min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted/70"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submit();
+              }
+            }}
+            readOnly={demoListening}
+            rows={1}
+            className="no-scrollbar max-h-[132px] min-h-9 min-w-0 flex-1 resize-none bg-transparent py-[7px] text-[16px] leading-[22px] outline-none placeholder:text-muted/70"
             placeholder="Ask Auri anything…"
           />
           <button
             type="button"
-            onClick={toggleVoice}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ink/10 bg-white/72 text-ink/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
-            aria-label="Use microphone"
+            onClick={listeningActive ? endVoiceInput : toggleVoice}
+            className={clsx(
+              "grid h-9 w-9 shrink-0 place-items-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]",
+              listeningActive ? "border-[#BFE6D4] bg-[#DDEEE4] text-mint" : "border-ink/10 bg-white/72 text-ink/85"
+            )}
+            aria-label={listeningActive ? "End voice input" : "Use microphone"}
           >
             <svg viewBox="0 0 28 28" className="h-[22px] w-[22px]" aria-hidden="true">
               <path d="M14 4.7a3.5 3.5 0 0 0-3.5 3.5v5.9a3.5 3.5 0 0 0 7 0V8.2A3.5 3.5 0 0 0 14 4.7Z" fill="none" stroke="currentColor" strokeWidth="1.55" />
@@ -402,7 +425,8 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
             ↑
           </button>
         </div>
-      )}
+        {listeningActive ? <VoiceListeningStrip onEnd={endVoiceInput} /> : null}
+      </div>
     </div>
   );
 }
@@ -413,62 +437,27 @@ function formatElapsed(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// A calm "listening" panel that rises in place of the composer while dictation
-// is active: a mic with soft breathing halos, a timer, the full live transcript
-// (wraps freely — never truncated), and two clear actions (Cancel / Send).
-function RecordingPanel({
-  transcript,
-  elapsed,
-  onCancel,
-  onStop,
-}: {
-  transcript: string;
-  elapsed: number;
-  onCancel: () => void;
-  onStop: () => void;
-}) {
-  const text = transcript.trim();
+function VoiceListeningStrip({ onEnd }: { onEnd: () => void }) {
   return (
-    <div className="rounded-[22px] border border-line bg-white px-[18px] pb-4 pt-6 shadow-[0_14px_36px_rgba(8,8,8,0.10)]">
-      <div className="flex flex-col items-center gap-3.5">
-        <span className="relative grid h-16 w-16 place-items-center" aria-hidden="true">
-          <span className="auri-halo-ring absolute h-16 w-16 rounded-full bg-mint" />
-          <span className="auri-halo-ring absolute h-16 w-16 rounded-full bg-mint" style={{ animationDelay: "1.2s" }} />
-          <span className="relative grid h-14 w-14 place-items-center rounded-full bg-mint text-white">
-            <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
-              <path d="M14 4a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V8a4 4 0 0 0-4-4Z" fill="none" stroke="currentColor" strokeWidth="2" />
-              <path d="M6 13v1a8 8 0 0 0 16 0v-1M14 22v3M10 25h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
-            </svg>
-          </span>
-        </span>
+    <button
+      type="button"
+      onClick={onEnd}
+      className="flex h-8 w-full items-center justify-center gap-3 rounded-full bg-[#F3F8F5] text-[13px] font-medium leading-none text-muted"
+      aria-label="End voice input"
+    >
+      <VoiceWave />
+      <span>Listening now, tap to finish.</span>
+      <VoiceWave reverse />
+    </button>
+  );
+}
 
-        <div className="flex items-center gap-2">
-          <span className="text-[15px] font-medium text-mint">Listening</span>
-          <span className="tabular-nums text-[13px] text-muted">{formatElapsed(elapsed)}</span>
-        </div>
-
-        <p className="no-scrollbar max-h-[34vh] w-full overflow-y-auto whitespace-pre-wrap break-words text-center text-[16px] leading-relaxed text-ink">
-          {text || <span className="text-muted/70">Start speaking…</span>}
-        </p>
-      </div>
-
-      <div className="mt-4 flex gap-2.5">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-11 flex-1 rounded-full border border-line bg-soft text-[15px] font-medium text-muted"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onStop}
-          className="h-11 flex-1 rounded-full bg-mint text-[15px] font-medium text-white"
-          aria-label="Send voice message"
-        >
-          Send
-        </button>
-      </div>
-    </div>
+function VoiceWave({ reverse = false }: { reverse?: boolean }) {
+  return (
+    <span className={clsx("auri-voice-wave flex h-4 items-center gap-1", reverse && "flex-row-reverse")} aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((bar) => (
+        <span key={bar} style={{ animationDelay: `${bar * 0.12}s` }} />
+      ))}
+    </span>
   );
 }

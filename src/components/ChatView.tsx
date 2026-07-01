@@ -361,8 +361,8 @@ function ChatTurnRow({ turn, after }: { turn: ChatTurn; after?: ReactNode }) {
   return (
     <div
       className={clsx(
-        "min-w-0 items-start gap-2.5",
-        isMe ? "flex justify-end" : after ? "grid grid-cols-[40px_minmax(0,1fr)]" : "flex"
+        "min-w-0 items-start",
+        isMe ? "flex justify-end gap-2.5" : after ? "grid grid-cols-[40px_minmax(0,1fr)] gap-0 pr-[39px]" : "flex gap-2.5"
       )}
     >
       {!isMe ? <Avatar avatar={turn.avatar} /> : null}
@@ -555,13 +555,6 @@ function ApiResponseCard({ card }: { card: ChatTurnCard }) {
 
 type DraftState = "confirmed" | "dismissed";
 
-const PERSON_OPTIONS = [
-  { id: "mia", label: "Mia" },
-  { id: "leo", label: "Leo" },
-  { id: "mom", label: "Mom" },
-  { id: "dad", label: "Dad" },
-  { id: "family", label: "Family" },
-];
 const DRAFT_STATE_KEY = "auri.draftStates.v1";
 
 // A stable key per draft so its confirmed/dismissed state survives a full-page
@@ -592,6 +585,17 @@ function writeDraftState(key: string, value: DraftState) {
 // state is persisted so it stays confirmed/dismissed after a page nav.
 function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const { addEvent, updateEvent, events, ready: eventsReady } = useRobotEvents();
+  const sophie = useFamilyMember("child1");
+  const mike = useFamilyMember("child2");
+  const jane = useFamilyMember("mom");
+  const liang = useFamilyMember("dad");
+  const personOptions: Array<{ id: DraftInfo["person"]; label: string }> = [
+    { id: "child1", label: sophie?.name ?? "Sophie" },
+    { id: "child2", label: mike?.name ?? "Mike" },
+    { id: "mom", label: jane?.name ?? "Jane" },
+    { id: "dad", label: liang?.name ?? "Liang" },
+    { id: "family", label: "Family" },
+  ];
   const key = draftKey(draft);
 
   // Client-side dedup: find a pending event that matches this draft by title.
@@ -632,7 +636,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const liveTitle = editTitle || draft.title;
   const liveTime = editTime || draft.timeLabel;
   const livePerson = editPerson || draft.person;
-  const livePersonLabel = PERSON_OPTIONS.find((p) => p.id === livePerson)?.label ?? livePerson;
+  const livePersonLabel = personOptions.find((p) => p.id === livePerson)?.label ?? livePerson;
   const whenLine = [draft.dateLabel, liveTime, livePersonLabel].filter(Boolean).join(" · ");
 
   const confirm = () => {
@@ -692,7 +696,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
               placeholder="Time (e.g. 1:30 PM)"
             />
             <div className="flex flex-wrap gap-1.5">
-              {PERSON_OPTIONS.map((p) => (
+              {personOptions.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => setEditPerson(p.id as DraftInfo["person"])}
@@ -763,7 +767,7 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
             placeholder="Time (e.g. 1:30 PM)"
           />
           <div className="flex flex-wrap gap-1.5">
-            {PERSON_OPTIONS.map((p) => (
+            {personOptions.map((p) => (
               <button
                 key={p.id}
                 onClick={() => setEditPerson(p.id as DraftInfo["person"])}

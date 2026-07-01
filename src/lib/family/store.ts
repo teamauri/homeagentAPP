@@ -1,5 +1,5 @@
 import { persistStore, registerStore } from "@/lib/demo/persistence";
-import { FamilyMemberProfile, seedFamilyMembers } from "./profile";
+import { FamilyMemberProfile, seedFamilyMembers, withCanonicalFamilyData } from "./profile";
 
 // The editable family: names, birthdays, avatar photos. Seeded from the static
 // profile, then owned by the Family settings page and persisted (B's store
@@ -10,12 +10,13 @@ registerStore({
   key: "family",
   snapshot: () => ({ members: g.__auriFamily }),
   restore: (data) => {
-    if (Array.isArray(data.members)) g.__auriFamily = data.members as FamilyMemberProfile[];
+    if (Array.isArray(data.members)) g.__auriFamily = withCanonicalFamilyData(data.members as FamilyMemberProfile[]);
   },
 });
 
 function members(): FamilyMemberProfile[] {
   if (!g.__auriFamily) g.__auriFamily = seedFamilyMembers.map((m) => ({ ...m }));
+  g.__auriFamily = withCanonicalFamilyData(g.__auriFamily);
   return g.__auriFamily;
 }
 
@@ -32,6 +33,6 @@ export function getChildren(): FamilyMemberProfile[] {
 }
 
 export function setFamily(next: FamilyMemberProfile[]): Promise<void> {
-  g.__auriFamily = next;
+  g.__auriFamily = withCanonicalFamilyData(next);
   return persistStore("family");
 }

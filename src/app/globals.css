@@ -105,9 +105,44 @@ button {
 .auri-halo-ring {
   animation: auri-halo 2.4s ease-out infinite;
 }
+
+@keyframes auri-wave {
+  0%,
+  100% {
+    transform: scaleY(0.42);
+    opacity: 0.55;
+  }
+  45% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.auri-voice-wave span {
+  display: block;
+  width: 4px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #9edfc4;
+  transform-origin: center;
+  animation: auri-wave 0.9s ease-in-out infinite;
+}
+
+.auri-voice-wave span:nth-child(2),
+.auri-voice-wave span:nth-child(4) {
+  height: 13px;
+}
+
+.auri-voice-wave span:nth-child(3) {
+  height: 10px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .auri-halo-ring {
     animation: none;
     opacity: 0;
+  }
+  .auri-voice-wave span {
+    animation: none;
   }
 }

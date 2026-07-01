@@ -52,8 +52,8 @@ function wantsHomekeeperReminder(request: ChatRequestBody) {
 
 function inferPersonFromRequest(request: ChatRequestBody) {
   const text = requestText(request);
-  if (/leo|里奥/.test(text)) return "leo";
-  if (/mia|阿丽塔|alita/.test(text)) return "mia";
+  if (/mike|michael|leo|里奥|麦克/.test(text)) return "child2";
+  if (/sophie|sofi|sophy|mia|阿丽塔|alita|索菲/.test(text)) return "child1";
   if (/mom|妈妈/.test(text)) return "mom";
   if (/dad|爸爸/.test(text)) return "dad";
   return "family";
@@ -66,10 +66,10 @@ type CameraSubject = {
 };
 
 const memberAliases: Record<string, string[]> = {
-  mia: ["mia", "阿丽塔", "alita"],
-  leo: ["leo", "里奥"],
+  child1: ["sophie", "sofi", "sophy", "索菲", "child1", "mia", "阿丽塔", "alita"],
+  child2: ["mike", "michael", "麦克", "child2", "leo", "里奥"],
   mom: ["mom", "妈妈", "jane"],
-  dad: ["dad", "爸爸", "marcus"],
+  dad: ["dad", "爸爸", "liang"],
 };
 
 function escapeRegExp(value: string) {

@@ -70,7 +70,7 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     memory: {
       sourceType: "auri",
       capturedAtLabel: "Today 9:42 AM",
-      people: ["mia"],
+      people: ["child1"],
     },
   },
   {
@@ -79,15 +79,15 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     icon: "video-heart",
     typeLabel: "Video receipt",
     title: "Medicine taken · 2:04 PM",
-    body: "A 6-second video receipt confirms Mia’s 2pm dose.",
-    metadata: ["Auri Robot", "0:06", "Mia"],
+    body: "A 6-second video receipt confirms Sophie’s 2pm dose.",
+    metadata: ["Auri Robot", "0:06", "Sophie"],
     videoUrl: "/demo-media/67fd7e14-aaab-4092-9b9c-1091ec2f87b7.mp4",
     poster: "/demo-media/77128c23-7216-4012-aaea-2a8c21e74de5.jpg",
     durationLabel: "0:06",
     memory: {
       sourceType: "auri",
       capturedAtLabel: "Today 2:04 PM",
-      people: ["mia"],
+      people: ["child1"],
     },
   },
   {
@@ -97,14 +97,14 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     typeLabel: "Film",
     title: "She walked!",
     body: "Three steps to the couch — a 30-second film, sent to the group.",
-    metadata: ["Auri Robot", "0:30", "Mia"],
+    metadata: ["Auri Robot", "0:30", "Sophie"],
     videoUrl: "/demo-media/e82d1f82-ca73-4222-8db0-4fe4799b9f04.mp4",
     poster: "/demo-media/7fada8f9-fc26-417f-86c7-80fd6b3048b8.jpg",
     durationLabel: "0:30",
     memory: {
       sourceType: "auri",
       capturedAtLabel: "Today 5:12 PM",
-      people: ["mia"],
+      people: ["child1"],
     },
   },
   {
@@ -112,8 +112,8 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     kind: "job",
     icon: "calendar",
     typeLabel: "Calendar event",
-    title: "Leo’s checkup",
-    metadata: ["Tomorrow", "9:30 AM", "Leo"],
+    title: "Mike’s checkup",
+    metadata: ["Tomorrow", "9:30 AM", "Mike"],
     action: { label: "Review event", intent: "review" },
   },
   {
@@ -122,7 +122,7 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     icon: "backpack",
     typeLabel: "Routine",
     title: "Leaving for school",
-    metadata: ["Leo", "weekday mornings"],
+    metadata: ["Mike", "weekday mornings"],
     subtasks: [
       { label: "Water bottle in bag", state: "done", timeLabel: "7:31" },
       { label: "Fruit packed", state: "active", timeLabel: "now" },
@@ -136,13 +136,13 @@ export const prdV6ChatCardFixtures: ChatCard[] = [
     icon: "book",
     typeLabel: "Reading moment",
     title: "Goodnight Moon with Companion",
-    body: "Mia asked where the mouse went 🐭",
-    metadata: ["Reading", "Tonight", "Mia"],
+    body: "Sophie asked where the mouse went 🐭",
+    metadata: ["Reading", "Tonight", "Sophie"],
     action: { label: "View", intent: "view" },
     memory: {
       sourceType: "reading",
       capturedAtLabel: "Tonight",
-      people: ["mia"],
+      people: ["child1"],
     },
   },
 ];
@@ -200,7 +200,7 @@ export const chatFixtureMessages: ChatMessage[] = [
     sender: "Mom",
     avatar: "mom",
     timeLabel: "2:02 PM",
-    text: "Did Mia take her 2pm meds?",
+    text: "Did Sophie take her 2pm meds?",
   },
   {
     id: "homekeeper-meds",
@@ -242,7 +242,7 @@ export const chatFixtureMessages: ChatMessage[] = [
     sender: "Reminder",
     avatar: "homekeeper",
     timeLabel: "5:20 PM",
-    text: "📅 Leo’s checkup tomorrow, 9:30 AM — added to your calendar.",
+    text: "📅 Mike’s checkup tomorrow, 9:30 AM — added to your calendar.",
     cards: [cardById["checkup-calendar"]],
   },
   {
@@ -251,7 +251,7 @@ export const chatFixtureMessages: ChatMessage[] = [
     sender: "Companion",
     avatar: "companion",
     timeLabel: "8:10 PM",
-    text: "Mia and I read Goodnight Moon — she asked where the mouse went 🐭",
+    text: "Sophie and I read Goodnight Moon — she asked where the mouse went 🐭",
     cards: [cardById["reading-moment"]],
   },
   {
@@ -260,7 +260,7 @@ export const chatFixtureMessages: ChatMessage[] = [
     sender: "Reminder",
     avatar: "homekeeper",
     timeLabel: "7:33 AM",
-    text: "On it — walking Leo through the morning routine.",
+    text: "On it — walking Mike through the morning routine.",
     cards: [cardById["morning-routine"]],
   },
 ];

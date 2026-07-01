@@ -29,19 +29,22 @@ const ADVICE_HINTS = [
 
 export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResponse {
   const input = lowerInput(request);
-  const mia = getMember("mia");
-  const med = mia?.health[0]; // "Finishing a 10-day course of medicine"
+  const sophie = getMember("child1");
+  const mike = getMember("child2");
+  const sophieName = sophie?.name ?? "Sophie";
+  const mikeName = mike?.name ?? "Mike";
+  const med = sophie?.health[0]; // "Finishing a 10-day course of medicine"
 
   // 1) Advice / emotional — Auri alone, grounded in what we know. No task.
   if (ADVICE_HINTS.some((h) => input.includes(h))) {
     const grounded = med
-      ? `A couple of things I'd gently look at with Mia: she's still ${med.toLowerCase()}, and little ones are often clingier or more easily upset when they're not feeling 100%. Her bedtime has also slipped past 8pm a few nights this week, and short sleep makes the next day rougher.`
+      ? `A couple of things I'd gently look at with ${sophieName}: she's still ${med.toLowerCase()}, and little ones are often clingier or more easily upset when they're not feeling 100%. Her bedtime has also slipped past 8pm a few nights this week, and short sleep makes the next day rougher.`
       : "A couple of things worth a look: a slip in sleep or routine, or coming down with something, often shows up as extra fussiness first.";
     return auri(
-      `That's hard — I'm sorry you're both having a rough patch. ${grounded} Want me to pull up Mia's sleep and meds from this week?`,
+      `That's hard — I'm sorry you're both having a rough patch. ${grounded} Want me to pull up ${sophieName}'s sleep and meds from this week?`,
       {
         intent: "general_question",
-        suggestedFollowups: ["Show Mia's sleep this week", "Was she off her meds?", "Ideas for a calmer evening"],
+        suggestedFollowups: [`Show ${sophieName}'s sleep this week`, "Was she off her meds?", "Ideas for a calmer evening"],
       }
     );
   }
@@ -81,19 +84,19 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
         {
           type: "reminder",
           title,
-          subtitle: `Today · ${timeLabel} · Mia`,
+          subtitle: `Today · ${timeLabel} · ${sophieName}`,
           body: "Scheduled camera capture",
           cta: "Edit",
-          metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "mia", agent: "cameraman", recordingMode: "cameraman_highlight" },
+          metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "child1", agent: "cameraman", recordingMode: "cameraman_highlight" },
         },
       ],
-      objectsToCreate: [{ type: "reminder_draft", payload: { title, timeLabel, dateLabel: "Today", person: "mia", agent: "cameraman", recordingMode: "cameraman_highlight", note: request.message } }],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title, timeLabel, dateLabel: "Today", person: "child1", agent: "cameraman", recordingMode: "cameraman_highlight", note: request.message } }],
     };
     return auri("交给 Cameraman 来拍这个瞬间。", { intent: "photo_video", helper, suggestedFollowups: ["改时间", "拍完自动保存到 Memory"] });
   }
 
   if (/记录|记一下|记下|log|logged|刚刚|刚才|已经|喝了|吃了|睡了|尿布|diaper|nap|slept|feed|fed|drank|temperature|体温/.test(input)) {
-    const person = input.includes("leo") || input.includes("里奥") ? "leo" : input.includes("mia") || input.includes("阿丽塔") ? "mia" : "baby";
+    const person = /mike|michael|leo|里奥|麦克/.test(input) ? "child2" : /sophie|sofi|sophy|mia|阿丽塔|alita|索菲/.test(input) ? "child1" : "baby";
     const title = /fruit|水果/.test(input) ? "Snack: Fruit" : /water|喝水/.test(input) ? "Drink: Water" : "Care note";
     const description = request.message?.trim() || "Care note";
     const helper: ChatHelperSegment = {
@@ -126,7 +129,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       const period = h >= 12 ? "PM" : "AM";
       const h12 = h % 12 === 0 ? 12 : h % 12;
       timeLabel = `${h12}:${String(m).padStart(2, "0")} ${period}`;
-      auriReply = `好的，我来帮Mia设置吃药提醒。她正在完成10天的疗程，现在该吃${timeLabel}的药了。`;
+      auriReply = `好的，我来帮${sophieName}设置吃药提醒。她正在完成10天的疗程，现在该吃${timeLabel}的药了。`;
     } else {
       timeLabel = "2:00 PM";
       auriReply = "Of course — I'll have Homekeeper keep this on the radar.";
@@ -134,18 +137,18 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const helper: ChatHelperSegment = {
       teamMemberId: "homekeeper",
       name: "Homekeeper",
-      reply: `已为您创建提醒：Mia${isNow ? "现在" : "下午2点"}吃药。`,
+      reply: `已为您创建提醒：${sophieName}${isNow ? "现在" : "下午2点"}吃药。`,
       cards: [
         {
           type: "reminder",
-          title: "Mia吃药",
-          subtitle: `Today · ${timeLabel} · Mia`,
-          body: "Mia正在完成10天疗程",
+          title: `${sophieName}吃药`,
+          subtitle: `Today · ${timeLabel} · ${sophieName}`,
+          body: `${sophieName}正在完成10天疗程`,
           cta: "Edit",
-          metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "mia", wantsReceipt: true },
+          metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "child1", wantsReceipt: true },
         },
       ],
-      objectsToCreate: [{ type: "reminder_draft", payload: { title: "Mia吃药", timeLabel, dateLabel: "Today", person: "mia", note: "Mia正在完成10天疗程", wantsReceipt: true } }],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title: `${sophieName}吃药`, timeLabel, dateLabel: "Today", person: "child1", note: `${sophieName}正在完成10天疗程`, wantsReceipt: true } }],
     };
     return auri(auriReply, { intent: "reminder", helper, suggestedFollowups: ["改成其他时间", "谁来拍视频确认?"] });
   }
@@ -159,13 +162,13 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
         {
           type: "calendar_draft",
           title: "Basketball game",
-          subtitle: "Friday · 5:30 PM · Leo",
+          subtitle: `Friday · 5:30 PM · ${mikeName}`,
           body: "Calendar draft ready for review.",
           cta: "Review event",
-          metadata: { person: "leo", date: "Friday", time: "5:30 PM" },
+          metadata: { person: "child2", date: "Friday", time: "5:30 PM" },
         },
       ],
-      objectsToCreate: [{ type: "calendar_draft", payload: { title: "Basketball game", person: "leo", dateLabel: "Friday", timeLabel: "5:30 PM" } }],
+      objectsToCreate: [{ type: "calendar_draft", payload: { title: "Basketball game", person: "child2", dateLabel: "Friday", timeLabel: "5:30 PM" } }],
     };
     return auri("Got it — Homekeeper will add it to the family calendar.", { intent: "calendar_event", helper, suggestedFollowups: ["Add Dad as pickup", "Add a reminder"] });
   }
@@ -174,7 +177,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const helper: ChatHelperSegment = {
       teamMemberId: "companion",
       name: "Companion",
-      reply: "I saved this as a reading moment — Mia's really into dinosaurs and volcanoes lately.",
+      reply: `I saved this as a reading moment — ${sophieName}'s really into dinosaurs and volcanoes lately.`,
       cards: [
         {
           type: "memory",
@@ -182,12 +185,12 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
           subtitle: "Dinosaur Day",
           body: "Saved to Memory",
           cta: "View",
-          metadata: { child: "mia", topic: "dinosaurs", source: "reading" },
+          metadata: { child: "child1", topic: "dinosaurs", source: "reading" },
         },
       ],
-      objectsToCreate: [{ type: "memory_item", payload: { person: "mia", title: "Dinosaur Day", sourceType: "reading", topics: ["dinosaurs"] } }],
+      objectsToCreate: [{ type: "memory_item", payload: { person: "child1", title: "Dinosaur Day", sourceType: "reading", topics: ["dinosaurs"] } }],
     };
-    return auri("Lovely — Companion will keep that with Mia's reading.", { intent: "reading", helper, suggestedFollowups: ["Find another dinosaur book", "Add to Memory"] });
+    return auri(`Lovely — Companion will keep that with ${sophieName}'s reading.`, { intent: "reading", helper, suggestedFollowups: ["Find another dinosaur book", "Add to Memory"] });
   }
 
   if (input.includes("photo") || input.includes("album") || input.includes("video") || input.includes("clip")) {
@@ -213,6 +216,6 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
   // 3) Default — warm, not a menu of tasks.
   return auri(
     "",
-    { intent: "general_question", suggestedFollowups: ["How's Mia doing this week?", "Organize my photos", "Set a reminder"] }
+    { intent: "general_question", suggestedFollowups: [`How's ${sophieName} doing this week?`, "Organize my photos", "Set a reminder"] }
   );
 }

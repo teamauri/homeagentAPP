@@ -5,12 +5,7 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import type { PersonId } from "@/lib/types";
 import { DoodleIcon } from "./Icons";
 import { NewRobotEventInput } from "./RobotEventContext";
-
-const people: { id: PersonId; label: string }[] = [
-  { id: "mia", label: "Mia" },
-  { id: "leo", label: "Leo" },
-  { id: "family", label: "Family" },
-];
+import { useFamilyMember } from "./FamilyContext";
 
 const dayOptions = ["Today", "Tomorrow"];
 
@@ -30,9 +25,16 @@ function formatElapsed(seconds: number) {
 }
 
 export function RobotEventComposer({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (input: NewRobotEventInput) => void }) {
+  const sophie = useFamilyMember("child1");
+  const mike = useFamilyMember("child2");
+  const people: { id: PersonId; label: string }[] = [
+    { id: "child1", label: sophie?.name ?? "Sophie" },
+    { id: "child2", label: mike?.name ?? "Mike" },
+    { id: "family", label: "Family" },
+  ];
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
-  const [person, setPerson] = useState<PersonId>("mia");
+  const [person, setPerson] = useState<PersonId>("child1");
   const [day, setDay] = useState("Today");
   const [time, setTime] = useState("16:00");
   const [forRobot, setForRobot] = useState(true);
@@ -52,7 +54,7 @@ export function RobotEventComposer({ open, onClose, onCreate }: { open: boolean;
   const reset = () => {
     setTitle("");
     setNote("");
-    setPerson("mia");
+    setPerson("child1");
     setDay("Today");
     setTime("16:00");
     setForRobot(true);
