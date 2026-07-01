@@ -55,6 +55,7 @@ function SubtaskCard({ card }: { card: ChatCard }) {
   const [steps, setSteps] = useState<Subtask[]>(card.subtasks ?? []);
 
   useEffect(() => {
+    if (card.autoAdvanceSubtasks === false) return;
     const activeIdx = steps.findIndex((s) => s.state === "active");
     if (activeIdx === -1) return; // settled — nothing running
     const timer = setTimeout(() => {
@@ -66,7 +67,7 @@ function SubtaskCard({ card }: { card: ChatCard }) {
       });
     }, 2600);
     return () => clearTimeout(timer);
-  }, [steps]);
+  }, [card.autoAdvanceSubtasks, steps]);
 
   const doneCount = steps.filter((s) => s.state === "done").length;
 
@@ -96,6 +97,19 @@ function SubtaskCard({ card }: { card: ChatCard }) {
         </span>
       </div>
       <div className="border-t border-line/70 px-3.5 pb-2.5 pt-1.5">
+        {card.plan?.length ? (
+          <div className="border-b border-line/70 pb-2 pt-1">
+            <div className="mb-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Plan</div>
+            <div className="space-y-1">
+              {card.plan.map((item, i) => (
+                <div key={i} className="flex items-start gap-2 text-[13px] leading-[18px] text-ink/75">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#C0492C]" aria-hidden="true" />
+                  <span className="min-w-0">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {steps.map((task, i) => (
           <SubtaskRow key={i} task={task} />
         ))}

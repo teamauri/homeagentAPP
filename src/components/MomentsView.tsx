@@ -87,14 +87,7 @@ export function MomentsView() {
   const { completions } = useRobotEvents();
   // Clips the robot captured this session (events + highlights) — playable here.
   const robotClips = completions.filter((event) => event.result && event.kept);
-  const [growth, setGrowth] = useState<GrowthData | null>(() => {
-    try {
-      const raw = sessionStorage.getItem("auri.growth.v1");
-      return raw ? (JSON.parse(raw) as GrowthData) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [growth, setGrowth] = useState<GrowthData | null>(null);
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -116,6 +109,12 @@ export function MomentsView() {
   }
 
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("auri.growth.v1");
+      if (raw) setGrowth(JSON.parse(raw) as GrowthData);
+    } catch {
+      // ignore stale or unavailable cache
+    }
     refresh().catch(() => {});
   }, []);
 

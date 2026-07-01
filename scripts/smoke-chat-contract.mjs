@@ -91,11 +91,31 @@ assert(
 const cameraJob = await postJson(chatRoute, { message: "现在拍一段阿丽塔的视频给我" });
 assert(cameraJob.intent === "photo_video", "camera job: expected photo_video intent", cameraJob);
 assert(cameraJob.helper?.teamMemberId === "cameraman", "camera job: expected cameraman helper", cameraJob.helper);
+assert(
+  cameraJob.helper?.reply === "Got it. I'll film Mia and edit them into a short story.",
+  "camera job: expected explicit-subject cameraman reply",
+  cameraJob.helper
+);
 assert(helperObjects(cameraJob).some((object) => object.type === "reminder_draft"), "camera job: expected scheduled job draft", helperObjects(cameraJob));
 const cameraPayload = helperObjects(cameraJob).find((object) => object.type === "reminder_draft")?.payload ?? {};
 assert(cameraPayload.agent === "cameraman", "camera job: expected cameraman agent", cameraPayload);
 assert(cameraPayload.recordingMode === "cameraman_highlight", "camera job: expected cameraman recordingMode", cameraPayload);
+assert(cameraPayload.person === "mia", "camera job: expected explicit camera subject person", cameraPayload);
 assert(!helperCards(cameraJob).some((card) => card.type === "text"), "camera job: must not render as text card", helperCards(cameraJob));
+
+const familyCameraJob = await postJson(chatRoute, { message: "现在拍一段视频给我" });
+assert(
+  familyCameraJob.helper?.reply === "Got it. I'll film the family, primarily Mia if she is there, and Leo, and edit them into a short story.",
+  "family camera job: expected default family cameraman reply",
+  familyCameraJob.helper
+);
+const familyCameraPayload = helperObjects(familyCameraJob).find((object) => object.type === "reminder_draft")?.payload ?? {};
+assert(familyCameraPayload.person === "mia", "family camera job: expected primary child person", familyCameraPayload);
+assert(
+  familyCameraPayload.subject === "the family, primarily Mia if she is there, and Leo",
+  "family camera job: expected default family subject",
+  familyCameraPayload
+);
 
 console.log(JSON.stringify({
   ok: true,
@@ -104,5 +124,6 @@ console.log(JSON.stringify({
     "fruit command routes to homekeeper reminder_draft",
     "explicit care log remains baby_log",
     "camera request routes to cameraman_highlight job draft",
+    "cameraman reply uses explicit subject or default family primary child",
   ],
 }, null, 2));

@@ -80,6 +80,7 @@ export function AppShell({
   onComposerSubmit,
   hideHeader = false,
   scrollContainerRef,
+  voiceDemoPhase,
 }: {
   children: ReactNode;
   activeTab: TabKey;
@@ -87,14 +88,15 @@ export function AppShell({
   onComposerSubmit?: (message: string, imageUrl?: string) => Promise<void> | void;
   hideHeader?: boolean;
   scrollContainerRef?: RefObject<HTMLDivElement>;
+  voiceDemoPhase?: number;
 }) {
   return (
     <main className="min-h-[100dvh] bg-paper md:grid md:min-h-screen md:place-items-center md:bg-[#f5f1eb] md:px-10 md:py-8">
       <div className="mx-auto w-full overflow-hidden bg-paper md:max-w-[430px]">
         <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-paper md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[760px]">
           {hideHeader ? <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]" /> : <ShellHeader activeTab={activeTab} />}
-          <div ref={scrollContainerRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[26px] pb-3 pt-2">{children}</div>
-          <ShellBottom activeTab={activeTab} onTabChange={onTabChange} onComposerSubmit={onComposerSubmit} />
+          <div ref={scrollContainerRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-[9px] pb-3 pt-2">{children}</div>
+          <ShellBottom activeTab={activeTab} onTabChange={onTabChange} onComposerSubmit={onComposerSubmit} voiceDemoPhase={voiceDemoPhase} />
         </div>
       </div>
     </main>
@@ -104,7 +106,7 @@ export function AppShell({
 function ShellHeader({ activeTab }: { activeTab: TabKey }) {
   return (
     <div className="shrink-0 bg-paper pt-[env(safe-area-inset-top)]">
-      <header className="flex items-start justify-between gap-3 px-[26px] pb-3 pt-3">
+      <header className="flex items-start justify-between gap-3 px-[9px] pb-3 pt-3">
         <div className="min-w-0">
           <h1 className="font-display text-[30px] font-normal leading-[0.96] tracking-[-0.01em] text-ink">
             {titles[activeTab].split("\n").map((line) => (
@@ -129,14 +131,16 @@ function ShellBottom({
   activeTab,
   onTabChange,
   onComposerSubmit,
+  voiceDemoPhase,
 }: {
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
   onComposerSubmit?: (message: string, imageUrl?: string) => Promise<void> | void;
+  voiceDemoPhase?: number;
 }) {
   return (
     <div className="shrink-0 bg-paper">
-      {activeTab === "chat" ? <AuriComposer onSubmit={onComposerSubmit} /> : null}
+      {activeTab === "chat" ? <AuriComposer onSubmit={onComposerSubmit} voiceDemoPhase={voiceDemoPhase} /> : null}
       <BottomTabBar activeTab={activeTab} onTabChange={onTabChange} />
     </div>
   );
@@ -163,7 +167,7 @@ function BottomTabBar({ activeTab, onTabChange }: { activeTab: TabKey; onTabChan
   );
 }
 
-function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: string) => Promise<void> | void }) {
+function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: string, imageUrl?: string) => Promise<void> | void; voiceDemoPhase?: number }) {
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [image, setImage] = useState<string | null>(null);
@@ -321,8 +325,21 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     recognition.start();
   };
 
+  if (voiceDemoPhase === 1 || voiceDemoPhase === 2) {
+    return (
+      <div className="px-[9px] pb-2 pt-1.5">
+        <RecordingPanel
+          transcript={voiceDemoPhase >= 2 ? "watch for sophie's best moments today" : ""}
+          elapsed={voiceDemoPhase >= 2 ? 3 : 1}
+          onCancel={() => {}}
+          onStop={() => {}}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="px-[26px] pb-2 pt-1.5">
+    <div className="px-[9px] pb-2 pt-1.5">
       {image ? (
         <div className="mb-2 flex items-center gap-2">
           <div className="relative">
@@ -343,15 +360,17 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
       {listening ? (
         <RecordingPanel transcript={value} elapsed={elapsed} onCancel={cancelVoice} onStop={finishVoice} />
       ) : (
-        <div className="flex h-[54px] items-center gap-2.5 rounded-full border border-ink/15 bg-white px-2.5 shadow-[0_10px_30px_rgba(8,8,8,0.1)]">
+        <div className="auri-composer-shell flex h-[54px] items-center gap-2.5 px-2.5">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={pickImage} className="hidden" />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-[26px] font-light leading-none text-ink"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ink/10 bg-white/72 text-ink/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
             aria-label="Add photo"
           >
-            +
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" aria-hidden="true">
+              <path d="M12 6.7v10.6M6.7 12h10.6" />
+            </svg>
           </button>
           <input
             value={value}
@@ -365,12 +384,12 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
           <button
             type="button"
             onClick={toggleVoice}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-white text-ink"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ink/10 bg-white/72 text-ink/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]"
             aria-label="Use microphone"
           >
-            <svg viewBox="0 0 28 28" className="h-6 w-6" aria-hidden="true">
-              <path d="M14 4a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V8a4 4 0 0 0-4-4Z" fill="none" stroke="currentColor" strokeWidth="2" />
-              <path d="M6 13v1a8 8 0 0 0 16 0v-1M14 22v3M10 25h8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+            <svg viewBox="0 0 28 28" className="h-[22px] w-[22px]" aria-hidden="true">
+              <path d="M14 4.7a3.5 3.5 0 0 0-3.5 3.5v5.9a3.5 3.5 0 0 0 7 0V8.2A3.5 3.5 0 0 0 14 4.7Z" fill="none" stroke="currentColor" strokeWidth="1.55" />
+              <path d="M7.1 13.1v.8a6.9 6.9 0 0 0 13.8 0v-.8M14 20.8v3M10.7 23.8h6.6" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.55" />
             </svg>
           </button>
           <button

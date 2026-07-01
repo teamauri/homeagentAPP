@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
@@ -92,6 +92,7 @@ const chatMeBubbleBg = "bg-[#DDEEE4]";
 const chatAvatarOffset = "pl-[54px]";
 const chatRowShell = "relative min-w-0";
 const chatRowAvatar = "absolute left-0 top-0";
+const chatMessageColumn = "min-w-0 max-w-[94%]";
 const CHAT_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
 
 function isRecentChatEvent(at: number, now = Date.now()) {
@@ -139,10 +140,12 @@ export function ChatView({ liveTurns = [], sophieDemoPhase = 0 }: { liveTurns?: 
     <div className="pb-28">
       <div className="space-y-5">
         {visibleTurns.map((turn) => (
-          <ChatTurnRow key={turn.id} turn={turn} />
+          <ChatTurnRow
+            key={turn.id}
+            turn={turn}
+            after={turn.id === "cameraman-sophie-plan" && sophieDemoPhase >= 5 ? <CameramanMomentJobCard phase={sophieDemoPhase} /> : undefined}
+          />
         ))}
-        {sophieDemoPhase >= 8 ? <CameramanFinalNotice /> : null}
-        {sophieDemoPhase >= 5 ? <CameramanMomentJobCard phase={sophieDemoPhase} /> : null}
         {stream.map((item) => item.node)}
       </div>
       {selectedJob ? (
@@ -190,6 +193,7 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
               { label: "Cut the best moments", state: "todo" },
             ];
   const doneCount = steps.filter((step) => step.state === "done").length;
+  const [kept, setKept] = useState(false);
 
   return (
     <div className="w-full overflow-hidden rounded-[16px] border border-line bg-white shadow-[0_8px_18px_rgba(8,8,8,0.04)]">
@@ -198,8 +202,8 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
           <DoodleIcon name="camera-note" className="h-8 w-8" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{complete ? "Cameraman completed" : "Cameraman running"}</div>
-          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">Watch for Sophie's best moments</div>
+          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{complete ? "Completed" : "Running"}</div>
+          <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">Sophie's best moments</div>
         </div>
         <span className="shrink-0 whitespace-nowrap rounded-full bg-[#7a55c7]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#7a55c7]">
           {doneCount} of {steps.length}
@@ -207,19 +211,6 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
       </div>
 
       <div className="border-t border-line/70 px-3.5 pb-2.5 pt-1.5">
-        {phase <= 5 ? (
-          <div className="border-b border-line/70 pb-2 pt-1">
-            <div className="mb-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Plan</div>
-            <div className="space-y-1">
-              {["Look for Sophie every 15 minutes today.", "Film while Sophie stays in frame.", "Stop when she leaves the frame.", "Cut the best moments into a short highlight."].map((item) => (
-                <div key={item} className="flex items-start gap-2 text-[13px] leading-[18px] text-ink/75">
-                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#C0492C]" aria-hidden="true" />
-                  <span className="min-w-0">{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
         {steps.map((step) => (
           <MomentJobStep key={step.label} step={step} />
         ))}
@@ -227,32 +218,38 @@ function CameramanMomentJobCard({ phase }: { phase: number }) {
 
       {complete ? (
         <div className="border-t border-line/70">
-          <div className="relative bg-[#17181b]">
+          <div className="relative overflow-hidden rounded-[16px] bg-[#17181b]">
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
               src="/demo-media/e82d1f82-ca73-4222-8db0-4fe4799b9f04.mp4"
               poster="/demo-media/7fada8f9-fc26-417f-86c7-80fd6b3048b8.jpg"
               playsInline
               preload="metadata"
-              className="block max-h-64 w-full object-cover"
+              className="block aspect-[4/3] w-full object-cover"
             />
-            <button type="button" className="absolute inset-0 grid place-items-center" aria-label="Play Sophie's big laugh">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 via-black/35 to-transparent" aria-hidden="true" />
+            <button type="button" className="absolute inset-x-0 top-0 grid h-[58%] place-items-center" aria-label="Play Sophie's big laugh">
               <span className="grid h-12 w-12 place-items-center rounded-full bg-white/95 text-ink shadow">
                 <svg viewBox="0 0 24 24" className="h-6 w-6 translate-x-[1px]" fill="currentColor" aria-hidden="true">
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </span>
-              <span className="absolute bottom-2 left-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">0:10</span>
+              <span className="absolute left-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-[11px] font-medium text-white">0:10</span>
             </button>
-          </div>
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[12px] leading-4 text-muted">Highlight film</div>
-              <div className="text-[13.5px] font-semibold leading-[17px] text-ink">Sophie's big laugh · 0:10</div>
+            <div className="pointer-events-none absolute bottom-[50px] left-3.5 right-3.5 text-white">
+              <p className="text-[13px] font-normal leading-[16px] tracking-[0] text-white drop-shadow">Her tower fell and she cracked up 😄</p>
             </div>
-            <button type="button" className="shrink-0 whitespace-nowrap rounded-full bg-[#DDEEE4] px-3 py-1.5 text-[12px] font-semibold text-ink">
-              Keep in Memory ❤️
-            </button>
+            <div className="absolute bottom-3.5 left-3.5 right-3.5 flex items-baseline justify-between gap-3 text-[13px] font-semibold leading-[16px] text-white">
+              <div className="min-w-0 truncate drop-shadow">Highlight Story · 0:10</div>
+              <button
+                type="button"
+                onClick={() => setKept((value) => !value)}
+                aria-pressed={kept}
+                className="shrink-0 whitespace-nowrap text-[13px] font-semibold leading-[16px] text-white drop-shadow"
+              >
+                Keep in Memory <span className={kept ? "text-[#FF3B30]" : "text-white"}>{kept ? "♥" : "♡"}</span>
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -265,7 +262,7 @@ function MomentJobStep({ step }: { step: { label: string; detail?: string; state
     return (
       <div className="-mx-1.5 my-0.5 flex items-center gap-2.5 rounded-[10px] bg-[#7a55c7]/10 px-1.5 py-1.5">
         <span className="h-[17px] w-[17px] shrink-0 animate-spin rounded-full border-2 border-[#7a55c7] border-t-transparent" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-[#5a3a9e]">{step.label}</span>
+        <span className="min-w-0 flex-1 text-[14px] font-medium leading-[18px] text-[#5a3a9e]">{step.label}</span>
         {step.detail ? <span className="shrink-0 text-[12px] text-[#7a55c7]">{step.detail}</span> : null}
       </div>
     );
@@ -279,7 +276,7 @@ function MomentJobStep({ step }: { step: { label: string; detail?: string; state
             <path d="m8.5 12 2.5 2.5 4.5-5" />
           </svg>
         </span>
-        <span className="min-w-0 flex-1 truncate text-[14px] text-muted">{step.label}</span>
+        <span className="min-w-0 flex-1 text-[14px] leading-[18px] text-muted">{step.label}</span>
         {step.detail ? <span className="shrink-0 text-[12px] text-muted/70">{step.detail}</span> : null}
       </div>
     );
@@ -287,29 +284,8 @@ function MomentJobStep({ step }: { step: { label: string; detail?: string; state
   return (
     <div className="flex items-center gap-2.5 py-1.5">
       <span className="h-[17px] w-[17px] shrink-0 rounded-full border-[1.5px] border-line" aria-hidden="true" />
-      <span className="min-w-0 flex-1 truncate text-[14px] text-ink/75">{step.label}</span>
+      <span className="min-w-0 flex-1 text-[14px] leading-[18px] text-ink/75">{step.label}</span>
       {step.detail ? <span className="shrink-0 text-[12px] text-muted">{step.detail}</span> : null}
-    </div>
-  );
-}
-
-function CameramanFinalNotice() {
-  return (
-    <div className={chatRowShell}>
-      <div className={chatRowAvatar}>
-        <ChatAgentBadge agentId="cameraman" size="sm" />
-      </div>
-      <div className="min-w-0">
-        <div className="mb-1 flex items-baseline gap-3">
-          <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>Cameraman</span>
-          <span className="text-[13px] text-muted">9:42 AM</span>
-        </div>
-        <div className={chatAvatarOffset}>
-          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
-            Her tower fell and she just cracked up 😄
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -379,13 +355,18 @@ function isMeAvatar(avatar: ChatTurn["avatar"] | LiveChatTurn["avatar"]) {
   return avatar === "mom";
 }
 
-function ChatTurnRow({ turn }: { turn: ChatTurn }) {
+function ChatTurnRow({ turn, after }: { turn: ChatTurn; after?: ReactNode }) {
   const displayName = useParentDisplayName(turn.avatar, turn.sender);
   const isMe = isMeAvatar(turn.avatar);
   return (
-    <div className={clsx("flex min-w-0 items-start gap-2.5", isMe && "justify-end")}>
+    <div
+      className={clsx(
+        "min-w-0 items-start gap-2.5",
+        isMe ? "flex justify-end" : after ? "grid grid-cols-[40px_minmax(0,1fr)]" : "flex"
+      )}
+    >
       {!isMe ? <Avatar avatar={turn.avatar} /> : null}
-      <div className={clsx("min-w-0 max-w-[78%]", isMe && "flex flex-col items-end")}>
+      <div className={clsx(isMe ? clsx(chatMessageColumn, "flex flex-col items-end") : after ? "min-w-0 w-full max-w-full" : chatMessageColumn)}>
         <div className={clsx("mb-1 flex items-baseline gap-3", isMe && "justify-end")}>
           <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>
@@ -393,7 +374,8 @@ function ChatTurnRow({ turn }: { turn: ChatTurn }) {
         <div className={clsx("flex", isMe ? "justify-end" : "justify-start")}>
           <p
             className={clsx(
-              "inline-block max-w-full rounded-[16px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink",
+              "inline-block rounded-[16px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink",
+              "max-w-full",
               isMe ? "rounded-tr-[5px]" : "rounded-tl-[5px]",
               isMe ? chatMeBubbleBg : chatBubbleBg
             )}
@@ -406,6 +388,7 @@ function ChatTurnRow({ turn }: { turn: ChatTurn }) {
             <ChatCardList cards={turn.cards} />
           </div>
         ) : null}
+        {after ? <div className="mt-2 w-full">{after}</div> : null}
       </div>
       {isMe ? <Avatar avatar={turn.avatar} /> : null}
     </div>
@@ -450,7 +433,7 @@ function LiveChatTurnRow({ turn }: { turn: LiveChatTurn }) {
   return (
     <div className={clsx("flex min-w-0 items-start gap-2.5", isMe && "justify-end")}>
       {!isMe ? <LiveAvatar avatar={turn.avatar} sender={turn.sender} /> : null}
-      <div className={clsx("min-w-0 max-w-[78%]", isMe && "flex flex-col items-end")}>
+      <div className={clsx(chatMessageColumn, isMe && "flex flex-col items-end")}>
         <div className={clsx("mb-1 flex items-baseline gap-3", isMe && "justify-end")}>
           <span className="text-[15px] font-semibold leading-5 text-ink">{displayName}</span>
           <span className="text-[13px] text-muted">{turn.time}</span>

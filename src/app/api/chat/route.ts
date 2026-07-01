@@ -5,6 +5,7 @@ import { createFallbackChatResponse } from "@/lib/demo/fallback-handler";
 import { callDeepSeekChat } from "@/lib/chat-server/deepseek";
 import { callGeminiChat } from "@/lib/chat-server/gemini";
 import { ChatAIResponse, ChatApiResponse, ChatRequestBody, ChatResponseCard, ObjectToCreate, type TeamMemberId } from "@/lib/chat-server/types";
+import { getChildren, getFamily } from "@/lib/family/store";
 import { immediateScheduledAt, timeLabelInZone } from "@/lib/job-time";
 import { helperTeamAgentIds, normalizeTeamAgentId, teamAgentById, type HelperTeamAgentId } from "@/lib/team";
 
@@ -58,6 +59,70 @@ function inferPersonFromRequest(request: ChatRequestBody) {
   return "family";
 }
 
+type CameraSubject = {
+  explicit: boolean;
+  personId: string;
+  replySubject: string;
+};
+
+const memberAliases: Record<string, string[]> = {
+  mia: ["mia", "阿丽塔", "alita"],
+  leo: ["leo", "里奥"],
+  mom: ["mom", "妈妈", "jane"],
+  dad: ["dad", "爸爸", "marcus"],
+};
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function subjectWasMentioned(text: string, phrases: string[]) {
+  return phrases.some((phrase) => {
+    const trimmed = phrase.trim();
+    if (!trimmed) return false;
+    const escaped = escapeRegExp(trimmed.toLowerCase());
+    if (/^[a-z0-9 ]+$/i.test(trimmed)) return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+    return text.includes(trimmed.toLowerCase());
+  });
+}
+
+function inferCameraSubject(request: ChatRequestBody): CameraSubject {
+  const text = requestText(request);
+  const family = getFamily();
+
+  for (const member of family) {
+    const aliases = [member.name, ...(memberAliases[member.id] ?? [])];
+    if (subjectWasMentioned(text, aliases)) {
+      return { explicit: true, personId: member.id, replySubject: member.name };
+    }
+  }
+
+  const properName = request.message
+    ?.match(/\b(?:film|record|capture|shoot|take|video|photo)\b(?:\s+(?:a|an|the|some))?(?:\s+(?:video|clip|photo|story))?(?:\s+of)?\s+([A-Z][a-z]+)(?:'s)?\b/i)?.[1]
+    ?.replace(/'s$/, "");
+  if (properName && !/^(please|now|today|tonight|family|cameraman)$/i.test(properName)) {
+    return { explicit: true, personId: "family", replySubject: properName };
+  }
+
+  const children = getChildren();
+  const primary = children[0];
+  if (!primary) return { explicit: false, personId: "family", replySubject: "the family" };
+
+  const others = children.slice(1).map((child) => child.name);
+  const otherClause = others.length ? `, and ${others.join(" and ")}` : "";
+  const pronoun = primary.avatar === "girl" ? "she" : primary.avatar === "boy" ? "he" : "they";
+  return {
+    explicit: false,
+    personId: primary.id,
+    replySubject: `the family, primarily ${primary.name} if ${pronoun} is there${otherClause}`,
+  };
+}
+
+function cameraHelperReply(request: ChatRequestBody) {
+  const subject = inferCameraSubject(request);
+  return `Got it. I'll film ${subject.replySubject}${subject.explicit ? " and" : ", and"} edit them into a short story.`;
+}
+
 function normalizeTimeLabel(value: unknown) {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
@@ -106,6 +171,7 @@ function reminderTitle(request: ChatRequestBody) {
 function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
   const now = nowScheduleFields();
   const immediate = /现在|立刻|马上|\bnow\b/i.test(request.message ?? "");
+  const subject = inferCameraSubject(request);
   return {
     type: "reminder_draft",
     payload: {
@@ -113,12 +179,28 @@ function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
       timeLabel: immediate ? now.timeLabel : "8:00 PM",
       dateLabel: now.dateLabel,
       ...(immediate ? { scheduledAt: now.scheduledAt } : {}),
-      person: "mia",
+      person: subject.personId,
+      subject: subject.replySubject,
       agent: "cameraman",
       recordingMode: "cameraman_highlight",
       note: request.message,
     },
   };
+}
+
+function withCameraSubject(objects: ObjectToCreate[], request: ChatRequestBody) {
+  const subject = inferCameraSubject(request);
+  return objects.map((object) => {
+    if (object.type !== "reminder_draft" && object.type !== "calendar_draft") return object;
+    return {
+      ...object,
+      payload: {
+        ...object.payload,
+        person: subject.personId,
+        subject: subject.replySubject,
+      },
+    };
+  });
 }
 
 function homekeeperReminderObject(request: ChatRequestBody): ObjectToCreate {
@@ -190,14 +272,15 @@ function ensureCameraCaptureJob(response: ChatAIResponse, request: ChatRequestBo
   const helper = response.helper ?? {
     teamMemberId: "cameraman" as TeamMemberId,
     name: "Cameraman",
-    reply: "收到，我这就去拍一段视频，马上发给你。",
+    reply: cameraHelperReply(request),
     cards: [],
     objectsToCreate: [],
   };
   const objectsToCreate = hasDraftObject(helper.objectsToCreate)
     ? objectsWithAgent(helper.objectsToCreate, "cameraman")
     : [cameraDraftObject(request), ...objectsWithAgent(helper.objectsToCreate, "cameraman")];
-  const cards = synthesizeCardsFromObjects(objectsToCreate);
+  const cameraObjects = withCameraSubject(objectsToCreate, request);
+  const cards = synthesizeCardsFromObjects(cameraObjects);
 
   return {
     ...response,
@@ -206,8 +289,9 @@ function ensureCameraCaptureJob(response: ChatAIResponse, request: ChatRequestBo
       ...helper,
       teamMemberId: "cameraman",
       name: "Cameraman",
+      reply: cameraHelperReply(request),
       cards,
-      objectsToCreate,
+      objectsToCreate: cameraObjects,
     },
   };
 }

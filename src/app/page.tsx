@@ -17,6 +17,7 @@ const HOME_TABS: TabKey[] = ["chat", "today", "memory"];
 const COVER_MIN_MS = 3500;
 const CHAT_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_LIVE_TURNS = 120;
+const SOPHIE_DEMO_TIMINGS = [900, 2500, 3900, 5200, 6500, 11500, 16500, 21500];
 
 declare global {
   interface Window {
@@ -57,10 +58,17 @@ function liveTurnTime(turn: LiveChatTurn): number {
   return match ? Number(match[1]) : Date.now();
 }
 
+function isStaleHelloTurn(turn: LiveChatTurn): boolean {
+  const normalizedText = turn.text.trim().toLowerCase();
+  if (normalizedText === "hello") return true;
+  return normalizedText.startsWith("hello, jane! it's so good to hear from you.");
+}
+
 function pruneLiveTurns(turns: LiveChatTurn[], now = Date.now()): LiveChatTurn[] {
   const cutoff = now - CHAT_RETENTION_MS;
   return turns
     .filter((turn) => !turn.pending)
+    .filter((turn) => !isStaleHelloTurn(turn))
     .filter((turn) => liveTurnTime(turn) >= cutoff)
     .slice(-MAX_LIVE_TURNS);
 }
@@ -72,8 +80,9 @@ function HomeInner() {
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
-  const [showCover, setShowCover] = useState(true);
+  const [showCover, setShowCover] = useState(false);
   const [coverMediaReady, setCoverMediaReady] = useState(false);
+  const [sophieDemoPhase, setSophieDemoPhase] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tabRef = useRef<TabKey>("chat");
   const returningHomeRef = useRef(false);
@@ -84,6 +93,7 @@ function HomeInner() {
   const coverStartedAtRef = useRef(Date.now());
   const coverDismissTimerRef = useRef<number | null>(null);
   const coverMediaReadyRef = useRef(false);
+  const coverDismissedRef = useRef(false);
 
   const scrollKey = (targetTab: TabKey) => `${HOME_SCROLL_PREFIX}${targetTab}.v1`;
 
@@ -140,6 +150,7 @@ function HomeInner() {
     if (!coverMediaReadyRef.current) return;
     const remaining = Math.max(0, COVER_MIN_MS - (Date.now() - coverStartedAtRef.current));
     coverDismissTimerRef.current = window.setTimeout(() => {
+      coverDismissedRef.current = true;
       setShowCover(false);
       coverDismissTimerRef.current = null;
     }, remaining);
@@ -159,10 +170,17 @@ function HomeInner() {
 
   const replayCover = () => {
     if (tabRef.current !== "chat") return;
+    if (coverDismissedRef.current) return;
     coverStartedAtRef.current = Date.now();
     resetCoverMediaReady();
     setShowCover(true);
     if (liveLoaded) scheduleCoverDismiss();
+  };
+
+  const dismissCover = () => {
+    coverDismissedRef.current = true;
+    clearCoverDismissTimer();
+    setShowCover(false);
   };
 
   useEffect(() => {
@@ -333,6 +351,23 @@ function HomeInner() {
     }
   }, [liveTurns, liveLoaded]);
 
+  useEffect(() => {
+    const timers = SOPHIE_DEMO_TIMINGS.map((delay, index) =>
+      window.setTimeout(() => setSophieDemoPhase(index + 1), delay)
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  useEffect(() => {
+    if (!liveLoaded || tabRef.current !== "chat") return;
+    if (sophieDemoPhase > 5) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [sophieDemoPhase, liveLoaded]);
+
   const switchTab = (next: TabKey) => {
     if (next === tabRef.current) return;
     saveScrollForTab(tabRef.current);
@@ -447,7 +482,14 @@ function HomeInner() {
 
   return (
     <div onClickCapture={handleHomeClickCapture}>
-      <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={(tab === "today" && jobsSubpage) || tab === "memory"} scrollContainerRef={scrollContainerRef}>
+      <AppShell
+        activeTab={tab}
+        onTabChange={switchTab}
+        onComposerSubmit={sendComposerMessage}
+        hideHeader={(tab === "today" && jobsSubpage) || tab === "memory"}
+        scrollContainerRef={scrollContainerRef}
+        voiceDemoPhase={sophieDemoPhase}
+      >
         {/*
           Keep every tab mounted and just toggle visibility. Conditional rendering
           (`tab === x && <View/>`) unmounts the inactive views, which made Memory
@@ -464,12 +506,12 @@ function HomeInner() {
           />
         </div>
         <div className={tab === "chat" ? "" : "hidden"}>
-          <ChatView liveTurns={liveTurns} />
+          <ChatView liveTurns={liveTurns} sophieDemoPhase={sophieDemoPhase} />
         </div>
         <div className={tab === "memory" ? "" : "hidden"}>
           <MomentsView />
         </div>
-        {showCover && tab === "chat" ? <AuriCover onReady={markCoverMediaReady} onDismiss={() => setShowCover(false)} /> : null}
+        {showCover && tab === "chat" ? <AuriCover onReady={markCoverMediaReady} onDismiss={dismissCover} /> : null}
       </AppShell>
     </div>
   );
@@ -480,6 +522,8 @@ function AuriCover({ onReady, onDismiss }: { onReady: () => void; onDismiss: () 
 
   useEffect(() => {
     if (imageRef.current?.complete) onReady();
+    const fallback = window.setTimeout(onReady, 1200);
+    return () => window.clearTimeout(fallback);
   }, [onReady]);
 
   return (

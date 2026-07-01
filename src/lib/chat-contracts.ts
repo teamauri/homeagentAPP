@@ -40,6 +40,10 @@ interface ChatCardBase {
   // Optional live progress (routine steps, capture counters, …). When present,
   // the card renders a checklist that updates in place instead of a flat card.
   subtasks?: Subtask[];
+  autoAdvanceSubtasks?: boolean;
+  // A concise user-facing execution plan. This is not model chain-of-thought;
+  // it is the concrete policy the agent will run.
+  plan?: string[];
   progressLabel?: string;
   // When present, the card plays the clip inline (no separate "Watch" screen).
   videoUrl?: string;
