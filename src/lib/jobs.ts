@@ -1,4 +1,5 @@
 import type { PersonId } from "./types";
+import { familyMemberById } from "./family/profile";
 import { normalizeTeamAgentId, teamAgentById, type TeamAgentId } from "./team";
 import { todayAt } from "./job-time";
 
@@ -42,10 +43,10 @@ export function loadStandingJobs(): StandingJob[] {
     const raw = localStorage.getItem(STANDING_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
     if (Array.isArray(parsed) && parsed.length) {
-      const migrated = parsed.map((job) => ({
+      const migrated = parsed.map((job) => migrateSeedStandingJob({
         ...job,
         agent: normalizeTeamAgentId(job.agent) ?? agentForJobType(job.type),
-      })) as StandingJob[];
+      } as StandingJob));
       const sorted = sortStandingJobs(migrated);
       localStorage.setItem(STANDING_KEY, JSON.stringify(sorted));
       return sorted;
@@ -88,6 +89,39 @@ export function sortStandingJobs(jobs: StandingJob[]): StandingJob[] {
   });
 }
 
+function migrateSeedStandingJob(job: StandingJob): StandingJob {
+  if (job.id === "home-watch" && (job.title === "Home watch" || job.trigger === "8 AM–8 PM · Family")) {
+    return {
+      ...job,
+      title: "Afterschool check-in",
+      trigger: `4:30 PM · ${familyMemberById.leo.name}`,
+      person: "leo",
+      schedule: { kind: "alarm", alarm: "16:30" },
+    };
+  }
+
+  if (
+    job.id === "morning-routine" &&
+    (job.trigger === "Alarm 7:30 AM" || (job.schedule.kind === "alarm" && job.schedule.alarm === "07:30"))
+  ) {
+    return {
+      ...job,
+      trigger: `7:45 AM · ${familyMemberById.leo.name}`,
+      person: "leo",
+      schedule: { kind: "alarm", alarm: "07:45" },
+    };
+  }
+
+  if (job.id === "baby-routine-log" && job.trigger === `Alarm 9 PM · ${familyMemberById.mia.name}`) {
+    return {
+      ...job,
+      trigger: `9 PM · ${familyMemberById.mia.name}`,
+    };
+  }
+
+  return job;
+}
+
 // Today's real datetime for a standing job's instance (epoch ms).
 export function standingScheduledAtToday(job: StandingJob, now: number = Date.now()): number {
   return todayAt(standingStartHHMM(job), now);
@@ -109,10 +143,10 @@ export const seedStanding: StandingJob[] = [
     id: "home-watch",
     type: "watch",
     agent: "watcher",
-    title: "Home watch",
-    trigger: "8 AM–8 PM · Family",
-    person: "family",
-    schedule: { kind: "window", start: "08:00", end: "20:00" },
+    title: "Afterschool check-in",
+    trigger: `4:30 PM · ${familyMemberById.leo.name}`,
+    person: "leo",
+    schedule: { kind: "alarm", alarm: "16:30" },
     enabled: true,
   },
   {
@@ -130,9 +164,9 @@ export const seedStanding: StandingJob[] = [
     type: "routine",
     agent: "homekeeper",
     title: "Morning routine",
-    trigger: "Alarm 7:30 AM",
-    person: "family",
-    schedule: { kind: "alarm", alarm: "07:30" },
+    trigger: `7:45 AM · ${familyMemberById.leo.name}`,
+    person: "leo",
+    schedule: { kind: "alarm", alarm: "07:45" },
     enabled: true,
   },
   {
@@ -140,7 +174,7 @@ export const seedStanding: StandingJob[] = [
     type: "baby_log",
     agent: "baby_logger",
     title: "Baby routine log",
-    trigger: "Alarm 9 PM · Mia",
+    trigger: `9 PM · ${familyMemberById.mia.name}`,
     person: "mia",
     schedule: { kind: "alarm", alarm: "21:00" },
     enabled: true,
