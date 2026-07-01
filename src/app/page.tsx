@@ -447,7 +447,7 @@ function HomeInner() {
 
   return (
     <div onClickCapture={handleHomeClickCapture}>
-      <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={tab === "today" && jobsSubpage} scrollContainerRef={scrollContainerRef}>
+      <AppShell activeTab={tab} onTabChange={switchTab} onComposerSubmit={sendComposerMessage} hideHeader={(tab === "today" && jobsSubpage) || tab === "memory"} scrollContainerRef={scrollContainerRef}>
         {/*
           Keep every tab mounted and just toggle visibility. Conditional rendering
           (`tab === x && <View/>`) unmounts the inactive views, which made Memory

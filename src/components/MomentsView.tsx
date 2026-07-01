@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DayGroup, GrowthData, MilestoneSession, OrganizedMedia } from "@/lib/album/types";
-import { useChildren, useFamilyMember } from "./FamilyContext";
+import { useFamilyMember } from "./FamilyContext";
 import { RobotEvent, useRobotEvents } from "./RobotEventContext";
 
 // Fixed gradient classes for seed/placeholder tones (kept literal so Tailwind
@@ -17,9 +17,6 @@ const TONE: Record<string, string> = {
   g6: "bg-gradient-to-br from-[#cfe7f0] via-[#7fa9bd] to-[#3c5f6f]",
 };
 const toneClass = (tone?: string) => (tone && TONE[tone]) || TONE.g1;
-
-// A Memory tab is "All", a source ("auri"/"phone"), or a specific child id.
-type Tab = { key: string; label: string };
 
 // Auri Cut — auto-edit one phone video into a ≤30s short via POST /api/edit.
 type AuriPhase = "idle" | "intro" | "editing" | "done";
@@ -87,7 +84,6 @@ async function fileToPayload(file: File) {
 const JOB_KEY = "auri.job.v1";
 
 export function MomentsView() {
-  const children = useChildren();
   const { completions } = useRobotEvents();
   // Clips the robot captured this session (events + highlights) — playable here.
   const robotClips = completions.filter((event) => event.result && event.kept);
@@ -99,7 +95,6 @@ export function MomentsView() {
       return null;
     }
   });
-  const [filter, setFilter] = useState<string>("all");
   const [organizing, setOrganizing] = useState<{ count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -372,45 +367,12 @@ export function MomentsView() {
     return <div className="pt-10 text-center text-[14px] text-muted">Loading memories…</div>;
   }
 
-  // All · one tab per child (oldest first).
-  const tabs: Tab[] = [
-    { key: "all", label: "All" },
-    ...children.map((c) => ({ key: `child:${c.id}`, label: c.name })),
-  ];
-  const days = filterDays(growth.days, filter);
-  // The milestone card belongs to a child, so show it only inside that child's
-  // tab — not on "All".
-  const activeChildId = filter.startsWith("child:") ? filter.slice("child:".length) : undefined;
-  const activeSession = activeChildId ? growth.sessions?.[activeChildId] : undefined;
+  const days = growth.days;
 
   return (
-    <div className="pb-4">
-      <div className="no-scrollbar mt-1 flex items-center gap-2 overflow-x-auto">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setFilter(t.key)}
-            className={
-              "shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] " +
-              (filter === t.key ? "border-ink bg-ink font-semibold text-white" : "border-line text-muted")
-            }
-          >
-            {t.label}
-          </button>
-        ))}
-        <div className="ml-auto shrink-0">
-          <button
-            onClick={() => setAuriPhase("intro")}
-            className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-semibold text-white shadow-[0_2px_8px_rgba(8,8,8,0.06)]"
-          >
-            ✨ Cut
-          </button>
-        </div>
-        <input ref={inputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
-        <input ref={auriInputRef} type="file" accept="video/*" hidden onChange={(e) => onAuriVideo(e.target.files)} />
-      </div>
-
-      {activeSession ? <SessionCard session={activeSession} /> : null}
+    <div className="-mx-[26px] -mt-2 pb-0">
+      <input ref={inputRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => onFiles(e.target.files)} />
+      <input ref={auriInputRef} type="file" accept="video/*" hidden onChange={(e) => onAuriVideo(e.target.files)} />
 
       {organizing ? <OrganizingPanel count={organizing.count} /> : null}
 
@@ -442,7 +404,7 @@ export function MomentsView() {
 
       {robotClips.length ? <RobotKeepsakes events={robotClips} /> : null}
 
-      <Feed days={days} onPlay={setLightbox} />
+      <Feed days={days} onPlay={setLightbox} onAdd={() => inputRef.current?.click()} />
 
       {lightbox ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3" onClick={() => setLightbox(null)}>
@@ -670,91 +632,114 @@ function AuriCutResult({ result, onDismiss, onPlay, onDelete }: { result: { memo
   );
 }
 
-function Feed({ days, onPlay }: { days: DayGroup[]; onPlay: (url: string) => void }) {
+type MomentSlide = {
+  day: DayGroup;
+  media: OrganizedMedia;
+};
+
+function Feed({ days, onPlay, onAdd }: { days: DayGroup[]; onPlay: (url: string) => void; onAdd: () => void }) {
   if (!days.length) return <p className="mt-8 text-center text-[13px] text-muted">No moments here yet.</p>;
+  const slides = days.flatMap((day) => day.media.map((media) => ({ day, media })));
   return (
-    <div className="mt-4">
-      {days.map((day) => (
-        <section key={day.dateISO + day.dateLabel} className="mb-6">
-          <h3 className="font-display text-[16px] tracking-[-0.02em] text-ink">
-            {day.dateLabel}
-            {day.ageShort ? <span className="ml-1.5 text-[11px] font-semibold text-[#b3ada3]">· {day.ageShort}</span> : null}
-          </h3>
-          {day.caption ? (
-            <p className="mb-2.5 mt-1 text-[12.5px] leading-snug text-[#3b3b3b]">
-              {day.isFirstDay ? (
-                <span className="mr-1.5 inline-flex items-center gap-1 rounded-full bg-[#fbeede] px-2 py-0.5 align-middle text-[10px] font-bold text-[#b9772a]">
-                  ★ First
-                </span>
-              ) : null}
-              {day.caption}
-            </p>
-          ) : null}
-          <div className="grid grid-cols-3 gap-1.5">
-            {day.media.map((m) => (
-              <Tile key={m.id} media={m} href={day.memoryId ? `/memory/${day.memoryId}` : m.url} sameTab={Boolean(day.memoryId)} onPlay={onPlay} />
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
+    <section className="relative">
+      <button
+        type="button"
+        onClick={onAdd}
+        aria-label="Add memories"
+        className="absolute right-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-full bg-black/42 text-[24px] leading-none text-white shadow-[0_8px_28px_rgba(0,0,0,0.2)] backdrop-blur-md"
+      >
+        +
+      </button>
+      <div className="no-scrollbar h-[calc(100dvh-98px)] min-h-[520px] snap-y snap-mandatory overflow-y-auto overscroll-contain bg-[#0b0b0b] md:h-[calc(min(900px,100dvh-4rem)-98px)]">
+        {slides.map((slide) => (
+          <MomentReel key={`${slide.day.dateISO}-${slide.media.id}`} slide={slide} onPlay={onPlay} />
+        ))}
+      </div>
+    </section>
   );
 }
 
-function Tile({ media, href, sameTab, onPlay }: { media: OrganizedMedia; href?: string; sameTab?: boolean; onPlay: (url: string) => void }) {
-  const inner = (
-    <>
-      {media.thumbDataUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={media.thumbDataUrl} alt="" className="h-full w-full object-cover" />
-      ) : (
-        <div className={"h-full w-full " + toneClass(media.tone)} />
-      )}
-      {/* Robot-captured media is tagged so it's clear it came from Auri. */}
-      {media.source === "auri" ? (
-        <span className="absolute left-1 top-1 flex items-center gap-0.5 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-white">
-          🤖 Auri
-        </span>
-      ) : null}
-      {media.kind === "video" ? (
-        <>
-          <span className="absolute inset-0 grid place-items-center">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-white/85 pl-0.5 text-[11px] text-ink">▶</span>
-          </span>
-          {media.durationLabel ? (
-            <span className="absolute bottom-1 right-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-white">
-              {media.durationLabel}
-            </span>
-          ) : null}
-        </>
-      ) : null}
-    </>
-  );
+function MomentReel({ slide, onPlay }: { slide: MomentSlide; onPlay: (url: string) => void }) {
+  const { day, media } = slide;
+  const href = day.memoryId ? `/memory/${day.memoryId}` : media.url;
+  const sameTab = Boolean(day.memoryId);
 
-  const className = "relative aspect-square overflow-hidden rounded-[11px]";
-  // Videos play inline in an enlarged player on this page — no navigation.
+  return (
+    <article className="relative flex h-full snap-start snap-always items-center justify-center overflow-hidden bg-[#0b0b0b] text-white">
+      <MomentBackdrop media={media} />
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/78 via-black/32 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/42 to-transparent" />
+
+      {media.kind === "video" && media.url ? (
+        <button
+          type="button"
+          onClick={() => onPlay(media.url as string)}
+          aria-label="Open player"
+          className="absolute inset-0 grid place-items-center"
+        >
+          <span className="grid h-14 w-14 place-items-center rounded-full bg-white/88 pl-1 text-[20px] text-ink shadow-[0_8px_30px_rgba(0,0,0,0.22)]">▶</span>
+        </button>
+      ) : null}
+
+      <div className="absolute bottom-0 left-0 right-0 px-3 pb-4">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11.5px] font-semibold leading-tight text-white/72">
+              {day.dateLabel}
+              {day.ageShort ? ` · ${day.ageShort}` : ""}
+            </p>
+            <h3 className="mt-0.5 truncate text-[16px] font-semibold leading-tight text-white">
+              {media.firstLabel || (media.kind === "video" ? "Family film" : "Family moment")}
+            </h3>
+            {day.caption ? <p className="mt-1 line-clamp-2 text-[12.5px] leading-snug text-white/82">{day.caption}</p> : null}
+          </div>
+          {href ? (
+            <a
+              href={href}
+              target={sameTab ? undefined : "_blank"}
+              rel={sameTab ? undefined : "noreferrer"}
+              className="shrink-0 rounded-full bg-white/18 px-3 py-1.5 text-[11.5px] font-semibold text-white backdrop-blur-md"
+            >
+              View
+            </a>
+          ) : null}
+          {media.kind === "video" && media.durationLabel ? (
+            <span className="shrink-0 rounded-full bg-white/18 px-2.5 py-1.5 text-[11.5px] font-semibold text-white/88 backdrop-blur-md">{media.durationLabel}</span>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MomentBackdrop({ media }: { media: OrganizedMedia }) {
   if (media.kind === "video" && media.url) {
     return (
-      <button type="button" onClick={() => onPlay(media.url as string)} className={className}>
-        {inner}
-      </button>
+      <>
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video src={`${media.url}#t=0.1`} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-[0.35] blur-2xl" />
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video src={`${media.url}#t=0.1`} muted playsInline preload="metadata" className="relative z-0 max-h-full w-full object-contain" />
+      </>
     );
   }
-  // A real Story links to its detail page; a bare media URL opens in a new tab.
-  if (href) {
-    return (
-      <a href={href} target={sameTab ? undefined : "_blank"} rel={sameTab ? undefined : "noreferrer"} className={className}>
-        {inner}
-      </a>
-    );
-  }
-  return <div className={className}>{inner}</div>;
-}
 
-function filterDays(days: DayGroup[], filter: string): DayGroup[] {
-  if (!filter.startsWith("child:")) return days; // "all"
-  const childId = filter.slice("child:".length);
-  return days
-    .map((day) => ({ ...day, media: day.media.filter((m) => m.childId === childId) }))
-    .filter((day) => day.media.length > 0);
+  if (media.thumbDataUrl) {
+    return (
+      <>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={media.thumbDataUrl} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-45 blur-2xl" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={media.thumbDataUrl} alt="" className="relative z-0 max-h-full w-full object-contain" />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className={"absolute inset-0 opacity-80 " + toneClass(media.tone)} />
+      <div className="relative z-0 h-[70%] w-[78%] rounded-[24px] border border-white/20 bg-white/10 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-sm" />
+    </>
+  );
 }
