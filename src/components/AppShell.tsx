@@ -225,7 +225,7 @@ function AuriComposer({ onSubmit }: { onSubmit?: (message: string, imageUrl?: st
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = "zh-CN"; // Chinese model; tolerates mixed Chinese/English
+    recognition.lang = "en-US"; // English model; better for English-first dictation.
     recognition.interimResults = true;
     recognition.continuous = true;
     const base = value.trim() ? `${value.trim()} ` : "";
