@@ -11,6 +11,18 @@ import type { FamilyMemberProfile } from "@/lib/family/profile";
 const FamilyContext = createContext<Record<string, FamilyMemberProfile>>({});
 
 const LS_KEY = "auri.family.v1";
+const CANONICAL_PARENT_DATA: Record<string, Pick<FamilyMemberProfile, "name" | "avatarUrl">> = {
+  mom: { name: "Jane", avatarUrl: "/family/jane.jpg" },
+  dad: { name: "Liang", avatarUrl: "/family/liang.jpg" },
+};
+
+function withCanonicalParentData(members: FamilyMemberProfile[]): FamilyMemberProfile[] {
+  return members.map((member) => (
+    CANONICAL_PARENT_DATA[member.id]
+      ? { ...member, ...CANONICAL_PARENT_DATA[member.id] }
+      : member
+  ));
+}
 
 export function loadFamilyFromStorage(): FamilyMemberProfile[] | null {
   resetClientUserDataOnce();
@@ -18,7 +30,7 @@ export function loadFamilyFromStorage(): FamilyMemberProfile[] | null {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : null;
+    return Array.isArray(parsed) ? withCanonicalParentData(parsed) : null;
   } catch { return null; }
 }
 
@@ -40,7 +52,7 @@ export function FamilyProvider({ children }: { children: React.ReactNode }) {
         if (!Array.isArray(data.members)) return;
         const local = loadFamilyFromStorage();
         // Prefer localStorage (user edits) over server seed; merge avatarUrls from server
-        const merged = local ?? data.members;
+        const merged = local ?? withCanonicalParentData(data.members);
         setById(Object.fromEntries((merged as FamilyMemberProfile[]).map((m) => [m.id, m])));
       })
       .catch(() => {});

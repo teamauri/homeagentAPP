@@ -40,7 +40,7 @@ export const demoFamilyContext = {
     name: "Jane’s Family",
     members: [
       { id: "mom", name: "Jane", role: "parent" },
-      { id: "dad", name: "Marcus", role: "parent" },
+      { id: "dad", name: "Liang", role: "parent" },
       { id: "mia", name: "Mia", role: "child" },
       { id: "leo", name: "Leo", role: "child" },
     ],
