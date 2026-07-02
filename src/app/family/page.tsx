@@ -61,6 +61,8 @@ export default function FamilySettingsPage() {
   const [saved, setSaved] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetDone, setResetDone] = useState(false);
+  const [clearingChat, setClearingChat] = useState(false);
+  const [chatClearDone, setChatClearDone] = useState(false);
   const [organizing, setOrganizing] = useState(false);
   const [organizeStatus, setOrganizeStatus] = useState<string | null>(null);
   const organizeRef = useRef<HTMLInputElement>(null);
@@ -151,6 +153,29 @@ export default function FamilySettingsPage() {
     }
   }
 
+  async function clearChatHistory() {
+    if (!window.confirm("Clear user chat history, drafts, and chat-created jobs? The built-in Sophie demo story will stay. This can’t be undone.")) return;
+    setClearingChat(true);
+    setChatClearDone(false);
+    try {
+      const res = await fetch("/api/chat/history/reset", { method: "POST" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      try {
+        localStorage.removeItem("auri.events.v1");
+        localStorage.removeItem("auri.deletedIds.v1");
+        sessionStorage.removeItem("auri.liveTurns.v1");
+        sessionStorage.removeItem("auri.draftStates.v1");
+        sessionStorage.removeItem("auri.job.v1");
+        sessionStorage.removeItem("auri.returnHome.v1");
+      } catch {
+        // ignore storage failures
+      }
+      setChatClearDone(true);
+    } finally {
+      setClearingChat(false);
+    }
+  }
+
   return (
     <main className="h-[100dvh] bg-[#f5f1eb]">
       <div className="mx-auto w-full max-w-[430px] bg-paper h-full flex flex-col">
@@ -198,6 +223,20 @@ export default function FamilySettingsPage() {
                 {organizeStatus ? (
                   <p className="mt-2 text-center text-[12px] text-muted">{organizeStatus}</p>
                 ) : null}
+              </div>
+
+              <div className="mt-6 border-t border-line pt-5">
+                <p className="text-[13px] font-semibold text-ink">Chat history</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                  Clear user messages, draft states and jobs created from Chat. The built-in Sophie demo conversation stays.
+                </p>
+                <button
+                  onClick={clearChatHistory}
+                  disabled={clearingChat}
+                  className="mt-3 w-full rounded-full border border-line bg-white py-3 text-[14px] font-semibold text-ink disabled:opacity-40"
+                >
+                  {clearingChat ? "Clearing…" : chatClearDone ? "Cleared ✓ — reopen Chat" : "Clear chat history"}
+                </button>
               </div>
 
               <div className="mt-6 border-t border-line pt-5">

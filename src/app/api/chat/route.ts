@@ -153,19 +153,28 @@ function nowScheduleFields() {
 }
 
 function cameraCaptureTitle(request: ChatRequestBody) {
-  const raw = request.message?.trim() || "视频拍摄请求";
+  const raw = request.message?.trim() || "Camera capture";
   return raw
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/给我|现在|立刻|马上|today|tonight|now/gi, "")
     .replace(/\s+/g, " ")
-    .trim() || "视频拍摄请求";
+    .trim() || "Camera capture";
 }
 
 function reminderTitle(request: ChatRequestBody) {
   const raw = request.message?.trim() || "Reminder";
   return raw
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^(please\s*)?(remind|remember to|tell|ask)\s+/i, "")
     .replace(/^(请)?(帮我)?(提醒|记得|叫|让)\s*/i, "")
+    .replace(/\bto\s+([A-Z])/g, (_, letter: string) => `to ${letter.toLowerCase()}`)
     .replace(/\s+/g, " ")
     .trim() || "Reminder";
+}
+
+function homekeeperReminderReply(request: ChatRequestBody) {
+  const title = reminderTitle(request);
+  return `Got it. I'll remind ${title}.`;
 }
 
 function cameraDraftObject(request: ChatRequestBody): ObjectToCreate {
@@ -327,7 +336,7 @@ function ensureWatcherJob(response: ChatAIResponse, request: ChatRequestBody): C
   const helper = response.helper ?? {
     teamMemberId: "watcher" as TeamMemberId,
     name: "Observer",
-    reply: "收到，我会按间隔观察并记录家里的状态。",
+    reply: "Got it. I'll keep watch and record meaningful updates.",
     cards: [],
     objectsToCreate: [],
   };
@@ -352,7 +361,7 @@ function ensureBabyLoggerJob(response: ChatAIResponse, request: ChatRequestBody)
   const helper = response.helper ?? {
     teamMemberId: "baby_logger" as TeamMemberId,
     name: "Baby Rhythm",
-    reply: "已记录这条宝宝照护日志。",
+    reply: "Got it. I logged this care note.",
     cards: [],
     objectsToCreate: [],
   };
@@ -379,7 +388,7 @@ function ensureHomekeeperReminderJob(response: ChatAIResponse, request: ChatRequ
   const helper = response.helper ?? {
     teamMemberId: "homekeeper" as TeamMemberId,
     name: "Homekeeper",
-    reply: "收到，我会把这个作为提醒来处理。",
+    reply: "Got it. I'll handle this as a reminder.",
     cards: [],
     objectsToCreate: [],
   };
@@ -397,6 +406,7 @@ function ensureHomekeeperReminderJob(response: ChatAIResponse, request: ChatRequ
       ...helper,
       teamMemberId: "homekeeper",
       name: "Homekeeper",
+      reply: homekeeperReminderReply(request),
       cards: synthesizeCardsFromObjects(objectsToCreate),
       objectsToCreate,
     },

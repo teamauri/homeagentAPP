@@ -1,6 +1,6 @@
 "use client";
 
-const RESET_MARKER_KEY = "auri.userDataReset.20260626.all";
+const RESET_MARKER_KEY = "auri.userDataReset.20260702.chat";
 
 const LOCAL_STORAGE_KEYS = [
   "auri.events.v1",
@@ -8,6 +8,7 @@ const LOCAL_STORAGE_KEYS = [
   "auri.standing.v1",
   "auri.agentProfiles.v1",
   "auri.agentProfiles.v2",
+  "auri.family.v1",
 ];
 
 const SESSION_STORAGE_KEYS = [

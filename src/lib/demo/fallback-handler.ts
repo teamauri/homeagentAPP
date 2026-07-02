@@ -55,7 +55,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const helper: ChatHelperSegment = {
       teamMemberId: "watcher",
       name: "Observer",
-      reply: "收到，我会按间隔拍短片并记录家里的状态。",
+      reply: "Got it. I'll keep watch and record meaningful updates.",
       cards: [
         {
           type: "reminder",
@@ -68,7 +68,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "reminder_draft", payload: { title, dateLabel: "Today", person: "family", agent: "watcher", recordingMode: "watcher_interval", note: request.message } }],
     };
-    return auri("交给 Observer 来持续观察。", { intent: "photo_video", helper, suggestedFollowups: ["改观察频率", "只观察客厅"] });
+    return auri("I'll have Observer keep watch.", { intent: "photo_video", helper, suggestedFollowups: ["Change the interval", "Watch the living room only"] });
   }
 
   if (/拍摄|拍一下|拍一段|拍[^\s，。,.!?]*|录像|录视频|录下|记录下|视频记录|拍照|film|record|video|capture|photo/.test(input)) {
@@ -79,7 +79,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const helper: ChatHelperSegment = {
       teamMemberId: "cameraman",
       name: "Cameraman",
-      reply: `收到，我会在今晚${timeLabel.replace(" PM", "")}拍下这个瞬间。`,
+      reply: `Got it. I'll film this around ${timeLabel}.`,
       cards: [
         {
           type: "reminder",
@@ -92,7 +92,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "reminder_draft", payload: { title, timeLabel, dateLabel: "Today", person: "child1", agent: "cameraman", recordingMode: "cameraman_highlight", note: request.message } }],
     };
-    return auri("交给 Cameraman 来拍这个瞬间。", { intent: "photo_video", helper, suggestedFollowups: ["改时间", "拍完自动保存到 Memory"] });
+    return auri("I'll have Cameraman capture this moment.", { intent: "photo_video", helper, suggestedFollowups: ["Change the time", "Save to Memory after filming"] });
   }
 
   if (/记录|记一下|记下|log|logged|刚刚|刚才|已经|喝了|吃了|睡了|尿布|diaper|nap|slept|feed|fed|drank|temperature|体温/.test(input)) {
@@ -102,7 +102,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const helper: ChatHelperSegment = {
       teamMemberId: "baby_logger",
       name: "Baby Rhythm",
-      reply: "已记录这条照护日志。",
+      reply: "Got it. I logged this care note.",
       cards: [
         {
           type: "baby_log",
@@ -115,7 +115,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       ],
       objectsToCreate: [{ type: "baby_log", payload: { childId: person, type: "snack", description, timestamp: new Date().toISOString() } }],
     };
-    return auri("我会让 Baby Rhythm 记下这条照护记录。", { intent: "baby_log", helper, suggestedFollowups: ["补充数量", "查看今天记录"] });
+    return auri("I'll have Baby Rhythm save this care note.", { intent: "baby_log", helper, suggestedFollowups: ["Add an amount", "View today's care log"] });
   }
 
   if (input.includes("remind") || input.includes("medicine") || input.includes("meds") || input.includes("water bottle")) {
@@ -129,7 +129,7 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
       const period = h >= 12 ? "PM" : "AM";
       const h12 = h % 12 === 0 ? 12 : h % 12;
       timeLabel = `${h12}:${String(m).padStart(2, "0")} ${period}`;
-      auriReply = `好的，我来帮${sophieName}设置吃药提醒。她正在完成10天的疗程，现在该吃${timeLabel}的药了。`;
+      auriReply = `Got it. I'll set a medicine reminder for ${sophieName}. She's finishing a 10-day course, and the next dose is due at ${timeLabel}.`;
     } else {
       timeLabel = "2:00 PM";
       auriReply = "Of course — I'll have Homekeeper keep this on the radar.";
@@ -137,20 +137,20 @@ export function createFallbackChatResponse(request: ChatRequestBody): ChatAIResp
     const helper: ChatHelperSegment = {
       teamMemberId: "homekeeper",
       name: "Homekeeper",
-      reply: `已为您创建提醒：${sophieName}${isNow ? "现在" : "下午2点"}吃药。`,
+      reply: `Got it. I'll remind ${sophieName} to take medicine at ${timeLabel}.`,
       cards: [
         {
           type: "reminder",
-          title: `${sophieName}吃药`,
+          title: `${sophieName}'s medicine`,
           subtitle: `Today · ${timeLabel} · ${sophieName}`,
-          body: `${sophieName}正在完成10天疗程`,
+          body: `${sophieName} is finishing a 10-day course.`,
           cta: "Edit",
           metadata: { due: timeLabel, time: timeLabel, dateLabel: "Today", person: "child1", wantsReceipt: true },
         },
       ],
-      objectsToCreate: [{ type: "reminder_draft", payload: { title: `${sophieName}吃药`, timeLabel, dateLabel: "Today", person: "child1", note: `${sophieName}正在完成10天疗程`, wantsReceipt: true } }],
+      objectsToCreate: [{ type: "reminder_draft", payload: { title: `${sophieName}'s medicine`, timeLabel, dateLabel: "Today", person: "child1", note: `${sophieName} is finishing a 10-day course.`, wantsReceipt: true } }],
     };
-    return auri(auriReply, { intent: "reminder", helper, suggestedFollowups: ["改成其他时间", "谁来拍视频确认?"] });
+    return auri(auriReply, { intent: "reminder", helper, suggestedFollowups: ["Change the time", "Ask for video confirmation"] });
   }
 
   if (input.includes("calendar") || input.includes("appointment") || input.includes("basketball") || input.includes("checkup") || input.includes("5:30")) {

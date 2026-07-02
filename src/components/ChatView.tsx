@@ -4,7 +4,7 @@ import { ChatResponseCard as ApiChatCard } from "@/lib/chat-server/types";
 import { ChatCardList } from "./ChatCardRenderer";
 import { DoodleIcon } from "./Icons";
 import { teamAgentById } from "@/lib/team";
-import { useChildren, useFamilyMember } from "./FamilyContext";
+import { useFamilyMember } from "./FamilyContext";
 import { chatFixtureMessages } from "@/lib/chat-fixtures";
 import { ChatMessage } from "@/lib/chat-contracts";
 import { TeamAgentId } from "@/lib/team";
@@ -66,6 +66,11 @@ function robotCompletedAt(event: RobotEvent): number {
   );
 }
 
+const avatarStyles = {
+  mom: "from-[#f7d8be] to-[#8c5135] text-white",
+  dad: "from-[#d9e7ef] to-[#4d6777] text-white",
+};
+
 const chatThreadIds = [
   "mom-sophie-watch",
   "cameraman-sophie-plan",
@@ -81,11 +86,6 @@ const turns: ChatTurn[] = chatFixtureMessages
     text: message.text,
     cards: message.cards,
   }));
-
-const avatarStyles = {
-  mom: "from-[#f7d8be] to-[#8c5135] text-white",
-  dad: "from-[#d9e7ef] to-[#4d6777] text-white",
-};
 
 const chatBubbleBg = "bg-[#F1F1F1]";
 const chatMeBubbleBg = "bg-[#DDEEE4]";
@@ -327,11 +327,6 @@ function RobotRunningRow({ event, onOpen }: { event: RobotEvent; onOpen: () => v
           <span className="text-[13px] text-muted">{startedLabel}</span>
         </div>
         <div className={chatAvatarOffset}>
-          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
-            I’m starting this job now.
-          </p>
-        </div>
-        <div className="mt-2">
           <JobCard event={event} phase="running" onOpen={onOpen} />
         </div>
       </div>
@@ -354,12 +349,9 @@ function RobotCompletionRow({ event, onOpen }: { event: RobotEvent; onOpen: () =
           <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{agentName}</span>
           <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
         </div>
-        <div className={clsx(chatAvatarOffset, "mb-2")}>
-          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
-            Done — here’s the video and summary.
-          </p>
+        <div className={chatAvatarOffset}>
+          <JobCard event={event} phase="completed" onOpen={onOpen} />
         </div>
-        <JobCard event={event} phase="completed" onOpen={onOpen} />
       </div>
     </div>
   );
@@ -611,15 +603,11 @@ function writeDraftState(key: string, value: DraftState) {
 // state is persisted so it stays confirmed/dismissed after a page nav.
 function DraftActionCard({ draft }: { draft: DraftInfo }) {
   const { addEvent, updateEvent, events, ready: eventsReady } = useRobotEvents();
-  const sophie = useFamilyMember("child1");
-  const mike = useFamilyMember("child2");
-  const jane = useFamilyMember("mom");
-  const liang = useFamilyMember("dad");
   const personOptions: Array<{ id: DraftInfo["person"]; label: string }> = [
-    { id: "child1", label: sophie?.name ?? "Sophie" },
-    { id: "child2", label: mike?.name ?? "Mike" },
-    { id: "mom", label: jane?.name ?? "Jane" },
-    { id: "dad", label: liang?.name ?? "Liang" },
+    { id: "child1", label: "Child 1" },
+    { id: "child2", label: "Child 2" },
+    { id: "mom", label: "You" },
+    { id: "dad", label: "Parent" },
     { id: "family", label: "Family" },
   ];
   const key = draftKey(draft);

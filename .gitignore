@@ -11,4 +11,5 @@ out
 *.dataless-backup
 public/demo-media/*
 !public/demo-media/.gitkeep
+!public/demo-media/auri-robot-camera.mp4
 .data/

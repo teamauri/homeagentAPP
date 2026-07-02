@@ -261,6 +261,22 @@ export function JobsView({
 
       <section className="mb-7">
         <div className="mb-2.5 flex items-baseline justify-between px-1">
+          <h2 className={SECTION_TITLE_CLASS}>Auri Robot</h2>
+        </div>
+        <div className="overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video
+            src="/demo-media/auri-robot-camera.mp4"
+            controls
+            playsInline
+            preload="metadata"
+            className="block aspect-video w-full bg-black object-cover"
+          />
+        </div>
+      </section>
+
+      <section className="mb-7">
+        <div className="mb-2.5 flex items-baseline justify-between px-1">
           <h2 className={SECTION_TITLE_CLASS}>Upcoming</h2>
           <span className="text-[12px] leading-4 text-muted">clears after it runs</span>
         </div>

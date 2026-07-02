@@ -36,3 +36,8 @@ export function setFamily(next: FamilyMemberProfile[]): Promise<void> {
   g.__auriFamily = withCanonicalFamilyData(next);
   return persistStore("family");
 }
+
+export function resetFamilyStore(): Promise<void> {
+  g.__auriFamily = seedFamilyMembers.map((member) => ({ ...member }));
+  return persistStore("family");
+}

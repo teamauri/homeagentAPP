@@ -1,7 +1,6 @@
 import clsx from "clsx";
 import { ChangeEvent, ReactNode, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { TabKey } from "@/lib/types";
-import { useFamilyMembers } from "./FamilyContext";
 import { DoodleIcon } from "./Icons";
 
 export type { TabKey };
@@ -33,7 +32,7 @@ const tabs: { key: TabKey; label: string; icon: string; activeBg: string; active
 
 const titles: Record<TabKey, string> = {
   today: "Jobs",
-  chat: "Jane’s Family",
+  chat: "Family Chat",
   memory: "Memories",
 };
 
@@ -178,17 +177,7 @@ function AuriComposer({ onSubmit, voiceDemoPhase = 0 }: { onSubmit?: (message: s
   const [listening, setListening] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [demoVoiceDismissed, setDemoVoiceDismissed] = useState(false);
-  const familyMembers = useFamilyMembers();
-  const familyNameCorrections = useMemo(
-    () =>
-      familyMembers
-        .map((member) => ({
-          canonical: member.name.trim(),
-          aliases: familyNameAliases(member.id, member.name.trim()),
-        }))
-        .filter((correction) => correction.canonical && correction.aliases.length),
-    [familyMembers]
-  );
+  const familyNameCorrections = useMemo<FamilyNameCorrection[]>(() => [], []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);

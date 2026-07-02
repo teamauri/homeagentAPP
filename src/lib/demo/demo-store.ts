@@ -158,6 +158,15 @@ export function resetDemoStore() {
   current.__auriDemoCalendarCounter = 0;
 }
 
+/** Wipe chat-created drafts/jobs while preserving seed demo content and Memory. */
+export function resetChatHistoryStore() {
+  const current = store();
+  current.__auriDemoObjects = [];
+  current.__auriDemoCalendarEvents = [];
+  current.__auriDemoCounter = 0;
+  current.__auriDemoCalendarCounter = 0;
+}
+
 function statusFor(type: ObjectToCreate["type"]): CreatedLocalObject["status"] {
   if (type === "baby_log") return "logged";
   if (type === "memory_item") return "saved";

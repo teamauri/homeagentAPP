@@ -95,7 +95,8 @@ export function JobCard({
   const result = job.result;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const metadata = [agent.name, job.dateLabel, job.timeLabel, job.personLabel, statusLabelForJobPhase(phase)].filter(Boolean).join(" · ");
+  const scheduleLine = scheduleLineForJob(job);
+  const statusRows = statusRowsForJob(job, phase);
 
   const play = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -140,15 +141,19 @@ export function JobCard({
           <DoodleIcon name={agent.icon} className="h-8 w-8" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{metadata}</div>
+          <div className="truncate text-[12px] leading-4 tracking-[0] text-muted">{agent.name}</div>
           <div className="truncate text-[15px] font-semibold leading-5 tracking-[-0.02em] text-ink">{job.title}</div>
+          {scheduleLine ? <div className="truncate text-[12px] leading-4 text-muted">{scheduleLine}</div> : null}
         </div>
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-[#7a55c7]/10 px-2.5 py-0.5 text-[11px] font-semibold leading-4 text-[#7a55c7]">
+          {badgeForJobPhase(phase)}
+        </span>
       </div>
 
       <div className="border-t border-line/70 px-3.5 py-2">
-        <JobStepRow label="Created" done active={phase === "created"} detail={createdDetail(job)} />
-        <JobStepRow label="Started" done={phase === "completed"} active={phase === "running"} detail={startedDetail(job, phase)} />
-        <JobStepRow label="Replied" done={phase === "completed"} active={phase === "completed"} detail={repliedDetail(job, phase)} />
+        {statusRows.map((row) => (
+          <JobStatusRow key={row.label} {...row} />
+        ))}
       </div>
 
       {phase === "running" && job.highlight ? (
@@ -156,10 +161,6 @@ export function JobCard({
           <CounterRow label="Clips" done={job.highlightProgress?.clips ?? 0} total={job.highlight.clipTarget} />
           <CounterRow label="Photos" done={job.highlightProgress?.photos ?? 0} total={job.highlight.photoTarget} />
         </div>
-      ) : null}
-
-      {job.note && phase !== "completed" ? (
-        <p className="border-t border-line/70 px-3.5 py-2.5 text-[13px] leading-[18px] tracking-[0] text-ink/70">“{job.note}”</p>
       ) : null}
 
       {result ? (
@@ -252,42 +253,61 @@ function CounterRow({ label, done, total }: { label: string; done: number; total
   );
 }
 
-function statusLabelForJobPhase(phase: JobCardPhase) {
+function badgeForJobPhase(phase: JobCardPhase) {
   if (phase === "completed") return "Done";
-  if (phase === "running") return "Running";
-  return "Created";
+  if (phase === "running") return "Scheduled";
+  return "Set";
 }
 
-function createdDetail(job: JobCardInput) {
-  return [job.dateLabel, job.timeLabel].filter(Boolean).join(" · ");
+function scheduleLineForJob(job: JobCardInput) {
+  return [job.dateLabel, job.timeLabel, job.personLabel].filter(Boolean).join(" · ");
 }
 
-function startedDetail(job: JobCardInput, phase: JobCardPhase) {
-  if (phase === "completed") return job.startedAtLabel ?? "Started";
-  if (phase === "running") return job.startedAtLabel ?? "Starting now";
-  return "Waiting for start";
+function targetLabel(job: JobCardInput) {
+  return job.personLabel && job.personLabel !== "Family" ? job.personLabel : "the family";
 }
 
-function repliedDetail(job: JobCardInput, phase: JobCardPhase) {
-  if (phase === "completed") return job.repliedAtLabel ?? "Replied";
-  return "Waiting for reply";
+type JobStatusRowModel = {
+  label: string;
+  detail?: string;
+  state: "done" | "active" | "todo";
+};
+
+function statusRowsForJob(job: JobCardInput, phase: JobCardPhase): JobStatusRowModel[] {
+  const schedule = [job.dateLabel, job.timeLabel].filter(Boolean).join(" · ");
+  const target = targetLabel(job);
+  const isCapture = job.agentId === "cameraman" || job.agentId === "watcher";
+  if (isCapture) {
+    return [
+      { label: "Request saved", state: "done", detail: schedule },
+      { label: phase === "completed" ? "Captured a highlight" : "Waiting for the right moment", state: phase === "running" ? "active" : "done" },
+      { label: "Send to Family Chat", state: phase === "completed" ? "done" : "todo" },
+    ];
+  }
+  return [
+    { label: "Reminder created", state: "done" },
+    { label: "Scheduled", detail: schedule, state: "done" },
+    { label: `Notify ${target}`, state: phase === "completed" ? "done" : phase === "running" ? "active" : "todo" },
+  ];
 }
 
-function JobStepRow({ label, detail, done, active }: { label: string; detail: string; done: boolean; active?: boolean }) {
+function JobStatusRow({ label, detail, state }: JobStatusRowModel) {
+  const done = state === "done";
+  const active = state === "active";
   return (
-    <div className={clsx("flex items-center gap-2.5 py-1.5", active && !done && "-mx-1 rounded-[10px] bg-[#C0492C]/10 px-1")}>
+    <div className={clsx("flex items-center gap-2.5 py-1.5", active && "-mx-1 rounded-[10px] bg-[#7a55c7]/10 px-1")}>
       <span
         className={clsx(
           "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border text-[11px] font-semibold",
-          done ? "border-[#2f9d5b] bg-[#2f9d5b] text-white" : active ? "border-[#C0492C] text-[#C0492C]" : "border-line text-transparent"
+          done ? "border-[#2f9d5b] bg-[#2f9d5b] text-white" : active ? "border-[#7a55c7] text-[#7a55c7]" : "border-line text-transparent"
         )}
       >
         {done ? "✓" : active ? <span className="h-[6px] w-[6px] animate-pulse rounded-full bg-current" /> : ""}
       </span>
-      <span className={clsx("min-w-0 flex-1 truncate text-[13px] leading-4", done ? "font-medium text-ink" : active ? "font-medium text-[#C0492C]" : "text-ink/65")}>
+      <span className={clsx("min-w-0 flex-1 truncate text-[13px] leading-4", done ? "font-medium text-ink/80" : active ? "font-medium text-[#5a3a9e]" : "text-ink/65")}>
         {label}
       </span>
-      <span className="max-w-[45%] shrink-0 truncate text-right text-[12px] leading-4 text-muted">{detail}</span>
+      {detail ? <span className="max-w-[48%] shrink-0 truncate text-right text-[12px] leading-4 text-muted">{detail}</span> : null}
     </div>
   );
 }

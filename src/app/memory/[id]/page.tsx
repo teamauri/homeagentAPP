@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 type ApiMedia = {
@@ -29,6 +29,114 @@ type Detail = { item: ApiMemory; media: ApiMedia[] };
 function durationLabel(seconds?: number) {
   if (!seconds) return undefined;
   return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+}
+
+function AutoPlayMemoryVideo({ video, title }: { video: ApiMedia; title: string }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+  const [needsTap, setNeedsTap] = useState(false);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    el.muted = true;
+    el.playsInline = true;
+    setIsMuted(true);
+    const play = async () => {
+      try {
+        await el.play();
+        setIsPaused(false);
+        setNeedsTap(false);
+      } catch {
+        setIsPaused(true);
+        setNeedsTap(true);
+      }
+    };
+    play();
+  }, [video.url]);
+
+  function togglePlayback() {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) {
+      el.play()
+        .then(() => {
+          setIsPaused(false);
+          setNeedsTap(false);
+        })
+        .catch(() => setNeedsTap(true));
+    } else {
+      el.pause();
+      setIsPaused(true);
+    }
+  }
+
+  function toggleSound() {
+    const el = videoRef.current;
+    if (!el) return;
+    const nextMuted = !el.muted;
+    el.muted = nextMuted;
+    setIsMuted(nextMuted);
+    if (!nextMuted && el.paused) {
+      el.play()
+        .then(() => {
+          setIsPaused(false);
+          setNeedsTap(false);
+        })
+        .catch(() => setNeedsTap(true));
+    }
+  }
+
+  return (
+    <div className="relative mt-4 overflow-hidden rounded-[18px] bg-black shadow-[0_18px_44px_rgba(8,8,8,0.18)]">
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <video
+        ref={videoRef}
+        aria-label={title}
+        className="aspect-[9/16] w-full bg-black object-cover"
+        src={video.url}
+        poster={video.thumbnailUrl}
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        disablePictureInPicture
+        controlsList="nodownload noplaybackrate"
+        onClick={togglePlayback}
+        onPlay={() => {
+          setIsPaused(false);
+          setNeedsTap(false);
+        }}
+        onPause={() => setIsPaused(true)}
+        onVolumeChange={(event) => setIsMuted(event.currentTarget.muted)}
+      />
+
+      <button
+        type="button"
+        aria-label={isMuted ? "Turn sound on" : "Mute video"}
+        className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-black/42 text-[18px] text-white shadow-sm backdrop-blur-md"
+        onClick={toggleSound}
+      >
+        <span aria-hidden="true">{isMuted ? "🔇" : "🔊"}</span>
+      </button>
+
+      {(isPaused || needsTap) ? (
+        <button
+          type="button"
+          aria-label="Play video"
+          className="absolute inset-0 grid place-items-center bg-black/10 text-white"
+          onClick={togglePlayback}
+        >
+          <span aria-hidden="true" className="grid h-16 w-16 place-items-center rounded-full bg-black/38 pl-1 text-[34px] shadow-lg backdrop-blur-md">
+            ▶
+          </span>
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 export default function MemoryDetailPage() {
@@ -114,19 +222,7 @@ function DetailBody({ detail }: { detail: Detail }) {
       </p>
 
       {video?.url ? (
-        <div className="mt-4 overflow-hidden rounded-[18px] border border-line bg-black">
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            className="aspect-[4/5] w-full bg-black object-cover"
-            // #t=0.1 makes Safari decode + show the ~first frame as the poster
-            // (instead of a black box) when there's no thumbnail image.
-            src={video.thumbnailUrl ? video.url : `${video.url}#t=0.1`}
-            poster={video.thumbnailUrl}
-            controls
-            playsInline
-            preload="metadata"
-          />
-        </div>
+        <AutoPlayMemoryVideo video={video} title={item.title} />
       ) : photos[0]?.url ? (
         <div className="mt-4 overflow-hidden rounded-[18px] border border-line">
           {/* eslint-disable-next-line @next/next/no-img-element */}
