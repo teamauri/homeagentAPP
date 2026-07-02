@@ -80,7 +80,7 @@ function HomeInner() {
   const [liveTurns, setLiveTurns] = useState<LiveChatTurn[]>([]);
   const [liveLoaded, setLiveLoaded] = useState(false);
   const [jobsSubpage, setJobsSubpage] = useState(false);
-  const [showCover, setShowCover] = useState(false);
+  const [showCover, setShowCover] = useState(true);
   const [coverMediaReady, setCoverMediaReady] = useState(false);
   const [sophieDemoPhase, setSophieDemoPhase] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -159,6 +159,7 @@ function HomeInner() {
   const markCoverMediaReady = () => {
     if (coverMediaReadyRef.current) return;
     coverMediaReadyRef.current = true;
+    coverStartedAtRef.current = Date.now();
     setCoverMediaReady(true);
     if (liveLoaded) scheduleCoverDismiss();
   };
@@ -221,10 +222,7 @@ function HomeInner() {
     } catch {
       // ignore malformed storage
     }
-    if (!returningHome) {
-      coverStartedAtRef.current = Date.now();
-      setShowCover(true);
-    }
+    setShowCover(!returningHome);
     setLiveLoaded(true);
   }, []);
 
