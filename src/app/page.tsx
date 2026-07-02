@@ -221,6 +221,10 @@ function HomeInner() {
     } catch {
       // ignore malformed storage
     }
+    if (!returningHome) {
+      coverStartedAtRef.current = Date.now();
+      setShowCover(true);
+    }
     setLiveLoaded(true);
   }, []);
 
