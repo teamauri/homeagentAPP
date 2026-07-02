@@ -524,8 +524,6 @@ function AuriCover({ onReady, onDismiss }: { onReady: () => void; onDismiss: () 
 
   useEffect(() => {
     if (imageRef.current?.complete) onReady();
-    const fallback = window.setTimeout(onReady, 1200);
-    return () => window.clearTimeout(fallback);
   }, [onReady]);
 
   return (
@@ -533,7 +531,7 @@ function AuriCover({ onReady, onDismiss }: { onReady: () => void; onDismiss: () 
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={imageRef}
-        src="/agents/auri-app-cover.png"
+        src="/agents/auri-app-cover.webp"
         alt=""
         loading="eager"
         onLoad={onReady}

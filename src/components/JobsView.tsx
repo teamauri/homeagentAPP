@@ -385,7 +385,7 @@ function AgentProfileView({
     shortRole: "Custom",
     summary: "A custom agent profile for a future capability.",
     responsibilities: ["New responsibility"],
-    portrait: "/agents/auri-app-cover.png",
+    portrait: "/agents/auri-app-cover.webp",
     portraitPosition: "50% 50%",
     icon: "robot",
     tone: "bg-[#E7E0D6]",
