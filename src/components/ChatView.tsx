@@ -10,7 +10,7 @@ import { ChatMessage } from "@/lib/chat-contracts";
 import { TeamAgentId } from "@/lib/team";
 import { RobotEvent, useRobotEvents } from "./RobotEventContext";
 import { ChatTurnCard, DraftInfo } from "@/lib/chat-draft";
-import { JobCard, JobDetailSheet, phaseForRobotEvent } from "./JobCard";
+import { JobCard, JobDetailSheet } from "./JobCard";
 
 type ChatTurn = {
   id: string;
@@ -99,13 +99,34 @@ function isRecentChatEvent(at: number, now = Date.now()) {
   return at >= now - CHAT_RETENTION_MS;
 }
 
-function normalizeJobTitle(title: string) {
-  return title.trim().toLowerCase();
-}
-
 export function ChatView({ liveTurns = [], sophieDemoPhase = 0 }: { liveTurns?: LiveChatTurn[]; sophieDemoPhase?: number }) {
-  const { events, removeEvent } = useRobotEvents();
+  const { completions, events, removeEvent } = useRobotEvents();
   const [selectedJob, setSelectedJob] = useState<RobotEvent | null>(null);
+  // Jobs that are mid-run land as fresh agent messages. The card shows the same
+  // job receipt shape as the final response, just without the returned media yet.
+  const runningEvents = events.filter((event) => event.forRobot && event.status === "recording");
+  // Merge live chat turns with robot-event activity (completions + in-flight
+  // highlights) into one timeline sorted oldest → newest, so the latest item is
+  // always at the bottom no matter which source it came from.
+  const stream = [
+    ...liveTurns.map((turn) => ({
+      key: turn.id,
+      at: turn.createdAt ?? epochFromId(turn.id),
+      node: <LiveChatTurnRow key={turn.id} turn={turn} />,
+    })),
+    ...completions.flatMap((event) => {
+      const at = robotCompletedAt(event);
+      return isRecentChatEvent(at)
+        ? [{ key: `done-${event.id}`, at, node: <RobotCompletionRow key={`done-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} /> }]
+        : [];
+    }),
+    ...runningEvents.flatMap((event) => {
+      const at = robotStartedAt(event);
+      return isRecentChatEvent(at)
+        ? [{ key: `live-${event.id}`, at, node: <RobotRunningRow key={`live-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} /> }]
+        : [];
+    }),
+  ].sort((a, b) => a.at - b.at);
   const visibleTurns = turns.flatMap((turn) => {
     if (turn.id === "mom-sophie-watch") return sophieDemoPhase >= 3 ? [turn] : [];
     if (turn.id === "cameraman-sophie-plan") {
@@ -114,34 +135,6 @@ export function ChatView({ liveTurns = [], sophieDemoPhase = 0 }: { liveTurns?: 
     }
     return [turn];
   });
-  const draftManagedJobTitles = new Set(
-    liveTurns
-      .flatMap((turn) => turn.cards ?? [])
-      .map((card) => (card.draft ? normalizeJobTitle(card.draft.title) : undefined))
-      .filter((title): title is string => Boolean(title))
-  );
-  const streamedEvents = events.filter(
-    (event) =>
-      event.forRobot &&
-      (event.status === "recording" || (event.status === "done" && !!event.result?.videoUrl)) &&
-      !draftManagedJobTitles.has(normalizeJobTitle(event.title))
-  );
-  // Merge live chat turns with robot-event activity into one timeline sorted
-  // oldest → newest. A job born from a chat draft is managed by that draft card,
-  // so backend status changes update the same card instead of adding new rows.
-  const stream = [
-    ...liveTurns.map((turn) => ({
-      key: turn.id,
-      at: turn.createdAt ?? epochFromId(turn.id),
-      node: <LiveChatTurnRow key={turn.id} turn={turn} />,
-    })),
-    ...streamedEvents.flatMap((event) => {
-      const at = event.status === "done" ? robotCompletedAt(event) : robotStartedAt(event);
-      return isRecentChatEvent(at)
-        ? [{ key: `job-${event.id}`, at, node: <RobotJobRow key={`job-${event.id}`} event={event} onOpen={() => setSelectedJob(event)} /> }]
-        : [];
-    }),
-  ].sort((a, b) => a.at - b.at);
 
   return (
     <div className="pb-28">
@@ -319,13 +312,10 @@ function MomentJobLog({ log }: { log: { time?: string; text: string; note?: stri
   );
 }
 
-function RobotJobRow({ event, onOpen }: { event: RobotEvent; onOpen: () => void }) {
+function RobotRunningRow({ event, onOpen }: { event: RobotEvent; onOpen: () => void }) {
   const agentId = event.agent ?? "homekeeper";
   const agentName = teamAgentById[agentId]?.name ?? "Auri";
-  const timeLabel =
-    event.status === "done"
-      ? event.completedAtLabel ?? displayTimeFromIso(event.robot?.highlightSyncedAt) ?? displayTimeFromIso(event.robot?.rawOutputReadyAt) ?? event.timeLabel
-      : displayTimeFromIso(event.robot?.startedAt) ?? displayTimeFromIso(event.robot?.uploadedAt) ?? event.timeLabel;
+  const startedLabel = displayTimeFromIso(event.robot?.startedAt) ?? displayTimeFromIso(event.robot?.uploadedAt) ?? event.timeLabel;
   return (
     <div className={chatRowShell}>
       <div className={chatRowAvatar}>
@@ -334,9 +324,42 @@ function RobotJobRow({ event, onOpen }: { event: RobotEvent; onOpen: () => void 
       <div className="min-w-0">
         <div className="mb-1 flex items-baseline gap-3">
           <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{agentName}</span>
-          <span className="text-[13px] text-muted">{timeLabel}</span>
+          <span className="text-[13px] text-muted">{startedLabel}</span>
         </div>
-        <JobCard event={event} phase={phaseForRobotEvent(event)} onOpen={onOpen} />
+        <div className={chatAvatarOffset}>
+          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
+            I’m starting this job now.
+          </p>
+        </div>
+        <div className="mt-2">
+          <JobCard event={event} phase="running" onOpen={onOpen} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// A finished job lands in chat as a new message: a job card showing the Done
+// status, with the captured video embedded and a Keep button at the bottom.
+function RobotCompletionRow({ event, onOpen }: { event: RobotEvent; onOpen: () => void }) {
+  const agentId = event.agent ?? "homekeeper";
+  const agentName = teamAgentById[agentId]?.name ?? "Reminder";
+  return (
+    <div className={chatRowShell}>
+      <div className={chatRowAvatar}>
+        <ChatAgentBadge agentId={agentId} size="sm" />
+      </div>
+      <div className="min-w-0">
+        <div className="mb-1 flex items-baseline gap-3">
+          <span className={clsx(chatAvatarOffset, "text-[15px] font-semibold leading-5 text-ink")}>{agentName}</span>
+          <span className="text-[13px] text-muted">{event.completedAtLabel}</span>
+        </div>
+        <div className={clsx(chatAvatarOffset, "mb-2")}>
+          <p className={clsx("inline-block max-w-full rounded-[16px] rounded-tl-[5px] px-3.5 py-2 text-[13px] leading-[19px] tracking-[0] text-ink", chatBubbleBg)}>
+            Done — here’s the video and summary.
+          </p>
+        </div>
+        <JobCard event={event} phase="completed" onOpen={onOpen} />
       </div>
     </div>
   );
@@ -603,7 +626,10 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
 
   // Client-side dedup: find a pending event that matches this draft by title.
   // This catches duplicates even when the server-side store was wiped (Render restart).
-  const matchingEvent = events.find((e) => e.forRobot && normalizeJobTitle(e.title) === normalizeJobTitle(draft.title));
+  const matchingEvent = events.find(
+    (e) => e.forRobot && e.status !== "done" &&
+           e.title.trim().toLowerCase() === draft.title.trim().toLowerCase()
+  );
 
   const [state, setState] = useState<"draft" | "confirmed" | "dismissed">(() => {
     if (matchingEvent) return "confirmed";
@@ -724,23 +750,19 @@ function DraftActionCard({ draft }: { draft: DraftInfo }) {
 
     return (
       <div className="w-full">
-        {matchingEvent ? (
-          <JobCard event={matchingEvent} phase={phaseForRobotEvent(matchingEvent)} />
-        ) : (
-          <button onClick={() => setEditing(true)} className="block w-full text-left">
-            <JobCard
-              phase="created"
-              draft={{
-                ...draft,
-                title: liveTitle,
-                timeLabel: liveTime,
-                person: livePerson,
-                personLabel: livePersonLabel,
-                agent: agentId,
-              }}
-            />
-          </button>
-        )}
+        <button onClick={() => setEditing(true)} className="block w-full text-left">
+          <JobCard
+            phase="created"
+            draft={{
+              ...draft,
+              title: liveTitle,
+              timeLabel: liveTime,
+              person: livePerson,
+              personLabel: livePersonLabel,
+              agent: agentId,
+            }}
+          />
+        </button>
         <div className="px-3 py-2">
           <button
             onClick={() => { window.__auriMarkHomeReturn?.(); window.location.href = "/calendar"; }}
