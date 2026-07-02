@@ -291,7 +291,7 @@ assert(robotStatusPayload.event?.robot?.auriVideoId === "video-smoke-from-auri",
 assert(robotStatusPayload.event?.robot?.auriClientVideoUuid === createPayload.event.auriClientVideoUuid, "robot status: expected Auri client video UUID", robotStatusPayload.event);
 assert(robotStatusPayload.event?.robot?.rawOutputStatus === "pending", "robot status: expected raw output pending", robotStatusPayload.event);
 
-const afterStatusResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?robot=true"));
+const afterStatusResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar"));
 const afterStatusPayload = await jsonFromResponse(afterStatusResponse);
 const updatedRobotTask = afterStatusPayload.items.find((item) => item.id === createPayload.event.id);
 assert(updatedRobotTask?.robot?.auriVideoId === "video-smoke-from-auri", "calendar: expected robot linkage to persist", updatedRobotTask);
@@ -406,7 +406,7 @@ await withFakeAuriServer(async () => {
   });
   assert(missingRawOutputSyncPayload.outcome === "pending", "raw output sync: expected pending outcome for missing raw-output job", missingRawOutputSyncPayload);
 
-  const afterSyncResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar?robot=true"));
+  const afterSyncResponse = await calendarRoute.GET(new Request("http://localhost/api/calendar"));
   const afterSyncPayload = await jsonFromResponse(afterSyncResponse);
   const syncedRobotTask = afterSyncPayload.items.find((item) => item.id === createPayload.event.id);
   const missingRawOutputTask = afterSyncPayload.items.find((item) => item.id === missingRawOutputPayload.event.id);

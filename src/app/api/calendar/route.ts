@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CalendarApiEvent, CalendarEventInput, type CalendarJobAgentId } from "@/lib/calendar-api";
+import { CalendarApiEvent, CalendarEventInput, type CalendarJobAgentId, type CalendarRobotCaptureStatus } from "@/lib/calendar-api";
 import { listDemoCalendarEvents, persistDemoStore, removeDemoCalendarEvent, upsertDemoCalendarEvent } from "@/lib/demo/demo-store";
 import { ensureHydrated, reloadStore } from "@/lib/demo/persistence";
 import { helperTeamAgentIds, normalizeTeamAgentId } from "@/lib/team";
@@ -20,6 +20,75 @@ function wantsTruthy(value: string | null) {
   return value === "1" || value === "true" || value === "yes";
 }
 
+const DISPLAY_TIME_ZONE = "Asia/Shanghai";
+const robotTerminalStatuses = new Set<CalendarRobotCaptureStatus>(["uploaded", "done", "failed"]);
+const robotClaimedStatuses = new Set<CalendarRobotCaptureStatus>(["recording", "uploading"]);
+
+function robotStatus(event: CalendarApiEvent): CalendarRobotCaptureStatus {
+  const status = event.robot?.status ?? event.status;
+  if (status === "recording" || status === "uploading" || status === "uploaded" || status === "done" || status === "failed") {
+    return status;
+  }
+  return "scheduled";
+}
+
+function timestampFromId(id: string) {
+  const match = id.match(/^revent_(\d+)/);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function parseEventTimestamp(value?: string) {
+  if (!value) return undefined;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function zonedDayNumber(timestamp: number) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: DISPLAY_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(new Date(timestamp));
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return undefined;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+function isFloatingTodayFromAnotherDay(event: CalendarApiEvent) {
+  if (event.dateLabel.trim().toLowerCase() !== "today") return false;
+  if (!Number.isFinite(event.scheduledAt)) return false;
+  const createdAt = parseEventTimestamp(event.createdAt) ?? timestampFromId(event.id);
+  if (!createdAt) return false;
+  const createdDay = zonedDayNumber(createdAt);
+  const scheduledDay = zonedDayNumber(event.scheduledAt!);
+  return createdDay !== undefined && scheduledDay !== undefined && createdDay !== scheduledDay;
+}
+
+function isRobotDockKitCandidate(event: CalendarApiEvent, now = Date.now()) {
+  if (!event.forRobot) return false;
+  const status = robotStatus(event);
+  if (robotTerminalStatuses.has(status) || robotClaimedStatuses.has(status)) return false;
+  if (isFloatingTodayFromAnotherDay(event)) return false;
+  if (Number.isFinite(event.scheduledAt) && event.scheduledAt! < now - 5 * 60 * 1000) return false;
+  return true;
+}
+
+function sortRobotCandidates(items: CalendarApiEvent[]) {
+  return [...items].sort((a, b) => {
+    const aScheduled = Number.isFinite(a.scheduledAt) ? a.scheduledAt! : Number.MAX_SAFE_INTEGER;
+    const bScheduled = Number.isFinite(b.scheduledAt) ? b.scheduledAt! : Number.MAX_SAFE_INTEGER;
+    if (aScheduled !== bScheduled) return aScheduled - bScheduled;
+    const aCreated = parseEventTimestamp(a.createdAt) ?? timestampFromId(a.id) ?? 0;
+    const bCreated = parseEventTimestamp(b.createdAt) ?? timestampFromId(b.id) ?? 0;
+    return bCreated - aCreated;
+  });
+}
+
 // Only real, family-created jobs — no seed/mock data is ever injected.
 function filteredEvents(request: Request) {
   const url = new URL(request.url);
@@ -33,7 +102,7 @@ function filteredEvents(request: Request) {
     items = items.filter((event) => event.source === "created");
   }
   if (robotOnly) {
-    items = items.filter((event) => event.forRobot);
+    items = sortRobotCandidates(items.filter((event) => isRobotDockKitCandidate(event)));
   }
   return items;
 }

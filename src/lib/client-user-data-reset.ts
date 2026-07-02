@@ -3,7 +3,6 @@
 const RESET_MARKER_KEY = "auri.userDataReset.20260626.all";
 
 const LOCAL_STORAGE_KEYS = [
-  "auri.family.v1",
   "auri.events.v1",
   "auri.deletedIds.v1",
   "auri.standing.v1",
