@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type SyntheticEvent, useEffect, useMemo, useState } from "react";
 import { loadStandingJobs, seedStanding, sortStandingJobs, STANDING_KEY, type StandingJob } from "@/lib/jobs";
 import { deriveDateLabel, deriveTimeLabel } from "@/lib/job-time";
 import { helperTeamAgentIds, teamAgentById, type TeamAgent } from "@/lib/team";
@@ -352,7 +352,7 @@ function AgentCard({ agent, onOpen }: { agent: AgentProfile; onOpen: () => void 
     <article className="overflow-hidden rounded-[8px] border border-line bg-white shadow-[0_2px_10px_rgba(8,8,8,0.035)]">
       <div className="aspect-[4/3] bg-[#eee7dc]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageSrc} alt="" className="h-full w-full object-cover" style={{ objectPosition: agent.portraitPosition }} />
+        <img src={imageSrc} alt="" className="h-full w-full object-cover" style={{ objectPosition: agent.portraitPosition }} onError={fallbackToPng} />
       </div>
       <div className="border-t border-line px-3.5 py-3">
         <button
@@ -450,7 +450,7 @@ function AgentConfigurePanel({ agent, onToggle }: { agent: AgentProfile; onToggl
     <>
       <div className="aspect-[4/3] bg-[#eee7dc]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={agent.portrait} alt="" className="h-full w-full object-contain" style={{ objectPosition: agent.portraitPosition }} />
+        <img src={agent.portrait} alt="" className="h-full w-full object-contain" style={{ objectPosition: agent.portraitPosition }} onError={fallbackToPng} />
       </div>
       <div className="space-y-4 px-3.5 py-3.5">
         <div className="flex items-start justify-between gap-3">
@@ -477,6 +477,12 @@ function AgentConfigurePanel({ agent, onToggle }: { agent: AgentProfile; onToggl
       </div>
     </>
   );
+}
+
+function fallbackToPng(event: SyntheticEvent<HTMLImageElement>) {
+  const img = event.currentTarget;
+  if (!img.src.endsWith(".webp")) return;
+  img.src = img.src.replace(/\.webp($|\?)/, ".png$1");
 }
 
 function LabeledInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
